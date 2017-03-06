@@ -206,6 +206,36 @@ read.MaxQuant.Peptides <- function( folder_path, file_name = 'peptides.txt', nro
   return (peptides.df)
 }
 
+# read allPeptides.txt table
+read.MaxQuant.AllPeptides <- function( folder_path, file_name = 'allPeptides.txt', nrows = Inf )
+{
+    allPeptides.df <- read_tsv( file.path( folder_path, file_name ), n_max = nrows,
+                           col_types = cols( `Type` = "c",
+                                             `Raw file` = "c",
+                                             `Resolution` = "n"
+                                             ),
+                           na = c( "", "NA", "n. def.", "n.def." ),
+                           guess_max = 20000L )
+    allPeptides.df <- dplyr::rename(allPeptides.df,
+                                    pep_type = Type,
+                                    raw_file = `Raw file`,
+                                    #protgroup_ids = `Protein group IDs`,
+                                    #fasta_headers = `Fasta headers`,
+                                    dp_modif = `DP Modification`,
+                                    dp_mass_diff = `DP Mass Difference`) %>%
+      dplyr::mutate(pep_type = factor(pep_type),
+                    raw_file = factor(raw_file),
+                    #protgroup_ids = factor(protgroup_ids),
+                    #fasta_headers = factor(fasta_headers),
+                    is_dp = !is.na(dp_mass_diff),
+                    dp_modif = factor(dp_modif),
+                    dp_mass_delta = as.integer(dp_mass_diff*100)/100)
+    # remove less useful memory-hungry columns
+    #allPeptides.df$Intensities <- NULL
+    #allPeptides.df$dp_mass_delta <- as.integer(allPeptides.df$`DP Mass Difference`*100)/100
+    return(allPeptides.df)
+}
+
 read.MaxQuant.Sites <- function( folder_path, file_name, nrows = Inf, modif = "Phospho (STY)",
                                  import_data = c() )
 {

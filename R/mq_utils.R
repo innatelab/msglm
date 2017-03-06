@@ -424,7 +424,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
                                        correct_ratios = TRUE,
                                        correct_by_ratio.ref_label = NA,
                                        mode = c("labeled", "label-free"),
-                                       mschannel2condition.f = NULL,
+                                       mschannel_annotate.f = NULL,
                                        na_weight = 1E-5, min_intensity = 1E+3,
                                        min_glm_intensity = 50*min_intensity,
                                        max_glm_factor = 50,
@@ -464,8 +464,17 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
       message('Evidence table contains label-free data')
       model <- 'label-free'
     }
-    if (!is.null(mschannel2condition.f)) {
-      mschannels.df$condition <- mschannel2condition.f(mschannels.df)
+    if (!is.null(mschannel_annotate.f)) {
+      # get user-defined mschannel annotations
+      annot.df <- mschannel_annotate.f(mschannels.df)
+      if (nrow(annot.df) != nrow(mschannels.df)) {
+        stop("mschannel annotations has incorrect number of rows")
+      }
+      mschannels_annot.df <- dplyr::left_join(mschannels.df, annot.df)
+      if (nrow(mschannels_annot.df) != nrow(mschannels.df)) {
+        stop("mschannel annotations do not correctly match mschannels")
+      }
+      mschannels.df <- mschannels_annot.df
     }
     mschannels.df <- dplyr::mutate(mschannels.df, protocol = factor(protocol))
     # NOTE?: the same mod. peptide Id can have multiple mod. sequences (mod at different poses)
@@ -606,7 +615,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
         message( "Correcting intensities by averaging ratios..." )
         if (quant_mode == "label-free") {
           if (!("condition" %in% colnames(mschannels.df))) {
-            stop("No condition annotations, cannot average ratios, specify mschannel2condition.f function")
+            stop("No condition annotations, cannot average ratios, specify mschannel_annotate.f function")
           }
           rlm.control <- lmrob.control("KS2014")
           intensities.df <- dplyr::left_join(intensities.df, mschannels.df) %>%
@@ -730,7 +739,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
 read.MaxQuant.Evidence <- function( folder_path, file_name = 'evidence.txt', layout = c( "wide", "long" ), nrows = -1,
                                     min_pepmod_state_freq = 0.9, min_essential_freq = 0.0,
                                     correct_ratios = TRUE, correct_by_ratio.ref_label = NA,
-                                    mode = c("labeled", "label-free"), mschannel2condition.f = NULL )
+                                    mode = c("labeled", "label-free"), mschannel_annotate.f = NULL )
 {
   process.MaxQuant.Evidence(read.MaxQuant.Evidence_internal(
                             folder_path = folder_path, file_name = file_name, nrows = nrows),
@@ -738,7 +747,7 @@ read.MaxQuant.Evidence <- function( folder_path, file_name = 'evidence.txt', lay
                             min_essential_freq = min_essential_freq,
                             correct_ratios = correct_ratios,
                             correct_by_ratio.ref_label = correct_by_ratio.ref_label,
-                            mode = mode, mschannel2condition.f = mschannel2condition.f)
+                            mode = mode, mschannel_annotate.f = mschannel_annotate.f)
 }
 
 msrun_code_parser.f = function( msruns, chunk_names = c( 'dataset', 'batch', 'frac_protocol', 'fraction', 'tech_replicate' ) ) {

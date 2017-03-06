@@ -87,8 +87,25 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
                                 val_trans = NULL)
 {
   n_samples <- n_distinct(samples.df$unpermuted_ix)
-  if (n_samples == 0L) stop("No samples for ", paste0(var_names, collapse=" "), " ", condition_col)
-  if (experiment_col != condition_col) {
+  if (n_samples == 0L) {
+    warning("No samples for ", paste0(var_names, collapse=" "), " ", condition_col)
+    return(data.frame())
+  }
+  if (is.na(condition_col)) {
+    # no conditions specified, assume the same condition for all experiments
+    # FIXME checking user-defined condition2experiments.df and constrastXcondition
+    condition2experiments.df <- dplyr::distinct(dplyr::select_(samples.df, .dots=c("experiment" = experiment_col))) %>%
+      dplyr::mutate(condition = '__all__')
+    # no contrastXcondition matrix, assume contrast===condition,
+    # i.e. combine all the experiments and calculate the summary statistics
+    if (is.null(contrastXcondition)) {
+      contrastXcondition <- diag(1L)
+      dimnames(contrastXcondition) <- list(contrast = c("identity"), condition = "__all__")
+    }
+    else if (ncol(contrastXcondition) != 1) {
+      stop("No condition specified, contrastXcondition matrix should have Nx1 size")
+    }
+  } else if (experiment_col != condition_col) {
     if (condition_col %in% colnames(samples.df)) {
       if (!is.null(condition2experiments.df)) {
         stop("Ambiguous experiment design specification: condition2experiment.df provided, but ", condition_col, " is also present in the samples.df")

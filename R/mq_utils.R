@@ -454,10 +454,10 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
                                   mstag = ilabels ) %>%
       dplyr::mutate(
           mschannel = interaction(msrun, mstag, drop=TRUE, lex.order=TRUE, sep='_'),
-          protocol = if_else(mstag %in% c('H','M','L'), 'SILAC',
-                     if_else(mstag == 'Sum', 'aggregate', 'label_free'))) %>%
+          quant_type = if_else(mstag %in% c('H','M','L'), 'SILAC',
+                       if_else(mstag == 'Sum', 'aggregate', 'label_free'))) %>%
       dplyr::inner_join(msruns.df)
-    if (any(mschannels.df$protocol == 'SILAC')) {
+    if (any(mschannels.df$quant_type == 'SILAC')) {
       message('Evidence table contains SILAC-labeled data')
       mode <- 'labeled'
     } else {
@@ -476,7 +476,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
       }
       mschannels.df <- mschannels_annot.df
     }
-    mschannels.df <- dplyr::mutate(mschannels.df, protocol = factor(protocol))
+    mschannels.df <- dplyr::mutate(mschannels.df, quant_type = factor(quant_type))
     # NOTE?: the same mod. peptide Id can have multiple mod. sequences (mod at different poses)
     message('Enumerating pepmod states and summarizing channel intensities...')
     intensities.mtx <- as.matrix(evidence.df[,dplyr::filter(intensity_columns.df, mstag != 'Sum')$old_name])

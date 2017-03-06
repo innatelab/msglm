@@ -338,6 +338,7 @@ glm_corrected_intensities <- function(intensities.df,
                                       max_glm_factor = 50.0,
                                       glm_reldelta_range = c(-0.9, 0.9)) {
   ndatapoints <- nrow(intensities.df)
+  nmsprotocols <- if ('msprotocol' %in% colnames(intensities.df)) n_distinct(intensities.df$msprotocol) else 1L
   msrunXcharge <- dplyr::distinct(dplyr::select(dplyr::filter(intensities.df, observed), msrun, charge))
   # GLM could be run also with ncharges = n_distinct(charge) > 1, but often generates artifacts
   ncharges <- max(table(msrunXcharge$msrun))
@@ -377,7 +378,8 @@ glm_corrected_intensities <- function(intensities.df,
           intensity_fixed_norm = intensity_fixed/max_intensity_fixed,
           pepmod_id = factor(pepmod_id, ordered = FALSE),
           charge = factor(charge, ordered = FALSE),
-          mstag = factor(mstag, ordered = FALSE)
+          mstag = factor(mstag, ordered = FALSE),
+          msprotocol = factor(msprotocol, ordered = FALSE)
       )
       fla <- as.formula(paste0("log(intensity_fixed_norm) ~ ", rhs_str))
       for (ltl in -6:1) { # try different scales
@@ -509,17 +511,20 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
     pms_full_intensities_long.df <- tidyr::expand(pms_intensities_long.df,
                                        mschannel, pepmod_state) %>%
       dplyr::left_join(pepmod_states.df) %>%
-      dplyr::left_join(dplyr::select(mschannels.df, mschannel, msrun, mstag)) %>%
+      dplyr::left_join(dplyr::select(mschannels.df, mschannel, msrun, mstag, one_of("msprotocol"))) %>%
       dplyr::left_join(pms_intensities_long.df) %>%
       dplyr::mutate(observed = !is.na(intensity) & intensity > 0,
                     weight = if_else(observed & is.finite(weight), weight, na_weight)) %>%
       dplyr::left_join(pepmod_states.df)
+    if (!("msprotocol" %in% colnames(pms_full_intensities_long.df))) {
+      pms_full_intensities_long.df$msprotocol <- "default"
+    }
 
     message('Correcting & predicting missing intensities...')
     pms_full_intensities_long.df <- dplyr::group_by(
         dplyr::filter(pms_full_intensities_long.df, mstag != 'Sum') %>%
         dplyr::mutate(intensity_fixed = if_else(!is.na(intensity) & intensity > min_intensity, intensity, min_intensity)),
-        pepmod_id) %>%
+        pepmod_id, msprotocol) %>%
       dplyr::do({glm_corrected_intensities(., max_glm_factor = max_glm_factor, glm_reldelta_range = glm_reldelta_range)}) %>%
       dplyr::ungroup() %>%
       dplyr::select(-intensity_fixed) %>% # remove temporary non-NA column
@@ -546,6 +551,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
                          n_full_quants = sum(is_full_quant)) %>%
         dplyr::ungroup()
     prediction.df <- dplyr::group_by(pms_full_intensities_long.df, pepmod_id) %>%
+      # FIXME for different msprotocols GLM could be different
       dplyr::summarise(glm_rhs = glm_rhs[1]) %>% dplyr::ungroup() %>%
       dplyr::mutate(glm_rhs = factor(glm_rhs))
     pepmod_stats.df <- pepmodXmsrun_stats.df %>%

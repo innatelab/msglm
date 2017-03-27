@@ -3,13 +3,13 @@
 # Author: astukalov
 ###############################################################################
 
-source( file.path( pcp_scripts_path, 'reshape.R' ) )
+source( file.path( base_scripts_path, 'misc/reshape.R' ) )
 
 require(readr)
 require(tidyr)
-require( stringr )
-require( CeMMmisc )
-require( quantreg )
+require(stringr)
+require(CeMMmisc)
+require(quantreg)
 
 selectUniprotACs <- function( acs, valid_acs )
 {

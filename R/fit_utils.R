@@ -207,10 +207,13 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
         } else {
           stop('Unknown method ', method)
         }
-        colnames(res) <- c(cond_col, "shift")
-        dplyr::mutate(res, method = method,
-                      n_objects = norm_data$Nobjects,
-                      n_experiments = norm_data$Nexperiments)
+        col_renames <- "condition"
+        names(col_renames) <- cond_col
+        res <- dplyr::rename_(res, .dots=col_renames) %>%
+          dplyr::mutate(
+            method = method,
+            n_objects = norm_data$Nobjects,
+            n_experiments = norm_data$Nexperiments)
     }) %>% dplyr::ungroup()
     if (cond_group_col == "__all__") {
       res$cond_group <- NULL

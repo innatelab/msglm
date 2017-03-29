@@ -56,7 +56,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
                                   exp_col = "mschannel_ix", cond_col = "bait_orf",
                                   cond_group_col = NULL, exp_shifts = NULL, shift_col="shift",
                                   missing_exp.ratio=0.1, missing_cond.ratio=if (exp_col==cond_col) missing_exp.ratio else 0.0,
-                                  method = c("optimizing", "sampling", "vb"),
+                                  method = c("optimizing", "mcmc", "vb"),
                                   max_quant.ratio=NA, exp_shift.min = -0.5, Rhat_max = 1.1,
                                   max_objs=1000L, iter=2000, chains=4, thin=4,
                                   verbose=FALSE)
@@ -179,7 +179,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
           res <- data.frame(condition = levels(exp_df$condition)[cond_shift_ixs],
                             shift = as.numeric(cond_shift_pars) - median(cond_shift_pars),
                             stringsAsFactors=FALSE)
-        } else if (method == 'sampling') {
+        } else if (method == 'mcmc') {
           norm_fit <- sampling(norm_model, norm_data, chains=chains, iter=iter, thin=thin,
                                init=function() list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, norm_data$Nconditions-1L))) )
           norm_fit_stat <- monitor(norm_fit)

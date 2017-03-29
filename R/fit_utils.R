@@ -105,8 +105,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
                     n_conditions >= (1-missing_cond.ratio)*n_max_conditions)
     message(n_distinct(group_stats$cond_group), " condition group(s)")
     res <- dplyr::group_by(valid_objs, cond_group) %>% do({
-        df_group <- dplyr::inner_join(df_std, .) %>%
-          dplyr::mutate(safe_quant = if_else(is.na(quant), 0.0, quant))
+        df_group <- dplyr::inner_join(df_std, .)
         valid_group_objs <- df_group %>%
           dplyr::group_by(obj, n_max_experiments, n_max_conditions, cond_group) %>%
           dplyr::summarise(quant_med = median(norm_quant, na.rm=TRUE),
@@ -126,6 +125,11 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
         norm_data <- def_norm_data
         norm_data$Nexperiments <- sel_group_objs$n_max_experiments[1]
         norm_data$Nconditions <- sel_group_objs$n_max_conditions[1]
+        norm_data$Nobjects <- nrow(sel_group_objs)
+        message("Normalizing group '", sel_group_objs$cond_group[1], "', ",
+                norm_data$Nobjects, " object(s), ",
+                norm_data$Nconditions, " condition(s), ",
+                norm_data$Nexperiments, " experiment(s)")
         if (nrow(df_group) == 0L) {
             # degenerated case
             warning("No valid observations in group ", .$cond_group[1])
@@ -142,11 +146,6 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
             colnames(res) <- c(cond_col, "shift")
             return (res)
         }
-        norm_data$Nobjects <- nrow(sel_group_objs)
-        message("Normalizing group '", sel_group_objs$cond_group[1], "', ",
-             norm_data$Nobjects, " object(s), ",
-             norm_data$Nconditions, " condition(s), ",
-             norm_data$Nexperiments, " experiment(s)")
         #if (any(is.na(df_group$quant))) {
         #  stop("Non-quanted observations detected")
         #}
@@ -166,8 +165,11 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
         norm_data$experiment_shift <- as.array(exp_df$shift)
         df_group <- dplyr::mutate(df_group,
                                   experiment = factor(as.character(experiment),
-                                                      levels=levels(exp_df$experiment))) %>%
-          dplyr::arrange(as.integer(obj), as.integer(experiment))
+                                                      levels=levels(exp_df$experiment)))
+        df_group <- dplyr::left_join(tidyr::expand(df_group, obj, experiment), df_group) %>%
+            dplyr::arrange(as.integer(obj), as.integer(experiment)) %>%
+            dplyr::mutate(safe_quant = if_else(is.na(quant), 0.0, quant))
+
         norm_data$qData <- matrix(df_group$safe_quant, ncol = nrow(exp_df), byrow=TRUE) #nrow=nrow(valid_group_objs)
         message("Running Stan optimization...")
         if (method == 'optimizing') {
@@ -236,7 +238,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacond
     if ( length(vars_cat_subset_info$names) > 0 ) {
       message('Filtering ', vars_category, ' to use for contrasts...')
       cond_stats.df <- dplyr::inner_join(vars_results[[vars_category]]$stats,
-                                    dplyr::mutate(contrastXcondition.df, is_lhs = weight > 0)) %>%
+                                         dplyr::mutate(contrastXcondition.df, is_lhs = weight > 0)) %>%
         dplyr::group_by(protgroup_ix, contrast, metacondition, condition, is_lhs) %>%
         dplyr::group_by_(.dots = condition_agg_col, add=TRUE) %>%
         dplyr::summarize(cond_mean = mean(mean)) %>% dplyr::ungroup()

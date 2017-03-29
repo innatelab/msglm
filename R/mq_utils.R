@@ -11,6 +11,13 @@ require(stringr)
 require(CeMMmisc)
 require(quantreg)
 
+expand_protgroups <- function(protgroup_ids) {
+    protgroups2protgroup.list <- strsplit(protgroup_ids, ';', fixed=TRUE)
+    data.frame( protgroup_ids = rep.int(protgroup_ids, sapply(protgroups2protgroup.list, length)),
+                protgroup_id = as.integer(unlist(protgroups2protgroup.list)),
+                stringsAsFactors = FALSE )
+}
+
 selectUniprotACs <- function( acs, valid_acs )
 {
       acs_noiso <- stripUniprotIsoform( acs )

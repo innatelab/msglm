@@ -131,11 +131,11 @@ gsub_columns <- function(df, from, to) {
 
 read.MaxQuant.ProteinGroups <- function( folder_path, file_name = 'proteinGroups.txt',
                                          protein_info = NULL, layout = c( "wide", "long" ),
-                                         nrows = Inf, import_data = c() )
+                                         nrows = Inf, import_data = c(), guess_max = min(10000L, nrows) )
 {
     proteinGroups.df <- read_tsv( file.path( folder_path, file_name ), n_max = nrows,
                              col_types = cols( `Fasta headers` = "c" ),
-                             na = c( "", "NA", "n. def.", "n.def." ) )
+                             na = c( "", "NA", "n. def.", "n.def." ), guess_max = guess_max )
     col_renames <- c("protgroup_id" = "id", "protein_acs" = "Protein IDs",
                      "majority_protein_acs" = "Majority protein IDs",
                      "gene_names" = "Gene names", "protein_names" = "Protein names",
@@ -315,7 +315,8 @@ backquote <- function( vars ) {
   return (res)
 }
 
-read.MaxQuant.Evidence_internal <- function( folder_path, file_name = 'evidence.txt', nrows = Inf) {
+read.MaxQuant.Evidence_internal <- function( folder_path, file_name = 'evidence.txt',
+                                             nrows = Inf, guess_max = min(20000L, nrows) ) {
   message( 'Reading evidence table...' )
   evidence.df <- read_tsv(file.path( folder_path, file_name ), col_names = TRUE, n_max = nrows,
                           col_types = cols( Resolution = 'n',
@@ -325,7 +326,7 @@ read.MaxQuant.Evidence_internal <- function( folder_path, file_name = 'evidence.
                                             Type = 'c', `Raw file` = 'c', Experiment = 'c',
                                             Modifications = 'c', `Labeling State` = 'c',
                                            .default = col_guess() ),
-                          na = c( "", "NA", "n. def.", "n.def." ), guess_max = 20000L)
+                          na = c( "", "NA", "n. def.", "n.def." ), guess_max = guess_max)
 
   message( 'Renaming and converting evidence table columns...' )
   # fix column names from different MQ versions
@@ -780,12 +781,13 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
 }
 
 read.MaxQuant.Evidence <- function( folder_path, file_name = 'evidence.txt', layout = c( "wide", "long" ), nrows = -1,
+                                    nrows = Inf, guess_max = min(10000L, nrows),
                                     min_pepmod_state_freq = 0.9, min_essential_freq = 0.0,
                                     correct_ratios = TRUE, correct_by_ratio.ref_label = NA,
                                     mode = c("labeled", "label-free"), mschannel_annotate.f = NULL )
 {
   process.MaxQuant.Evidence(read.MaxQuant.Evidence_internal(
-                            folder_path = folder_path, file_name = file_name, nrows = nrows),
+                            folder_path = folder_path, file_name = file_name, nrows = nrows, guess_max=guess_max),
                             min_pepmod_state_freq = min_pepmod_state_freq,
                             min_essential_freq = min_essential_freq,
                             correct_ratios = correct_ratios,

@@ -183,23 +183,25 @@ read.MaxQuant.ProteinGroups <- function( folder_path, file_name = 'proteinGroups
     return (res.df)
 }
 
-read.MaxQuant.Peptides <- function( folder_path, file_name = 'peptides.txt', nrows = Inf )
+read.MaxQuant.Peptides <- function( folder_path, file_name = 'peptides.txt',
+                                    import_data = c(), nrows = Inf )
 {
   peptides.df <- read_tsv( file.path( folder_path, file_name ), n_max = nrows,
                            col_types = cols( `Proteins` = "c",
                                              `Protein group IDs` = "c",
                                              `Mod. peptide IDs` = "c",
                                              `Leading razor protein` = "c",
-                                             `Charges` = "c",
-                                             `Fasta headers` = 'c' ),
-                            na = c( "", "NA", "n. def.", "n.def." ),
-                            guess_max = 20000L ) %>%
+                                             `Charges` = "c" ),
+                           na = c( "", "NA", "n. def.", "n.def." ),
+                           guess_max = 20000L ) %>%
     dplyr::mutate( peptide_id = row_number()-1,
                    is_reverse = !is.na(`Reverse`) & `Reverse` == '+',
                    is_contaminant = !is.na(`Potential contaminant`) & `Potential contaminant` == '+',
                    is_shared_by_groups = is.na(`Unique (Groups)`) | !(`Unique (Groups)` %in% c('yes', '+')),
                    is_shared = is_shared_by_groups,
-                   is_shared_by_proteins = is.na(`Unique (Proteins)`) | !(`Unique (Proteins)` %in% c('yes', '+')) ) %>%
+                   is_shared_by_proteins = is.na(`Unique (Proteins)`) | !(`Unique (Proteins)` %in% c('yes', '+')) )
+  #message(paste0(colnames(peptides.df), collapse='\n'))
+  res.df <- peptides.df %>%
     dplyr::select(peptide_id, seq = Sequence, seq_len = Length, n_miscleavages = `Missed cleavages`,
                   nterm_window = `N-term cleavage window`, cterm_window = `C-term cleavage window`,
                   aa_before = `Amino acid before`, aa_after = `Amino acid after`,
@@ -210,7 +212,16 @@ read.MaxQuant.Peptides <- function( folder_path, file_name = 'peptides.txt', nro
                   start_pos = `Start position`, end_pos = `End position`,
                   mass = Mass, charges = `Charges`, score = Score, PEP = PEP,
                   is_reverse, is_contaminant, is_shared_by_groups, is_shared, is_shared_by_proteins)
-  return (peptides.df)
+  col_info <- list( peptide = colnames(res.df) )
+  if ('intensity' %in% import_data) {
+    intensities.df <- peptides.df %>% dplyr::select(starts_with("Intensity")) %>%
+      gsub_columns("^Intensity\\s([LMH](\\s|$))", "Intensity.\\1") %>%
+      gsub_columns("^Intensity(\\s|$)", "Intensity.Sum\\1") %>%
+      mutate_each(., funs(ifelse(.==0.0, NA, .)))
+    res.df <- bind_cols(res.df, intensities.df)
+    col_info$intensity <- colnames(intensities.df)
+  }
+  return (res.df)
 }
 
 # read allPeptides.txt table

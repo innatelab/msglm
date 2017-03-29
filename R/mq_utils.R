@@ -503,11 +503,11 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
     msruns.df <- evidence.df %>% dplyr::select(msrun, raw_file) %>% dplyr::distinct()
     mschannels.df <- expand.grid( raw_file = msruns.df$raw_file,
                                   mstag = ilabels ) %>%
+      dplyr::inner_join(msruns.df) %>%
       dplyr::mutate(
           mschannel = interaction(msrun, mstag, drop=TRUE, lex.order=TRUE, sep='_'),
           quant_type = if_else(mstag %in% c('H','M','L'), 'SILAC',
-                       if_else(mstag == 'Sum', 'aggregate', 'label_free'))) %>%
-      dplyr::inner_join(msruns.df)
+                       if_else(mstag == 'Sum', 'aggregate', 'label_free')))
     if (any(mschannels.df$quant_type == 'SILAC')) {
       message('Evidence table contains SILAC-labeled data')
       mode <- 'labeled'
@@ -526,6 +526,20 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
         stop("mschannel annotations do not correctly match mschannels")
       }
       mschannels.df <- mschannels_annot.df
+      if ('is_msrun_used' %in% colnames(mschannels.df)) {
+        message('Removing unused user-specified msruns')
+        mschannels.df <- dplyr::filter(mschannels.df, !is.na(is_msrun_used) & is_msrun_used) %>%
+            # drop unused levels
+            dplyr::mutate(msrun = factor(msrun),
+                          raw_file = factor(raw_file),
+                          mschannel = factor(mschannel))
+        evidence.df <- dplyr::filter(evidence.df, as.character(raw_file) %in% mschannels.df$raw_file) %>%
+            dplyr::mutate(raw_file = factor(raw_file, levels=levels(mschannels.df$raw_file)),
+                          msrun = factor(msrun, levels=levels(mschannels.df$msrun)))
+      }
+      if (n_distinct(mschannels.df$mschannel) != nrow(mschannels.df)) {
+        stop('mschannel ids are not unique')
+      }
     }
     mschannels.df <- dplyr::mutate(mschannels.df, quant_type = factor(quant_type))
     # NOTE?: the same mod. peptide Id can have multiple mod. sequences (mod at different poses)

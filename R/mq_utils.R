@@ -501,7 +501,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
       dplyr::arrange( mstag )
     ilabels <- intensity_columns.df$mstag # restrict to the labels actually used
     msruns.df <- evidence.df %>% dplyr::select(msrun, raw_file) %>% dplyr::distinct()
-    mschannels.df <- expand.grid( msrun = msruns.df$msrun,
+    mschannels.df <- expand.grid( raw_file = msruns.df$raw_file,
                                   mstag = ilabels ) %>%
       dplyr::mutate(
           mschannel = interaction(msrun, mstag, drop=TRUE, lex.order=TRUE, sep='_'),

@@ -56,7 +56,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
                                   exp_col = "mschannel_ix", cond_col = "bait_orf",
                                   cond_group_col = NULL, exp_shifts = NULL, shift_col="shift",
                                   missing_exp.ratio=0.1, missing_cond.ratio=if (exp_col==cond_col) missing_exp.ratio else 0.0,
-                                  method = c("optimizing", "mcmc", "vb"),
+                                  method = c("optimizing", "mcmc", "vb"), center_shifts=TRUE,
                                   max_quant.ratio=NA, exp_shift.min = -0.5, Rhat_max = 1.1,
                                   max_objs=1000L, iter=2000, chains=4, thin=4,
                                   verbose=FALSE)
@@ -179,7 +179,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
           cond_shift_pars <- norm_fit$par[str_detect(names(norm_fit$par), "^condition_shift\\[\\d+\\]$")]
           cond_shift_ixs <- as.integer(str_match(names(cond_shift_pars), "\\[(\\d+)\\]$")[,2])
           res <- data.frame(condition = levels(exp_df$condition)[cond_shift_ixs],
-                            shift = as.numeric(cond_shift_pars) - median(cond_shift_pars),
+                            shift = as.numeric(cond_shift_pars),
                             stringsAsFactors=FALSE)
         } else if (method == 'mcmc') {
           norm_fit <- sampling(norm_model, norm_data, chains=chains, iter=iter, thin=thin,
@@ -193,7 +193,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
           cond_shift_pars <- norm_fit_stat[cond_shift_mask, 'mean']
           cond_shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[cond_shift_mask], "\\[(\\d+)\\]$")[,2])
           res <- data.frame(condition = levels(exp_df$condition)[cond_shift_ixs],
-                            shift = as.numeric(cond_shift_pars) - median(cond_shift_pars),
+                            shift = as.numeric(cond_shift_pars),
                             Rhat = norm_fit_stat[cond_shift_mask, 'Rhat'],
                             stringsAsFactors=FALSE)
         } else if (method == 'vb') {
@@ -204,10 +204,13 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
           cond_shift_pars <- norm_fit_stat[cond_shift_mask, 'mean']
           cond_shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[cond_shift_mask], "\\[(\\d+)\\]$")[,2])
           res <- data.frame(condition = levels(exp_df$condition)[cond_shift_ixs],
-                            shift = as.numeric(cond_shift_pars) - median(cond_shift_pars),
+                            shift = as.numeric(cond_shift_pars),
                             stringsAsFactors=FALSE)
         } else {
           stop('Unknown method ', method)
+        }
+        if (center_shifts) {
+          res$shift <- res$shift - median(res$shift)
         }
         col_renames <- "condition"
         names(col_renames) <- cond_col

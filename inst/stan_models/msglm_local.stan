@@ -158,22 +158,33 @@ parameters {
   row_vector[Nproteins] protein_shift0;
 
   #real<lower=0.0> protein_effect_tau;
-  vector<lower=0.0>[NproteinEffects] protein_effect_lambda;
+  vector<lower=0.0>[NproteinEffects] protein_effect_lambda_t;
+  vector<lower=0.0>[NproteinEffects] protein_effect_lambda_a;
   vector[NproteinEffects] protein_effect_unscaled;
 
   #real<lower=0> protein_repl_effect_sigma;
   #vector<lower=0>[Nproteins*Nexperiments] repl_shift_lambda;
-  vector<lower=0>[NproteinReplEffects] protein_repl_effect_lambda;
-  vector[NproteinReplEffects] protein_repl_effect;
+  vector<lower=0>[NproteinReplEffects] protein_repl_effect_lambda_t;
+  vector<lower=0>[NproteinReplEffects] protein_repl_effect_lambda_a;
+  vector[NproteinReplEffects] protein_repl_effect_unscaled;
 
   #real<lower=0> protein_batch_effect_sigma;
-  vector<lower=0>[NproteinBatchEffects] protein_batch_effect_lambda;
-  vector[NproteinBatchEffects] protein_batch_effect;
+  vector<lower=0>[NproteinBatchEffects] protein_batch_effect_lambda_t;
+  vector<lower=0>[NproteinBatchEffects] protein_batch_effect_lambda_a;
+  vector[NproteinBatchEffects] protein_batch_effect_unscaled;
 }
 
 transformed parameters {
   row_vector[Nproteins] protein_shift;
   vector[NproteinEffects] protein_effect;
+  vector<lower=0>[NproteinEffects] protein_effect_lambda;
+
+  vector[NproteinReplEffects] protein_repl_effect;
+  vector<lower=0>[NproteinReplEffects] protein_repl_effect_lambda;
+
+  vector[NproteinBatchEffects] protein_batch_effect;
+  vector<lower=0>[NproteinBatchEffects] protein_batch_effect_lambda;
+
   vector[Niactions] iaction_shift;
   vector[Nobservations] iaction_repl_shift;
   matrix[Nproteins, Nexperiments] repl_shift;
@@ -182,7 +193,15 @@ transformed parameters {
   for (i in 1:NunderdefProteins) {
     protein_shift[underdef_proteins[i]] = protein_shift[underdef_proteins[i]] + underdef_protein_shift;
   }
-  protein_effect = protein_effect_unscaled .* protein_effect_lambda;
+  protein_effect_lambda = protein_effect_lambda_a ./ sqrt(protein_effect_lambda_t);
+  protein_effect = protein_effect_unscaled .* protein_effect_lambda * protein_effect_tau;
+
+  protein_repl_effect_lambda = protein_repl_effect_lambda_a ./ sqrt(protein_repl_effect_lambda_t);
+  protein_repl_effect = protein_repl_effect_unscaled .* protein_repl_effect_lambda * protein_repl_effect_tau;
+
+  protein_batch_effect_lambda = protein_batch_effect_lambda_a ./ sqrt(protein_batch_effect_lambda_t);
+  protein_batch_effect = protein_batch_effect_unscaled .* protein_batch_effect_lambda * protein_batch_effect_tau;
+
   # calculate iaction_shift
   {
     matrix[Nproteins, Nconditions] proteinXcondition;
@@ -209,7 +228,9 @@ model {
     protein_shift0 ~ normal(0, protein_shift_sigma);
     # treatment effect parameters, horseshoe prior
     #protein_effect_tau ~ student_t(2, 0.0, 1.0);
-    protein_effect_lambda ~ student_t(2, 0.0, protein_effect_tau);
+    #protein_effect_lambda ~ student_t(2, 0.0, protein_effect_tau);
+    protein_effect_lambda_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
+    protein_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
     protein_effect_unscaled ~ normal(0.0, 1.0);
     # batch effect parameters, cauchy prior on sigma
     #condition_repl_effect_sigma ~ inv_gamma(1.5, 1.0);
@@ -217,12 +238,18 @@ model {
     #underdef_protein_shift ~ normal(0.0, 10.0);
 
     #repl_shift_lambda ~ student_t(2, 0.0, repl_shift_tau);
-    protein_repl_effect_lambda ~ student_t(2, 0.0, protein_repl_effect_tau);
-    protein_repl_effect ~ normal(0.0, protein_repl_effect_lambda);
+    #protein_repl_effect_lambda ~ student_t(2, 0.0, protein_repl_effect_tau);
+    protein_repl_effect_lambda_t ~ gamma(1.0, 1.0);
+    protein_repl_effect_lambda_a ~ normal(0.0, 1.0);
+    #protein_repl_effect ~ normal(0.0, protein_repl_effect_lambda);
+    protein_repl_effect_unscaled ~ normal(0.0, 1.0);
     #to_vector(repl_shift) ~ normal(0.0, repl_shift_lambda);
 
-    protein_batch_effect_lambda ~ student_t(2, 0.0, protein_batch_effect_tau);
-    protein_batch_effect ~ normal(0.0, protein_batch_effect_lambda);
+    #protein_batch_effect_lambda ~ student_t(2, 0.0, protein_batch_effect_tau);
+    protein_batch_effect_lambda_t ~ gamma(1.0, 1.0);
+    protein_batch_effect_lambda_a ~ normal(0.0, 1.0);
+    #protein_batch_effect ~ normal(0.0, protein_batch_effect_lambda);
+    protein_batch_effect_unscaled ~ normal(0.0, 1.0);
 
     # calculate the likelihood
     {

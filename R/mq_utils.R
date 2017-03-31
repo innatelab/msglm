@@ -385,7 +385,7 @@ read.MaxQuant.Evidence_internal <- function( folder_path, file_name = 'evidence.
 
 glm_corrected_intensities <- function(intensities.df,
                                       use_mstags=FALSE,
-                                      max_glm_factor = 50.0,
+                                      glm_max_factor = 50.0,
                                       glm_reldelta_range = c(-0.9, 0.9)) {
   ndatapoints <- nrow(intensities.df)
   nmsprotocols <- if ('msprotocol' %in% colnames(intensities.df)) n_distinct(intensities.df$msprotocol) else 1L
@@ -451,7 +451,7 @@ glm_corrected_intensities <- function(intensities.df,
       # use GLM predictions correcting for
       # anomalously big GLM predictions (e.g. when charge of higest intensity was missing and got predicted)
       intensities.df <- dplyr::mutate(intensities.df,
-                                      intensity_corr = pmin(intensity_glm, max_glm_factor*max_intensity_fixed) )
+                                      intensity_corr = pmin(intensity_glm, glm_max_factor*max_intensity_fixed) )
     } else {
       # GLM generates outliers that do not make sense, use the original intensities
       intensities.df$intensity_corr <-intensities.df$intensity
@@ -478,9 +478,9 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
                                        mode = c("labeled", "label-free"),
                                        mschannel_annotate.f = NULL,
                                        na_weight = 1E-5, min_intensity = 1E+3,
-                                       min_glm_intensity = 50*min_intensity,
-                                       max_glm_factor = 50,
-                                       glm_reldelta_range = c(-0.99, 0.99) )
+                                       glm.min_intensity = 50*min_intensity,
+                                       glm.max_factor = 50,
+                                       glm.reldelta_range = c(-0.99, 0.99) )
 {
     quant_mode <- match.arg(mode)
     complete_names <- function( vars ) {
@@ -589,7 +589,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
         dplyr::filter(pms_full_intensities_long.df, mstag != 'Sum') %>%
         dplyr::mutate(intensity_fixed = if_else(!is.na(intensity) & intensity > min_intensity, intensity, min_intensity)),
         pepmod_id, msprotocol) %>%
-      dplyr::do({glm_corrected_intensities(., max_glm_factor = max_glm_factor, glm_reldelta_range = glm_reldelta_range)}) %>%
+      dplyr::do({glm_corrected_intensities(., glm_max_factor = glm.max_factor, glm_reldelta_range = glm.reldelta_range)}) %>%
       dplyr::ungroup() %>%
       dplyr::select(-intensity_fixed) %>% # remove temporary non-NA column
       bind_rows(dplyr::filter(pms_full_intensities_long.df, mstag == 'Sum'))
@@ -603,7 +603,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
         dplyr::ungroup() %>%
         dplyr::mutate(intensity = if_else(intensity > 0, intensity, NA_real_),
                       intensity_glm = if_else(mstag == 'Sum', NA_real_, intensity_glm),
-                      intensity_corr = if_else(intensity_corr > min_glm_intensity, intensity_corr, NA_real_),
+                      intensity_corr = if_else(intensity_corr > glm.min_intensity, intensity_corr, NA_real_),
                       intensity_glm_reldelta = (intensity_glm - intensity) / pmax(intensity_glm, intensity),
                       intensity_corr_reldelta = (intensity_corr - intensity) / pmax(intensity_corr, intensity))
 

@@ -174,6 +174,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
 
         norm_data$qData <- matrix(df_group$safe_quant, ncol = nrow(exp_df), byrow=TRUE) #nrow=nrow(valid_group_objs)
         message("Running Stan optimization...")
+        out_params <- c("data_sigma", "condition_sigma", "condition_shift")
         if (method == 'optimizing') {
           norm_fit <- optimizing(norm_model, norm_data, algorithm="LBFGS",
                                  init=list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, norm_data$Nconditions-1L))),
@@ -185,6 +186,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
                             stringsAsFactors=FALSE)
         } else if (method == 'mcmc') {
           norm_fit <- sampling(norm_model, norm_data, chains=mcmc.chains, iter=mcmc.iter, thin=mcmc.thin,
+                               pars=out_params, include=TRUE,
                                init=function() list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, norm_data$Nconditions-1L))),
                                control = list(adapt_delta=mcmc.adapt_delta))
           norm_fit_stat <- monitor(norm_fit)
@@ -201,6 +203,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
                             stringsAsFactors=FALSE)
         } else if (method == 'vb') {
           norm_fit <- vb(norm_model, norm_data, iter=vb.iter,
+                         pars=out_params, include=TRUE,
                          init=function() list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, norm_data$Nconditions-1L))) )
           norm_fit_stat <- monitor(norm_fit)
           cond_shift_mask <- str_detect(rownames(norm_fit_stat), "^condition_shift\\[\\d+\\]$")

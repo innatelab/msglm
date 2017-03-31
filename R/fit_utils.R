@@ -58,7 +58,9 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
                                   missing_exp.ratio=0.1, missing_cond.ratio=if (exp_col==cond_col) missing_exp.ratio else 0.0,
                                   method = c("optimizing", "mcmc", "vb"), center_shifts=TRUE,
                                   max_quant.ratio=NA, exp_shift.min = -0.5, Rhat_max = 1.1,
-                                  max_objs=1000L, iter=2000, chains=4, thin=4,
+                                  max_objs=1000L,
+                                  mcmc.iter=2000L, mcmc.chains=4, mcmc.thin=4, mcmc.adapt_delta=0.9,
+                                  vb.iter=100000L,
                                   verbose=FALSE)
 {
     method <- match.arg(method)
@@ -182,8 +184,9 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
                             shift = as.numeric(cond_shift_pars),
                             stringsAsFactors=FALSE)
         } else if (method == 'mcmc') {
-          norm_fit <- sampling(norm_model, norm_data, chains=chains, iter=iter, thin=thin,
-                               init=function() list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, norm_data$Nconditions-1L))) )
+          norm_fit <- sampling(norm_model, norm_data, chains=mcmc.chains, iter=mcmc.iter, thin=mcmc.thin,
+                               init=function() list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, norm_data$Nconditions-1L))),
+                               control = list(adapt_delta=mcmc.adapt_delta))
           norm_fit_stat <- monitor(norm_fit)
           cond_shift_mask <- str_detect(rownames(norm_fit_stat), "^condition_shift\\[\\d+\\]$")
           nonconv_mask <- norm_fit_stat[cond_shift_mask, 'Rhat'] > Rhat_max
@@ -197,7 +200,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
                             Rhat = norm_fit_stat[cond_shift_mask, 'Rhat'],
                             stringsAsFactors=FALSE)
         } else if (method == 'vb') {
-          norm_fit <- vb(norm_model, norm_data, iter=100000,
+          norm_fit <- vb(norm_model, norm_data, iter=vb.iter,
                          init=function() list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, norm_data$Nconditions-1L))) )
           norm_fit_stat <- monitor(norm_fit)
           cond_shift_mask <- str_detect(rownames(norm_fit_stat), "^condition_shift\\[\\d+\\]$")

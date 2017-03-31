@@ -345,6 +345,7 @@ read.MaxQuant.Evidence_internal <- function( folder_path, file_name = 'evidence.
                     pepmod_id = 'Mod. peptide ID',
                     raw_file = "Raw file", msrun = "Experiment", ident_type = "Type", label_state = 'Labeling State',
                     mass_error_ppm = "Mass Error [ppm]", mass_error_da = "Mass Error [Da]",
+                    mass_error_ppm = "Mass error [ppm]", mass_error_da = "Mass error [Da]",
                     uncalib_mass_error_ppm = "Uncalibrated Mass Error [ppm]",
                     uncalib_mass_error_da = "Uncalibrated Mass Error [Da]",
                     seq = 'Sequence', seq_len = 'Length', count_K = 'K Count', count_R = 'R Count', modifs = 'Modifications',

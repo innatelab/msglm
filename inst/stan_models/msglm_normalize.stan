@@ -78,16 +78,20 @@ transformed data {
 }
 
 parameters {
+    real<lower=0> data_sigma_a;
+    real<lower=0> data_sigma_t;
     real<lower=0> condition_sigma_a;
     real<lower=0> condition_sigma_t;
     vector[Nconditions-1] condition_shift0_unscaled;
 }
 
 transformed parameters {
+    real<lower=0> data_sigma;
     real<lower=0> condition_sigma;
     vector[Nconditions] condition_shift_unscaled;
     vector[Nconditions] condition_shift;
 
+    data_sigma = data_sigma_a ./ sqrt(data_sigma_t);
     condition_sigma = condition_sigma_a ./ sqrt(condition_sigma_t);
     condition_shift_unscaled = condition_shift_transform * condition_shift0_unscaled;
     condition_shift = condition_shift_unscaled * condition_sigma;
@@ -97,6 +101,9 @@ model {
     vector[Nexperiments] total_experiment_shift;
     matrix[Nexperiments, Nexperiments] sum_experiments;
 
+    data_sigma_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
+    data_sigma_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+    #data_sigma ~ student_t(2, 0.0, 1.0);
     condition_sigma_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
     condition_sigma_a ~ normal(0.0, 1.0); // 1.0 = 2/2
     #condition_sigma ~ student_t(2, 0.0, 1.0);
@@ -105,5 +112,5 @@ model {
     total_experiment_shift = experiment_shift + condition_shift[experiment2condition];
     sum_experiments = exp(rep_matrix(total_experiment_shift', Nexperiments) - rep_matrix(total_experiment_shift, Nexperiments));
     #print("avg_exps=", average_experiments);
-    to_vector(qDataScaled) ~ double_exponential(to_vector((qData * sum_experiments) .* meanDenomScaled), 1.0);
+    to_vector(qDataScaled) ~ double_exponential(to_vector((qData * sum_experiments) .* meanDenomScaled), data_sigma);
 }

@@ -78,21 +78,29 @@ transformed data {
 }
 
 parameters {
-    real<lower=0.5, upper=5> condition_sigma;
-    vector<lower=-5,upper=5>[Nconditions-1] condition_shift0;
+    real<lower=0> condition_sigma_a;
+    real<lower=0> condition_sigma_t;
+    vector[Nconditions-1] condition_shift0_unscaled;
 }
 
 transformed parameters {
+    real<lower=0> condition_sigma;
+    vector[Nconditions] condition_shift_unscaled;
     vector[Nconditions] condition_shift;
-    condition_shift = condition_shift_transform * condition_shift0;
+
+    condition_sigma = condition_sigma_a ./ sqrt(condition_sigma_t);
+    condition_shift_unscaled = condition_shift_transform * condition_shift0_unscaled;
+    condition_shift = condition_shift_unscaled * condition_sigma;
 }
 
 model {
     vector[Nexperiments] total_experiment_shift;
     matrix[Nexperiments, Nexperiments] sum_experiments;
 
-    condition_sigma ~ cauchy(0.0, 1.0);
-    condition_shift ~ normal(0.0, condition_sigma);
+    condition_sigma_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
+    condition_sigma_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+    #condition_sigma ~ student_t(2, 0.0, 1.0);
+    condition_shift_unscaled ~ normal(0.0, 1.0);
 
     total_experiment_shift = experiment_shift + condition_shift[experiment2condition];
     sum_experiments = exp(rep_matrix(total_experiment_shift', Nexperiments) - rep_matrix(total_experiment_shift, Nexperiments));

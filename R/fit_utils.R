@@ -245,7 +245,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
 
 calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacondition, conditionXmetacondition.df, contrastXcondition.df,
                            condition_agg_col = "condition",
-                           obj_dims = 'protgroup_ix', var_info_cols = 'protgroup_ix', val_trans = NULL, condition.reported = c("lhs", "enriched"),
+                           obj_dims = 'glm_protgroup_ix', var_info_cols = 'glm_protgroup_ix', val_trans = NULL, condition.reported = c("lhs", "enriched"),
                            condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1)) {
   condition.reported <- match.arg(condition.reported)
   for (vars_category in names(vars_results)) {
@@ -255,23 +255,23 @@ calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacond
       message('Filtering ', vars_category, ' to use for contrasts...')
       cond_stats.df <- dplyr::inner_join(vars_results[[vars_category]]$stats,
                                          dplyr::mutate(contrastXcondition.df, is_lhs = weight > 0)) %>%
-        dplyr::group_by(protgroup_ix, contrast, metacondition, condition, is_lhs) %>%
+        dplyr::group_by_(.dots=c(obj_dims, "contrast", "metacondition", condition_agg_col, "is_lhs")) %>%
         dplyr::group_by_(.dots = condition_agg_col, add=TRUE) %>%
         dplyr::summarize(cond_mean = mean(mean)) %>% dplyr::ungroup()
-      
-      cond_agg_stats.df <- dplyr::group_by(cond_stats.df, protgroup_ix, contrast, metacondition, is_lhs) %>%
+
+      cond_agg_stats.df <- dplyr::group_by_(cond_stats.df, .dots=c(obj_dims, "contrast", "metacondition", "is_lhs")) %>%
         dplyr::group_by_(.dots = condition_agg_col, add=TRUE) %>%
         dplyr::summarize(cond_max_mean = max(cond_mean),
                          cond_min_mean = min(cond_mean)) %>%
-        dplyr::group_by(protgroup_ix, contrast, metacondition, is_lhs) %>%
+        dplyr::group_by_(.dots=c(obj_dims, "contrast", "metacondition", "is_lhs")) %>%
         dplyr::mutate(cond_max_qtile = cume_dist(cond_max_mean) - 1/n(),
                       cond_min_qtile = cume_dist(cond_min_mean) - 1/n()) %>% dplyr::ungroup() %>%
-        dplyr::select_(.dots = c("protgroup_ix", "contrast", "metacondition", condition_agg_col,
+        dplyr::select_(.dots = c(obj_dims, "contrast", "metacondition", condition_agg_col,
                                  "is_lhs", "cond_min_qtile", "cond_max_qtile", "cond_max_mean", "cond_min_mean"))
-      
+
       cond_stats.df <- dplyr::inner_join(cond_stats.df, cond_agg_stats.df) %>%
         dplyr::mutate(is_accepted = (is_lhs & cond_min_qtile >= condition.quantiles_lhs[[1]] & cond_max_qtile <= condition.quantiles_lhs[[2]]) |
-                                   (!is_lhs & cond_min_qtile >= condition.quantiles_rhs[[1]] & cond_max_qtile <= condition.quantiles_rhs[[2]]))
+                                    (!is_lhs & cond_min_qtile >= condition.quantiles_rhs[[1]] & cond_max_qtile <= condition.quantiles_rhs[[2]]))
       cond_stats.df <- dplyr::filter(cond_stats.df, is_accepted)
       message( 'Calculating contrasts for ', vars_category, ' variables...' )
       samples.df <- dplyr::semi_join(vars_results[[vars_category]]$samples, cond_stats.df) # exclude unused conditions
@@ -292,7 +292,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacond
         }
       }
       contrast_stats.df <- vars_contrast_stats( samples.df, vars_cat_subset_info$names,
-                                                group_cols = 'protgroup_ix', condition_col = 'metacondition', experiment_col = experiment_col,
+                                                group_cols = obj_dims, condition_col = 'metacondition', experiment_col = experiment_col,
                                                 condition2experiments.df = metacondition2experiments.df,
                                                 contrastXcondition = contrastXmetacondition, val_trans = val_trans )
       var_info.df <- vars_results[[vars_category]]$stats %>%

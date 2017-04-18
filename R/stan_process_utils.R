@@ -50,12 +50,18 @@ extract_var <- function( var_names ) {
   gsub( '\\[(\\d+\\,?)+]$', '', var_names )
 }
 
-pvalue_not_zero <- function( samples )
+pvalue_not_zero <- function( samples, tail = c("both", "negative", "positive") )
 {
-  2 * min( c( 0.5, insilicoMop:::ProbabilityLessZeroSmoothed( 
-         samples, nsteps = 100, bandwidth = NA ),
-       insilicoMop:::ProbabilityLessZeroSmoothed( 
-         -samples, nsteps = 100, bandwidth = NA ) ) )
+  tail = match.arg(tail)
+  if (tail == "negative") {
+    return(insilicoMop:::ProbabilityLessZeroSmoothed(samples, nsteps = 100, bandwidth = NA))
+  } else if (tail == "positive") {
+    return(insilicoMop:::ProbabilityLessZeroSmoothed(-samples, nsteps = 100, bandwidth = NA))
+  } else if (tail == "both") {
+    # 2x correction as both tails are tested
+    2 * min(c(0.5,insilicoMop:::ProbabilityLessZeroSmoothed(samples, nsteps = 100, bandwidth = NA),
+                  insilicoMop:::ProbabilityLessZeroSmoothed(-samples, nsteps = 100, bandwidth = NA)))
+  }
 }
 
 vars_pvalue_not_zero <- function( samples.df, vars_cat_info, dim_info )

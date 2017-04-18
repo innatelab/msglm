@@ -115,9 +115,16 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
                            quant_max = max(norm_quant, na.rm=TRUE),
                            sd = sd(norm_quant, na.rm=TRUE)) %>% dplyr::ungroup() %>%
           dplyr::mutate(sd_rel = sd/quant_med,
-                        sd_quantile = percent_rank(if_else(!is.na(sd_rel), sd_rel, Inf))) %>%
-          dplyr::filter(is.na(max_quant.ratio) | sd_quantile <= 0.25 |
-                        (quant_min*max_quant.ratio > quant_med & quant_max < max_quant.ratio*quant_med))
+                        sd_quantile = percent_rank(if_else(!is.na(sd_rel), sd_rel, Inf)),
+                        is_valid = is.na(max_quant.ratio) |
+                                   (quant_min*max_quant.ratio > quant_med &
+                                    quant_max < max_quant.ratio*quant_med))
+        # max sure at least 25% of group objects or max_objs (if specified) are valid for normalization
+        if (sum(group_objs$is_valid) < pmin(0.25*nrow(group_objs),
+                                            ifelse(max_objs > 0L, max_objs, Inf))) {
+            group_objs$is_valid <- group_objs$sd_quantile <= 0.25
+        }
+        valid_group_objs <- dplyr::filter(group_objs, is_valid)
         sel_group_objs <- if (max_objs > 0L && nrow(valid_group_objs) > max_objs) {
           sample_n(valid_group_objs, max_objs)
         } else {

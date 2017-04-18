@@ -64,15 +64,16 @@ pvalue_not_zero <- function( samples, tail = c("both", "negative", "positive") )
   }
 }
 
-vars_pvalue_not_zero <- function( samples.df, vars_cat_info, dim_info )
+vars_effect_pvalue <- function( samples.df, vars_cat_info, dim_info, tail = c("both", "negative", "positive") )
 {
+   tail = match.arg(tail)
    group_cols <- paste0( 'index_', vars_cat_info$dims )
    #print( str(samples.df) )
    #print( str(group_cols ) )
    p_value_all_samples <- function( samples ) {
        do.call( rbind, lapply( vars_cat_info$names, function(col) {
            data.frame( var = col,
-                       p_value = pvalue_not_zero( samples[[col]] ),
+                       p_value = pvalue_not_zero( samples[[col]], tail = tail ),
                        stringsAsFactors = FALSE )
            } ) )
    }

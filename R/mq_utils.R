@@ -35,17 +35,17 @@ expand_sites <- function(sites_df) {
 
 selectUniprotACs <- function(acs, valid_acs)
 {
-    acs_noiso <- stripUniprotIsoform( acs )
-    if ( !is.null( valid_acs ) ) {
-        acs_noiso <- intersect( acs_noiso, valid_acs )
+    acs_noiso <- stripUniprotIsoform(acs)
+    if (!is.null(valid_acs)) {
+        acs_noiso <- intersect(acs_noiso, valid_acs)
     }
-    if ( length(acs_noiso) == 1 ) {
-        return ( acs_noiso ) }
-    } else if ( length(acs_noiso) > 1 ) {
+    if (length(acs_noiso) == 1L) {
+        return (acs_noiso)
+    } else if (length(acs_noiso) > 1L) {
         # return the first "classical" UniProt AC starting with O, P or Q 
         is_classical_uprot <- str_detect(acs_noiso, '^[POQ]')
-        return ( acs_noiso[[ order(!is_classical_uprot, acs_noiso)[[1]] ]] )
-    } else { return ( NA_character_ ) }
+        return (acs_noiso[[ order(!is_classical_uprot, acs_noiso)[[1]] ]])
+    } else {return (NA_character_)}
 }
 
 read.MaxQuant <- function(filename, layout = c("wide", "long"),

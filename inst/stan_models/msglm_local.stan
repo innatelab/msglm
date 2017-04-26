@@ -7,16 +7,16 @@ functions {
 data {
   int<lower=1> Nexperiments;    # number of experiments
   int<lower=1> Nconditions;     # number of experimental conditions
-  int<lower=0> Nproteins;       # number of proteins
-  int<lower=0> Niactions;       # number of interactions
+  int<lower=0> Nobjects;        # number of objects (proteins/peptides/sites etc)
+  int<lower=0> Niactions;       # number of interactions (objectXcondition pairs)
   int<lower=0> Nobservations;   # number of potential observations of interactions
   int<lower=0> Neffects;        # number of effects (that define conditions)
   int<lower=0> NreplEffects;    # number of repl effects (that define biological experimental variation, iaction_repl_shift)
   int<lower=0> NbatchEffects;   # number of batch effects (that define assay experimental variation, but not biology)
-  int<lower=0> NunderdefProteins; # number of virtual interactions (the ones not detected but required for comparison)
-  int<lower=1,upper=Nproteins> iaction2protein[Niactions];
+  int<lower=0> NunderdefObjs;   # number of virtual interactions (the ones not detected but required for comparison)
+  int<lower=1,upper=Nobjects> iaction2obj[Niactions];
   int<lower=1,upper=Nconditions> iaction2condition[Niactions];
-  int<lower=1,upper=Nproteins> underdef_proteins[NunderdefProteins];
+  int<lower=1,upper=Nobjects> underdef_objs[NunderdefObjects];
 
   matrix[Neffects, Nconditions] effectXcondition;
   matrix[NreplEffects, Nexperiments] replEffectXexperiment;
@@ -27,34 +27,34 @@ data {
   int<lower=1,upper=Nexperiments> observation2experiment[Nobservations];
   int<lower=1,upper=Niactions> observation2iaction[Nobservations];
 
-  # map from labelXreplicateXprotein to observed/missed data
-  int<lower=0> Nquanted;       # total number of quantified proteinsXexperiments
+  # map from labelXreplicateXobject to observed/missed data
+  int<lower=0> Nquanted;       # total number of quantified objectsXexperiments
   int<lower=1,upper=Nobservations>  quant2observation[Nquanted];
-  int<lower=0> Nmissed;         # total number of missed proteinsXexperiments
+  int<lower=0> Nmissed;         # total number of missed objectsXexperiments
   int<lower=1,upper=Nobservations> miss2observation[Nmissed];
 
-  int<lower=0> NproteinEffects;
-  int<lower=1,upper=Neffects> protein_effect2effect[NproteinEffects];
-  int<lower=1,upper=Nproteins> protein_effect2protein[NproteinEffects];
-  int<lower=0> NeffectsPerProteinCumsum[Nproteins+1];
+  int<lower=0> NobjEffects;
+  int<lower=1,upper=Neffects> obj_effect2effect[NobjEffects];
+  int<lower=1,upper=Nobjects> obj_effect2obj[NobjEffects];
+  int<lower=0> NeffectsPerObjCumsum[Nobjects+1];
 
-  int<lower=0> NproteinReplEffects;
-  int<lower=1,upper=NreplEffects> protein_repl_effect2repl_effect[NproteinReplEffects];
-  int<lower=0> NreplEffectsPerProteinCumsum[Nproteins+1];
+  int<lower=0> NobjReplEffects;
+  int<lower=1,upper=NreplEffects> obj_repl_effect2repl_effect[NobjReplEffects];
+  int<lower=0> NreplEffectsPerObjCumsum[Nobjects+1];
 
-  int<lower=0> NproteinBatchEffects;
-  int<lower=1,upper=NbatchEffects> protein_batch_effect2batch_effect[NproteinBatchEffects];
-  int<lower=0> NbatchEffectsPerProteinCumsum[NproteinBatchEffects > 0 ? Nproteins+1 : 1];
+  int<lower=0> NobjBatchEffects;
+  int<lower=1,upper=NbatchEffects> obj_batch_effect2batch_effect[NobjBatchEffects];
+  int<lower=0> NbatchEffectsPerObjCumsum[NobjBatchEffects > 0 ? Nobjects+1 : 1];
 
   vector<lower=0>[Nquanted] qData; # quanted data
 
   # global model constants
-  real protein_base;
-  real<lower=0> protein_effect_tau;
-  real<lower=0> protein_repl_effect_tau;
-  real<lower=0> protein_batch_effect_tau;
-  real<lower=0> protein_shift_sigma;
-  real<upper=0> underdef_protein_shift;
+  real obj_base;
+  real<lower=0> obj_effect_tau;
+  real<lower=0> obj_repl_effect_tau;
+  real<lower=0> obj_batch_effect_tau;
+  real<lower=0> obj_shift_sigma;
+  real<upper=0> underdef_obj_shift;
 
   # instrument calibrated parameters 
   real<lower=0> zDetectionFactor;
@@ -72,9 +72,9 @@ data {
 }
 
 transformed data {
-  real mzShift; # zShift for the missing observation intensity (zShift shifted by protein_base)
+  real mzShift; # zShift for the missing observation intensity (zShift shifted by obj_base)
   vector[Nquanted] zScore; # log(qData) transformed in zScore
-  vector[Nquanted] qLogStd; # log(sd(qData))-protein_base
+  vector[Nquanted] qLogStd; # log(sd(qData))-obj_base
   vector<lower=0>[Nquanted] qDataNorm; # qData/sd(qData)
   matrix[Nexperiments, Nconditions] experimentXcondition;
 
@@ -90,13 +90,13 @@ transformed data {
     vector[Nquanted] qLogData;
     qLogData = log(qData);
     zScore = (qLogData - zShift) * zScale;
-    mzShift = zShift - protein_base;
+    mzShift = zShift - obj_base;
   
     # process the intensity data to optimize likelihood calculation
     for (i in 1:Nquanted) {
       qLogStd[i] = intensity_log_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
       qDataNorm[i] = exp(qLogData[i] - qLogStd[i]);
-      qLogStd[i] = qLogStd[i] - protein_base; # iaction_repl_shift is modeled without protein_base
+      qLogStd[i] = qLogStd[i] - obj_base; # iaction_repl_shift is modeled without obj_base
     }
   }
   quant2experiment = observation2experiment[quant2observation];
@@ -150,106 +150,106 @@ transformed data {
 }
 
 parameters {
-  #real protein_base;
-  #real<lower=-20, upper=-2> underdef_protein_shift;
-  #real<lower=0, upper=5.0> protein_shift_sigma;
+  #real obj_base;
+  #real<lower=-20, upper=-2> underdef_obj_shift;
+  #real<lower=0, upper=5.0> obj_shift_sigma;
   #vector<lower=0>[Nconditions] condition_repl_effect_sigma;
 
-  row_vector[Nproteins] protein_shift0;
+  row_vector[Nobjects] obj_shift0;
 
-  #real<lower=0.0> protein_effect_tau;
-  vector<lower=0.0>[NproteinEffects] protein_effect_lambda_t;
-  vector<lower=0.0>[NproteinEffects] protein_effect_lambda_a;
-  vector[NproteinEffects] protein_effect_unscaled;
+  #real<lower=0.0> obj_effect_tau;
+  vector<lower=0.0>[NobjEffects] obj_effect_lambda_t;
+  vector<lower=0.0>[NobjEffects] obj_effect_lambda_a;
+  vector[NobjEffects] obj_effect_unscaled;
 
-  #real<lower=0> protein_repl_effect_sigma;
-  #vector<lower=0>[Nproteins*Nexperiments] repl_shift_lambda;
-  vector<lower=0>[NproteinReplEffects] protein_repl_effect_lambda_t;
-  vector<lower=0>[NproteinReplEffects] protein_repl_effect_lambda_a;
-  vector[NproteinReplEffects] protein_repl_effect_unscaled;
+  #real<lower=0> obj_repl_effect_sigma;
+  #vector<lower=0>[Nobjects*Nexperiments] repl_shift_lambda;
+  vector<lower=0>[NobjReplEffects] obj_repl_effect_lambda_t;
+  vector<lower=0>[NobjReplEffects] obj_repl_effect_lambda_a;
+  vector[NobjReplEffects] obj_repl_effect_unscaled;
 
-  #real<lower=0> protein_batch_effect_sigma;
-  vector<lower=0>[NproteinBatchEffects] protein_batch_effect_lambda_t;
-  vector<lower=0>[NproteinBatchEffects] protein_batch_effect_lambda_a;
-  vector[NproteinBatchEffects] protein_batch_effect_unscaled;
+  #real<lower=0> obj_batch_effect_sigma;
+  vector<lower=0>[NobjBatchEffects] obj_batch_effect_lambda_t;
+  vector<lower=0>[NobjBatchEffects] obj_batch_effect_lambda_a;
+  vector[NobjBatchEffects] obj_batch_effect_unscaled;
 }
 
 transformed parameters {
-  row_vector[Nproteins] protein_shift;
-  vector[NproteinEffects] protein_effect;
-  vector<lower=0>[NproteinEffects] protein_effect_lambda;
+  row_vector[Nobjects] obj_shift;
+  vector[NobjEffects] obj_effect;
+  vector<lower=0>[NobjEffects] obj_effect_lambda;
 
-  vector[NproteinReplEffects] protein_repl_effect;
-  vector<lower=0>[NproteinReplEffects] protein_repl_effect_lambda;
+  vector[NobjReplEffects] obj_repl_effect;
+  vector<lower=0>[NobjReplEffects] obj_repl_effect_lambda;
 
-  vector[NproteinBatchEffects] protein_batch_effect;
-  vector<lower=0>[NproteinBatchEffects] protein_batch_effect_lambda;
+  vector[NobjBatchEffects] obj_batch_effect;
+  vector<lower=0>[NobjBatchEffects] obj_batch_effect_lambda;
 
   vector[Niactions] iaction_shift;
   vector[Nobservations] iaction_repl_shift;
-  matrix[Nproteins, Nexperiments] repl_shift;
+  matrix[Nobjects, Nexperiments] repl_shift;
 
-  protein_shift = protein_shift0;
-  for (i in 1:NunderdefProteins) {
-    protein_shift[underdef_proteins[i]] = protein_shift[underdef_proteins[i]] + underdef_protein_shift;
+  obj_shift = obj_shift0;
+  for (i in 1:NunderdefObjs) {
+    obj_shift[underdef_objs[i]] = obj_shift[underdef_objs[i]] + underdef_obj_shift;
   }
-  protein_effect_lambda = protein_effect_lambda_a ./ sqrt(protein_effect_lambda_t);
-  protein_effect = protein_effect_unscaled .* protein_effect_lambda * protein_effect_tau;
+  obj_effect_lambda = obj_effect_lambda_a ./ sqrt(obj_effect_lambda_t);
+  obj_effect = obj_effect_unscaled .* obj_effect_lambda * obj_effect_tau;
 
-  protein_repl_effect_lambda = protein_repl_effect_lambda_a ./ sqrt(protein_repl_effect_lambda_t);
-  protein_repl_effect = protein_repl_effect_unscaled .* protein_repl_effect_lambda * protein_repl_effect_tau;
+  obj_repl_effect_lambda = obj_repl_effect_lambda_a ./ sqrt(obj_repl_effect_lambda_t);
+  obj_repl_effect = obj_repl_effect_unscaled .* obj_repl_effect_lambda * obj_repl_effect_tau;
 
-  protein_batch_effect_lambda = protein_batch_effect_lambda_a ./ sqrt(protein_batch_effect_lambda_t);
-  protein_batch_effect = protein_batch_effect_unscaled .* protein_batch_effect_lambda * protein_batch_effect_tau;
+  obj_batch_effect_lambda = obj_batch_effect_lambda_a ./ sqrt(obj_batch_effect_lambda_t);
+  obj_batch_effect = obj_batch_effect_unscaled .* obj_batch_effect_lambda * obj_batch_effect_tau;
 
   # calculate iaction_shift
   {
-    matrix[Nproteins, Nconditions] proteinXcondition;
+    matrix[Nobjects, Nconditions] objXcondition;
 
-    proteinXcondition = csr_to_dense_matrix(Nproteins, Neffects, protein_effect,
-                                            protein_effect2effect, NeffectsPerProteinCumsum) * effectXcondition;
+    objXcondition = csr_to_dense_matrix(Nobjects, Neffects, obj_effect,
+                                        obj_effect2effect, NeffectsPerObjCumsum) * effectXcondition;
     for (i in 1:Niactions) {
-      iaction_shift[i] = protein_shift[iaction2protein[i]] + proteinXcondition[iaction2protein[i], iaction2condition[i]];
+      iaction_shift[i] = obj_shift[iaction2obj[i]] + objXcondition[iaction2obj[i], iaction2condition[i]];
     }
   }
   # calculate iaction_repl_shift
-  repl_shift = csr_to_dense_matrix(Nproteins, NreplEffects, protein_repl_effect,
-                                   protein_repl_effect2repl_effect, NreplEffectsPerProteinCumsum) * replEffectXexperiment;
+  repl_shift = csr_to_dense_matrix(Nobjects, NreplEffects, obj_repl_effect,
+                                   obj_repl_effect2repl_effect, NreplEffectsPerObjCumsum) * replEffectXexperiment;
   for (i in 1:Nobservations) {
     iaction_repl_shift[i] = iaction_shift[observation2iaction[i]]
-                       + repl_shift[iaction2protein[observation2iaction[i]], observation2experiment[i]];
+                       + repl_shift[iaction2obj[observation2iaction[i]], observation2experiment[i]];
   }
 }
 
 model {
     # abundance distribution
-    #protein_base ~ normal(zShift, 1.0);
-    #protein_shift_sigma ~ inv_gamma(2.0, 0.33/zScale); # mode is 1/zScale
-    protein_shift0 ~ normal(0, protein_shift_sigma);
+    #obj_base ~ normal(zShift, 1.0);
+    #obj_shift_sigma ~ inv_gamma(2.0, 0.33/zScale); # mode is 1/zScale
+    obj_shift0 ~ normal(0, obj_shift_sigma);
     # treatment effect parameters, horseshoe prior
-    #protein_effect_tau ~ student_t(2, 0.0, 1.0);
-    #protein_effect_lambda ~ student_t(2, 0.0, protein_effect_tau);
-    protein_effect_lambda_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
-    protein_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
-    protein_effect_unscaled ~ normal(0.0, 1.0);
+    #obj_effect_tau ~ student_t(2, 0.0, 1.0);
+    #obj_effect_lambda ~ student_t(2, 0.0, obj_effect_tau);
+    obj_effect_lambda_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
+    obj_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+    obj_effect_unscaled ~ normal(0.0, 1.0);
     # batch effect parameters, cauchy prior on sigma
     #condition_repl_effect_sigma ~ inv_gamma(1.5, 1.0);
 
-    #underdef_protein_shift ~ normal(0.0, 10.0);
+    #underdef_obj_shift ~ normal(0.0, 10.0);
 
     #repl_shift_lambda ~ student_t(2, 0.0, repl_shift_tau);
-    #protein_repl_effect_lambda ~ student_t(2, 0.0, protein_repl_effect_tau);
-    protein_repl_effect_lambda_t ~ gamma(1.0, 1.0);
-    protein_repl_effect_lambda_a ~ normal(0.0, 1.0);
-    #protein_repl_effect ~ normal(0.0, protein_repl_effect_lambda);
-    protein_repl_effect_unscaled ~ normal(0.0, 1.0);
+    #obj_repl_effect_lambda ~ student_t(2, 0.0, obj_repl_effect_tau);
+    obj_repl_effect_lambda_t ~ gamma(1.0, 1.0);
+    obj_repl_effect_lambda_a ~ normal(0.0, 1.0);
+    #obj_repl_effect ~ normal(0.0, obj_repl_effect_lambda);
+    obj_repl_effect_unscaled ~ normal(0.0, 1.0);
     #to_vector(repl_shift) ~ normal(0.0, repl_shift_lambda);
 
-    #protein_batch_effect_lambda ~ student_t(2, 0.0, protein_batch_effect_tau);
-    protein_batch_effect_lambda_t ~ gamma(1.0, 1.0);
-    protein_batch_effect_lambda_a ~ normal(0.0, 1.0);
-    #protein_batch_effect ~ normal(0.0, protein_batch_effect_lambda);
-    protein_batch_effect_unscaled ~ normal(0.0, 1.0);
+    #obj_batch_effect_lambda ~ student_t(2, 0.0, obj_batch_effect_tau);
+    obj_batch_effect_lambda_t ~ gamma(1.0, 1.0);
+    obj_batch_effect_lambda_a ~ normal(0.0, 1.0);
+    #obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
+    obj_batch_effect_unscaled ~ normal(0.0, 1.0);
 
     # calculate the likelihood
     {
@@ -262,13 +262,13 @@ model {
         #qLogAbu = iaction_shift[quant2iaction] + experiment_shift[observation2experiment[quant2observation]];
         #mLogAbu = iaction_shift[miss2iaction] + experiment_shift[observation2experiment[miss2observation]];
         if (NbatchEffects > 0) {
-          matrix[Nproteins, Nexperiments] batch_shift;
+          matrix[Nobjects, Nexperiments] batch_shift;
           vector[Nobservations] obs_batch_shift;
 
-          batch_shift = csr_to_dense_matrix(Nproteins, NbatchEffects, protein_batch_effect,
-                                            protein_batch_effect2batch_effect, NbatchEffectsPerProteinCumsum) * batchEffectXexperiment;
+          batch_shift = csr_to_dense_matrix(Nobjects, NbatchEffects, obj_batch_effect,
+                                            obj_batch_effect2batch_effect, NbatchEffectsPerObjCumsum) * batchEffectXexperiment;
           for (i in 1:Nobservations) {
-              obs_batch_shift[i] = batch_shift[iaction2protein[observation2iaction[i]], observation2experiment[i]];
+              obs_batch_shift[i] = batch_shift[iaction2obj[observation2iaction[i]], observation2experiment[i]];
           }
           qLogAbu = qLogAbu + obs_batch_shift[quant2observation];
           mLogAbu = mLogAbu + obs_batch_shift[miss2observation];

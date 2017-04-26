@@ -847,19 +847,45 @@ msrun_code_parser.f = function(msruns, chunk_names = c('dataset', 'batch', 'frac
     res[,canonical_order]
 }
 
-expand_protgroup_acs <- function(protgroups, acs_col, ac_col = str_replace(acs_col, "_acs", "_ac")) {
+expand_protgroup_acs <- function(protgroups, acs_col,
+                                 ac_col = str_replace(acs_col, "_acs", "_ac"),
+                                 id_col="protgroup_id") {
   acs <- str_split(protgroups[[acs_col]], ";", simplify = FALSE)
-  res <- data.frame(protgroup_id = rep.int(protgroups$protgroup_id, sapply(acs, length)),
+  res <- data.frame(row_ix = rep.int(seq_along(acs), sapply(acs, length)),
                     stringsAsFactors = FALSE)
+  res[[id_col]] <- protgroups[[id_col]][res$row_ix]
   res[[ac_col]] <- unlist(acs)
   return (res)
 }
 
-match_protgroup_by_acs <- function(pgs1, pgs2, acs_col, suffix=c(".x", ".y")) {
+match_protgroups_by_acs <- function(pgs1, pgs2, acs_col, suffix = c(".x", ".y")) {
     ac_col <- str_replace(acs_col, "_acs", "_ac")
     expd_pgs1 <- expand_protgroup_acs(pgs1, acs_col, ac_col)
     expd_pgs2 <- expand_protgroup_acs(pgs2, acs_col, ac_col)
-    dplyr::full_join(expd_pgs1, expd_pgs2, by=ac_col, suffix=suffix)
+    res <- dplyr::full_join(expd_pgs1, expd_pgs2, by = ac_col, suffix = suffix)
+    res$is_matching <- !is.na(res[[paste0("protgroup_id", suffix[[1]])]]) &
+        !is.na(res[[paste0("protgroup_id", suffix[[2]])]])
+    return ( res )
+}
+
+match_protgroups <- function(pgs1, pgs2, suffix = c(".x", ".y")) {
+  pg2pg_by_majority_acs.df <- match_protgroups_by_acs(pgs1, pgs2, "majority_protein_acs") %>%
+    dplyr::mutate(ac_match_rank = if_else(is_matching, 1L, NA_integer_))
+  pg2pg_by_simple_acs.df <- match_protgroups_by_acs(pgs1, pgs2, "protein_acs") %>%
+    dplyr::mutate(ac_match_rank = if_else(is_matching, 2L, NA_integer_))
+  protgroup_vars <- c("protgroup_id.x", "protgroup_id.y")
+  names(protgroup_vars) <- paste0("protgroup_id", suffix)
+  pg2pg.df <- dplyr::bind_rows(pg2pg_by_majority_acs.df, pg2pg_by_simple_acs.df) %>%
+    dplyr::group_by(protgroup_id.x, protgroup_id.y) %>%
+    dplyr::summarize(min_ac_match_rank = min(ac_match_rank, na.rm = TRUE),
+                     n_ac_matches = sum(!is.na(ac_match_rank) & ac_match_rank == min_ac_match_rank)) %>%
+    # remove non-matches if there are matches
+    dplyr::group_by(protgroup_id.x) %>%
+    dplyr::filter(is.na(protgroup_id.x) | (is.na(min_ac_match_rank) == all(is.na(min_ac_match_rank)))) %>%
+    dplyr::group_by(protgroup_id.y) %>%
+    dplyr::filter(is.na(protgroup_id.y) | (is.na(min_ac_match_rank) == all(is.na(min_ac_match_rank)))) %>%
+    dplyr::ungroup() %>%
+    dplyr::rename_(.dots=protgroup_vars)
 }
 
 split_protgroups <- function(protgroups.df) {

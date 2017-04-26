@@ -11,6 +11,11 @@ require(stringr)
 require(CeMMmisc)
 require(quantreg)
 
+recombine_dlms <- function(dlms, sep=";") {
+    dlms_expanded <- unique(unlist(lapply(dlms, strsplit, sep, fixed=TRUE)))
+    paste0(dlms_expanded[!is.na(dlms_expanded)], collapse=sep)
+}
+
 expand_protgroups <- function(protgroup_ids) {
     protgroups2protgroup.list <- strsplit(protgroup_ids, ';', fixed=TRUE)
     data.frame( protgroup_ids = rep.int(protgroup_ids, sapply(protgroups2protgroup.list, length)),

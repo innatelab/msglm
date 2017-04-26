@@ -23,6 +23,16 @@ expand_protgroups <- function(protgroup_ids) {
                 stringsAsFactors = FALSE )
 }
 
+expand_sites <- function(sites_df) {
+    protgroups2protgroup.list <- strsplit(sites_df$protgroup_ids, ';', fixed=TRUE)
+    positions2position.list <- strsplit(sites_df$positions, ';', fixed=TRUE)
+    data.frame( protgroup_ids = rep.int(sites_df$protgroup_ids, sapply(protgroups2protgroup.list, length)),
+                positions = rep.int(sites_df$positions, sapply(positions2position.list, length)),
+                protgroup_id = as.integer(unlist(protgroups2protgroup.list)),
+                position = as.integer(unlist(positions2position.list)),
+                stringsAsFactors = FALSE )
+}
+
 selectUniprotACs <- function( acs, valid_acs )
 {
     acs_noiso <- stripUniprotIsoform( acs )

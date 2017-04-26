@@ -8,15 +8,15 @@ data {
   int<lower=1> Nexperiments;    # number of experiments
   int<lower=1> Nconditions;     # number of experimental conditions
   int<lower=0> Nobjects;        # number of objects (proteins/peptides/sites etc)
-  int<lower=0> Niactions;       # number of interactions (objectXcondition pairs)
-  int<lower=0> Nobservations;   # number of potential observations of interactions
+  int<lower=0> Niactions;       # number of interactions (observed objectXcondition pairs)
+  int<lower=0> Nobservations;   # number of observations of interactions (objectXexperiment pairs for all iactions and experiments of its condition)
   int<lower=0> Neffects;        # number of effects (that define conditions)
   int<lower=0> NreplEffects;    # number of repl effects (that define biological experimental variation, iaction_repl_shift)
   int<lower=0> NbatchEffects;   # number of batch effects (that define assay experimental variation, but not biology)
   int<lower=0> NunderdefObjs;   # number of virtual interactions (the ones not detected but required for comparison)
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
   int<lower=1,upper=Nconditions> iaction2condition[Niactions];
-  int<lower=1,upper=Nobjects> underdef_objs[NunderdefObjects];
+  int<lower=1,upper=Nobjects> underdef_objs[NunderdefObjs];
 
   matrix[Neffects, Nconditions] effectXcondition;
   matrix[NreplEffects, Nexperiments] replEffectXexperiment;
@@ -28,7 +28,7 @@ data {
   int<lower=1,upper=Niactions> observation2iaction[Nobservations];
 
   # map from labelXreplicateXobject to observed/missed data
-  int<lower=0> Nquanted;       # total number of quantified objectsXexperiments
+  int<lower=0> Nquanted;        # total number of quantified objectsXexperiments
   int<lower=1,upper=Nobservations>  quant2observation[Nquanted];
   int<lower=0> Nmissed;         # total number of missed objectsXexperiments
   int<lower=1,upper=Nobservations> miss2observation[Nmissed];
@@ -49,11 +49,11 @@ data {
   vector<lower=0>[Nquanted] qData; # quanted data
 
   # global model constants
-  real obj_base;
+  real global_labu_shift;   # shift to be applied to all XXX_labu variables to get the real log intensity
   real<lower=0> obj_effect_tau;
   real<lower=0> obj_repl_effect_tau;
   real<lower=0> obj_batch_effect_tau;
-  real<lower=0> obj_shift_sigma;
+  real<lower=0> obj_base_labu_sigma;
   real<upper=0> underdef_obj_shift;
 
   # instrument calibrated parameters 
@@ -90,13 +90,13 @@ transformed data {
     vector[Nquanted] qLogData;
     qLogData = log(qData);
     zScore = (qLogData - zShift) * zScale;
-    mzShift = zShift - obj_base;
+    mzShift = zShift - global_labu_shift;
   
     # process the intensity data to optimize likelihood calculation
     for (i in 1:Nquanted) {
       qLogStd[i] = intensity_log_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
       qDataNorm[i] = exp(qLogData[i] - qLogStd[i]);
-      qLogStd[i] = qLogStd[i] - obj_base; # iaction_repl_shift is modeled without obj_base
+      qLogStd[i] = qLogStd[i] - global_labu_shift; # obs_labu is modeled without obj_base
     }
   }
   quant2experiment = observation2experiment[quant2observation];
@@ -155,7 +155,7 @@ parameters {
   #real<lower=0, upper=5.0> obj_shift_sigma;
   #vector<lower=0>[Nconditions] condition_repl_effect_sigma;
 
-  row_vector[Nobjects] obj_shift0;
+  row_vector[Nobjects] obj_base_labu0; # baseline object abundance without underdefinedness adjustment
 
   #real<lower=0.0> obj_effect_tau;
   vector<lower=0.0>[NobjEffects] obj_effect_lambda_t;
@@ -175,49 +175,61 @@ parameters {
 }
 
 transformed parameters {
-  row_vector[Nobjects] obj_shift;
+  row_vector[Nobjects] obj_base_labu;
   vector[NobjEffects] obj_effect;
   vector<lower=0>[NobjEffects] obj_effect_lambda;
 
-  vector[NobjReplEffects] obj_repl_effect;
-  vector<lower=0>[NobjReplEffects] obj_repl_effect_lambda;
+  vector[Niactions] iaction_labu;
+  matrix[Nobjects, Nexperiments] objXexp_repl_shift; # replicate shifts for all potential observations (including unobserved)
+  vector[Nobservations] obs_labu; # iaction_labu + objXexp_repl_shift
 
-  vector[NobjBatchEffects] obj_batch_effect;
-  vector<lower=0>[NobjBatchEffects] obj_batch_effect_lambda;
+  matrix[Nobjects, Nexperiments] objXexp_batch_shift; # batch shifts for all potential observations (including unobserved)
 
-  vector[Niactions] iaction_shift;
-  vector[Nobservations] iaction_repl_shift;
-  matrix[Nobjects, Nexperiments] repl_shift;
-
-  obj_shift = obj_shift0;
+  # correct baseline abundances of underdefined objects
+  obj_base_labu = obj_base_labu0;
   for (i in 1:NunderdefObjs) {
-    obj_shift[underdef_objs[i]] = obj_shift[underdef_objs[i]] + underdef_obj_shift;
+    obj_base_labu[underdef_objs[i]] = obj_base_labu[underdef_objs[i]] + underdef_obj_shift;
   }
+
+  # calculate effects lambdas and scale effects
   obj_effect_lambda = obj_effect_lambda_a ./ sqrt(obj_effect_lambda_t);
   obj_effect = obj_effect_unscaled .* obj_effect_lambda * obj_effect_tau;
 
-  obj_repl_effect_lambda = obj_repl_effect_lambda_a ./ sqrt(obj_repl_effect_lambda_t);
-  obj_repl_effect = obj_repl_effect_unscaled .* obj_repl_effect_lambda * obj_repl_effect_tau;
-
-  obj_batch_effect_lambda = obj_batch_effect_lambda_a ./ sqrt(obj_batch_effect_lambda_t);
-  obj_batch_effect = obj_batch_effect_unscaled .* obj_batch_effect_lambda * obj_batch_effect_tau;
-
-  # calculate iaction_shift
+  # calculate iaction_labu
   {
     matrix[Nobjects, Nconditions] objXcondition;
 
     objXcondition = csr_to_dense_matrix(Nobjects, Neffects, obj_effect,
                                         obj_effect2effect, NeffectsPerObjCumsum) * effectXcondition;
     for (i in 1:Niactions) {
-      iaction_shift[i] = obj_shift[iaction2obj[i]] + objXcondition[iaction2obj[i], iaction2condition[i]];
+      iaction_labu[i] = obj_base_labu[iaction2obj[i]] + objXcondition[iaction2obj[i], iaction2condition[i]];
     }
   }
-  # calculate iaction_repl_shift
-  repl_shift = csr_to_dense_matrix(Nobjects, NreplEffects, obj_repl_effect,
-                                   obj_repl_effect2repl_effect, NreplEffectsPerObjCumsum) * replEffectXexperiment;
-  for (i in 1:Nobservations) {
-    iaction_repl_shift[i] = iaction_shift[observation2iaction[i]]
-                       + repl_shift[iaction2obj[observation2iaction[i]], observation2experiment[i]];
+  # calculate objXexp_repl_shift and obs_labu
+  {
+    vector[NobjReplEffects] obj_repl_effect;
+    vector[NobjReplEffects] obj_repl_effect_lambda;
+
+    obj_repl_effect_lambda = obj_repl_effect_lambda_a ./ sqrt(obj_repl_effect_lambda_t);
+    obj_repl_effect = obj_repl_effect_unscaled .* obj_repl_effect_lambda * obj_repl_effect_tau;
+
+    objXexp_repl_shift = csr_to_dense_matrix(Nobjects, NreplEffects, obj_repl_effect,
+                                        obj_repl_effect2repl_effect, NreplEffectsPerObjCumsum) * replEffectXexperiment;
+    for (i in 1:Nobservations) {
+      obs_labu[i] = iaction_labu[observation2iaction[i]]
+                  + objXexp_repl_shift[iaction2obj[observation2iaction[i]], observation2experiment[i]];
+    }
+  }
+  # calculate objXexp_batch_shift (doesn't make sense to add to obs_labu)
+  {
+    vector[NobjBatchEffects] obj_batch_effect;
+    vector[NobjBatchEffects] obj_batch_effect_lambda;
+
+    obj_batch_effect_lambda = obj_batch_effect_lambda_a ./ sqrt(obj_batch_effect_lambda_t);
+    obj_batch_effect = obj_batch_effect_unscaled .* obj_batch_effect_lambda * obj_batch_effect_tau;
+
+    objXexp_batch_shift = csr_to_dense_matrix(Nobjects, NbatchEffects, obj_batch_effect,
+                                              obj_batch_effect2batch_effect, NbatchEffectsPerObjCumsum) * batchEffectXexperiment;
   }
 }
 
@@ -225,7 +237,7 @@ model {
     # abundance distribution
     #obj_base ~ normal(zShift, 1.0);
     #obj_shift_sigma ~ inv_gamma(2.0, 0.33/zScale); # mode is 1/zScale
-    obj_shift0 ~ normal(0, obj_shift_sigma);
+    obj_base_labu0 ~ normal(0, obj_base_labu_sigma);
     # treatment effect parameters, horseshoe prior
     #obj_effect_tau ~ student_t(2, 0.0, 1.0);
     #obj_effect_lambda ~ student_t(2, 0.0, obj_effect_tau);
@@ -253,30 +265,26 @@ model {
 
     # calculate the likelihood
     {
-        vector[Nquanted] qLogAbu;
-        vector[Nmissed] mLogAbu;
+        vector[Nquanted] q_labu;
+        vector[Nmissed] m_labu;
 
-        # calculate obs_batch_shift
-        qLogAbu = iaction_repl_shift[quant2observation] + experiment_shift[observation2experiment[quant2observation]];
-        mLogAbu = iaction_repl_shift[miss2observation] + experiment_shift[observation2experiment[miss2observation]];
+        q_labu = obs_labu[quant2observation] + experiment_shift[observation2experiment[quant2observation]];
+        m_labu = obs_labu[miss2observation] + experiment_shift[observation2experiment[miss2observation]];
         #qLogAbu = iaction_shift[quant2iaction] + experiment_shift[observation2experiment[quant2observation]];
         #mLogAbu = iaction_shift[miss2iaction] + experiment_shift[observation2experiment[miss2observation]];
         if (NbatchEffects > 0) {
-          matrix[Nobjects, Nexperiments] batch_shift;
+          # adjust by objXexp_batch_shift
           vector[Nobservations] obs_batch_shift;
-
-          batch_shift = csr_to_dense_matrix(Nobjects, NbatchEffects, obj_batch_effect,
-                                            obj_batch_effect2batch_effect, NbatchEffectsPerObjCumsum) * batchEffectXexperiment;
           for (i in 1:Nobservations) {
-              obs_batch_shift[i] = batch_shift[iaction2obj[observation2iaction[i]], observation2experiment[i]];
+              obs_batch_shift[i] = objXexp_batch_shift[iaction2obj[observation2iaction[i]], observation2experiment[i]];
           }
-          qLogAbu = qLogAbu + obs_batch_shift[quant2observation];
-          mLogAbu = mLogAbu + obs_batch_shift[miss2observation];
+          q_labu = q_labu + obs_batch_shift[quant2observation];
+          m_labu = m_labu + obs_batch_shift[miss2observation];
         }
 
-        qDataNorm ~ double_exponential(exp(qLogAbu - qLogStd), 1);
-        # model missing data
-        1 ~ bernoulli_logit(qLogAbu * (zScale * zDetectionFactor) - mzShift * zScale * zDetectionFactor + zDetectionIntercept);
-        0 ~ bernoulli_logit(mLogAbu * (zScale * zDetectionFactor) - mzShift * zScale * zDetectionFactor + zDetectionIntercept);
+        qDataNorm ~ double_exponential(exp(q_labu - qLogStd), 1);
+        # model quantitations and missing data
+        1 ~ bernoulli_logit(q_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
+        0 ~ bernoulli_logit(m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
     }
 }

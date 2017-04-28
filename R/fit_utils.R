@@ -244,13 +244,13 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
 }
 
 calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacondition, conditionXmetacondition.df, contrastXcondition.df,
-                           condition_agg_col = "condition",
-                           obj_dims = 'glm_protgroup_ix', var_info_cols = 'glm_protgroup_ix', val_trans = NULL, condition.reported = c("lhs", "enriched"),
+                           mschannel_col = "mschannel_ix",
+                           condition_agg_col = "condition", var_names = c('iaction_labu', 'obs_labu'),
+                           obj_dims = 'glm_object_ix', var_info_cols = 'glm_object_ix', val_trans = NULL,
                            condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1)) {
-  condition.reported <- match.arg(condition.reported)
   for (vars_category in names(vars_results)) {
     vars_cat_subset_info <- vars_info[[vars_category]]
-    vars_cat_subset_info$names <- intersect(vars_cat_subset_info$names, c('iaction_shift', 'iaction_repl_shift'))
+    vars_cat_subset_info$names <- intersect(vars_cat_subset_info$names, var_names)
     if ( length(vars_cat_subset_info$names) > 0 ) {
       message('Filtering ', vars_category, ' to use for contrasts...')
       cond_stats.df <- dplyr::inner_join(vars_results[[vars_category]]$stats,
@@ -275,7 +275,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacond
       cond_stats.df <- dplyr::filter(cond_stats.df, is_accepted)
       message( 'Calculating contrasts for ', vars_category, ' variables...' )
       samples.df <- dplyr::semi_join(vars_results[[vars_category]]$samples, cond_stats.df) # exclude unused conditions
-      experiment_col <- if ('mschannel_ix' %in% colnames(samples.df)) 'mschannel_ix'
+      experiment_col <- if (mschannel_col %in% colnames(samples.df)) mschannel_col
                         else if ('condition' %in% colnames(samples.df)) 'condition'
                         else 'condition'
       metacondition2experiments.df <- dplyr::inner_join(dplyr::semi_join(conditionXmetacondition.df, cond_stats.df),
@@ -285,31 +285,37 @@ calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacond
         # no samples
         vars_results[[vars_category]]$contrast_stats <- NULL
       } else {
-      # adjust samples w.r.t. condition shift
-      if ('condition_shift' %in% colnames(samples.df)) {
-        for (shift_name in vars_cat_subset_info$names) {
-          samples.df[,shift_name] <- samples.df[,shift_name] - samples.df$condition_shift
+        # adjust samples w.r.t. condition shift
+        if ('condition_shift' %in% colnames(samples.df)) {
+          for (shift_name in vars_cat_subset_info$names) {
+            samples.df[,shift_name] <- samples.df[,shift_name] - samples.df$condition_shift
+          }
         }
-      }
-      contrast_stats.df <- vars_contrast_stats( samples.df, vars_cat_subset_info$names,
-                                                group_cols = obj_dims, condition_col = 'metacondition', experiment_col = experiment_col,
-                                                condition2experiments.df = metacondition2experiments.df,
-                                                contrastXcondition = contrastXmetacondition, val_trans = val_trans )
-      var_info.df <- vars_results[[vars_category]]$stats %>%
-        dplyr::select_(.dots = setdiff(var_info_cols, c('index_observation', 'msrun', 'mschannel_ix'))) %>%
-        dplyr::distinct()
-      # inject contrast statistics into vars_results
-      vars_results[[vars_category]]$contrast_stats <- left_join( var_info.df, contrast_stats.df ) %>%
-        dplyr::mutate(p_value = 2*pmin(prob_nonpos, prob_nonneg),
-                      # fake P-values to fit in the plot
-                      prob_nonpos_fake = pmax(if_else(mean < 0, 1E-300, 1E-100), rgamma(n(), shape=1E-2, scale=1E-150), prob_nonpos),
-                      prob_nonneg_fake = pmax(if_else(mean > 0, 1E-300, 1E-100), rgamma(n(), shape=1E-2, scale=1E-150), prob_nonneg),
-                      p_value_fake = 2*pmin(prob_nonpos_fake, prob_nonneg_fake)) %>%
-        #dplyr::select(-index_observation, -msrun, -msrun_ix) %>% dplyr::distinct() %>%
-        left_join(contrastXcondition.df %>% dplyr::filter(contrast %in% rownames(contrastXmetacondition)) %>% dplyr::rename(contrast_weight = weight)) %>%
-        dplyr::filter((condition.reported == "lhs" & contrast_weight > 0) |
-                      (condition.reported == "enriched" & contrast_weight * mean > 0)) %>%
-        dplyr::inner_join(dims_info$iaction)
+        contrast_stats.df <- vars_contrast_stats(samples.df, vars_cat_subset_info$names,
+                                                 group_cols = obj_dims, condition_col = 'metacondition', experiment_col = experiment_col,
+                                                 condition2experiments.df = metacondition2experiments.df,
+                                                 contrastXcondition = contrastXmetacondition, val_trans = val_trans)
+        var_info.df <- vars_results[[vars_category]]$stats %>%
+          dplyr::inner_join(conditionXmetacondition.df) %>%
+          dplyr::select_(.dots = setdiff(var_info_cols, c('index_observation', 'iaction_id', 'condition', condition_agg_col, experiment_col))) %>%
+          dplyr::distinct()
+        # inject contrast statistics into vars_results
+        vars_results[[vars_category]]$contrast_stats <- left_join(var_info.df, contrast_stats.df) %>%
+          dplyr::mutate(p_value = 2*pmin(prob_nonpos, prob_nonneg)
+                        # fake P-values to fit in the plot
+                        #prob_nonpos_fake = pmax(if_else(mean < 0, 1E-300, 1E-100), rgamma(n(), shape=1E-2, scale=1E-150), prob_nonpos),
+                        #prob_nonneg_fake = pmax(if_else(mean > 0, 1E-300, 1E-100), rgamma(n(), shape=1E-2, scale=1E-150), prob_nonneg),
+                        #p_value_fake = 2*pmin(prob_nonpos_fake, prob_nonneg_fake)
+          ) %>%
+          #dplyr::select(-index_observation, -msrun, -msrun_ix) %>% dplyr::distinct() %>%
+          left_join(contrastXmetacondition.df %>% dplyr::filter(contrast %in% rownames(contrastXmetacondition)) %>% dplyr::rename(contrast_weight = weight) %>%
+                      dplyr::mutate(metacondition_reported = case_when(.$contrast_type == "filtering" ~ "lhs",
+                                                                       .$contrast_type == "comparison" ~ "enriched",
+                                                                       TRUE ~ NA_character_))) %>%
+          dplyr::filter((metacondition_reported == "lhs" & contrast_weight > 0) |
+                        (metacondition_reported == "enriched" & contrast_weight * `50%` > 0)) %>%
+          dplyr::select(-metacondition_reported, -contrast_type) %>%
+          dplyr::inner_join(dims_info$object)
       }
     }
   }

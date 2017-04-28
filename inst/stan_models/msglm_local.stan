@@ -51,7 +51,7 @@ data {
   # global model constants
   real global_labu_shift;   # shift to be applied to all XXX_labu variables to get the real log intensity
   real<lower=0> obj_effect_tau;
-  real<lower=0> obj_repl_effect_tau;
+  real<lower=0> obj_repl_shift_tau;
   real<lower=0> obj_batch_effect_tau;
   real<lower=0> obj_base_labu_sigma;
   real<upper=0> underdef_obj_shift;
@@ -164,8 +164,8 @@ parameters {
 
   #real<lower=0> obj_repl_effect_sigma;
   #vector<lower=0>[Nobjects*Nexperiments] repl_shift_lambda;
-  vector<lower=0>[NobjReplEffects] obj_repl_effect_lambda_t;
-  vector<lower=0>[NobjReplEffects] obj_repl_effect_lambda_a;
+  vector<lower=0>[Nconditions] obj_repl_shift_lambda_t;
+  vector<lower=0>[Nconditions] obj_repl_shift_lambda_a;
   vector[NobjReplEffects] obj_repl_effect_unscaled;
 
   #real<lower=0> obj_batch_effect_sigma;
@@ -180,8 +180,10 @@ transformed parameters {
   vector<lower=0>[NobjEffects] obj_effect_lambda;
 
   vector[Niactions] iaction_labu;
-  matrix[Nobjects, Nexperiments] objXexp_repl_shift; # replicate shifts for all potential observations (including unobserved)
-  vector[Nobservations] obs_labu; # iaction_labu + objXexp_repl_shift
+
+  vector[Nconditions] obj_repl_shift_sigma;
+  matrix[Nobjects, Nexperiments] objXexp_repl_shift_unscaled; # unscaled replicate shifts for all potential observations (including unobserved)
+  vector[Nobservations] obs_labu; # iaction_labu + objXexp_repl_shift * obj_repl_shift_sigma
 
   matrix[Nobjects, Nexperiments] objXexp_batch_shift; # batch shifts for all potential observations (including unobserved)
 
@@ -194,6 +196,7 @@ transformed parameters {
   # calculate effects lambdas and scale effects
   obj_effect_lambda = obj_effect_lambda_a ./ sqrt(obj_effect_lambda_t);
   obj_effect = obj_effect_unscaled .* obj_effect_lambda * obj_effect_tau;
+  obj_repl_shift_sigma = obj_repl_shift_lambda_a ./ sqrt(obj_repl_shift_lambda_t) * obj_repl_shift_tau;
 
   # calculate iaction_labu
   {
@@ -210,18 +213,19 @@ transformed parameters {
     vector[NobjReplEffects] obj_repl_effect;
     vector[NobjReplEffects] obj_repl_effect_lambda;
 
-    obj_repl_effect_lambda = obj_repl_effect_lambda_a ./ sqrt(obj_repl_effect_lambda_t);
-    obj_repl_effect = obj_repl_effect_unscaled .* obj_repl_effect_lambda * obj_repl_effect_tau;
-
-    objXexp_repl_shift = csr_to_dense_matrix(Nobjects, NreplEffects, obj_repl_effect,
+    # note: linear transform of obj_repl_effect_unscaled, Jacobian is zero
+    objXexp_repl_shift_unscaled = csr_to_dense_matrix(Nobjects, NreplEffects, obj_repl_effect_unscaled,
                                         obj_repl_effect2repl_effect, NreplEffectsPerObjCumsum) * replEffectXexperiment;
     for (i in 1:Nobservations) {
-      obs_labu[i] = iaction_labu[observation2iaction[i]]
-                  + objXexp_repl_shift[iaction2obj[observation2iaction[i]], observation2experiment[i]];
+      int iaction_ix;
+      iaction_ix = observation2iaction[i];
+      obs_labu[i] = iaction_labu[iaction_ix]
+                  + objXexp_repl_shift_unscaled[iaction2obj[iaction_ix], observation2experiment[i]] *
+                    obj_repl_shift_sigma[iaction2condition[iaction_ix]];
     }
   }
   # calculate objXexp_batch_shift (doesn't make sense to add to obs_labu)
-  {
+  if (NbatchEffects > 0) {
     vector[NobjBatchEffects] obj_batch_effect;
     vector[NobjBatchEffects] obj_batch_effect_lambda;
 
@@ -230,6 +234,8 @@ transformed parameters {
 
     objXexp_batch_shift = csr_to_dense_matrix(Nobjects, NbatchEffects, obj_batch_effect,
                                               obj_batch_effect2batch_effect, NbatchEffectsPerObjCumsum) * batchEffectXexperiment;
+  } else {
+    objXexp_batch_shift = rep_matrix(0.0, Nobjects, Nexperiments);
   }
 }
 
@@ -251,10 +257,10 @@ model {
 
     #repl_shift_lambda ~ student_t(2, 0.0, repl_shift_tau);
     #obj_repl_effect_lambda ~ student_t(2, 0.0, obj_repl_effect_tau);
-    obj_repl_effect_lambda_t ~ gamma(1.0, 1.0);
-    obj_repl_effect_lambda_a ~ normal(0.0, 1.0);
+    obj_repl_shift_lambda_t ~ gamma(1.0, 1.0);
+    obj_repl_shift_lambda_a ~ normal(0.0, 1.0);
     #obj_repl_effect ~ normal(0.0, obj_repl_effect_lambda);
-    obj_repl_effect_unscaled ~ normal(0.0, 1.0);
+    to_vector(objXexp_repl_shift_unscaled) ~ normal(0.0, 1.0);
     #to_vector(repl_shift) ~ normal(0.0, repl_shift_lambda);
 
     #obj_batch_effect_lambda ~ student_t(2, 0.0, obj_batch_effect_tau);

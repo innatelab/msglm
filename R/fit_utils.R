@@ -108,7 +108,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
     message(n_distinct(group_stats$cond_group), " condition group(s)")
     res <- dplyr::group_by(valid_objs, cond_group) %>% do({
         df_group <- dplyr::inner_join(df_std, .)
-        valid_group_objs <- df_group %>%
+        group_objs <- df_group %>%
           dplyr::group_by(obj, n_max_experiments, n_max_conditions, cond_group) %>%
           dplyr::summarise(quant_med = median(norm_quant, na.rm=TRUE),
                            quant_min = min(norm_quant, na.rm=TRUE),

@@ -202,11 +202,17 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
           if (any(nonconv_mask)) {
             warning("Rhat>", Rhat_max, " for ", sum(nonconv_mask), " shift(s)")
           }
+          n_eff_min <- 0.1*mcmc.iter
+          nonconv_mask <- norm_fit_stat[cond_shift_mask, 'n_eff'] < n_eff_min
+          if (any(nonconv_mask)) {
+            warning("n_eff<", n_eff_min, " for ", sum(nonconv_mask), " shift(s)")
+          }
           cond_shift_pars <- norm_fit_stat[cond_shift_mask, 'mean']
           cond_shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[cond_shift_mask], "\\[(\\d+)\\]$")[,2])
           res <- data.frame(condition = levels(exp_df$condition)[cond_shift_ixs],
                             shift = as.numeric(cond_shift_pars),
                             Rhat = norm_fit_stat[cond_shift_mask, 'Rhat'],
+                            n_eff = norm_fit_stat[cond_shift_mask, 'n_eff'],
                             stringsAsFactors=FALSE)
         } else if (method == 'vb') {
           norm_fit <- vb(norm_model, norm_data, iter=vb.iter,

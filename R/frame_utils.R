@@ -7,7 +7,7 @@ join_report_frames <- function(reports, frame_extractor=function(report) stop('n
                                global_vars = c('model_dataset', 'version', 'chunk'),
                                prot_info=NULL)
 {
-  joined_res.df <- bind_rows( lapply( reports, function(report) {
+  joined_res.df <- bind_rows(lapply( reports, function(report) {
     frame <- frame_extractor(report)
     if (is.null(frame)) return ( NULL )
     for (var in global_vars) {
@@ -21,7 +21,7 @@ join_report_frames <- function(reports, frame_extractor=function(report) stop('n
   return ( joined_res.df )
 }
 
-rbind_all_frames <- function( frames_coll_list, frame_names = NULL, link_col = NULL )
+rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NULL)
 {
   if ( is.null(frame_names) ) {
     # select names that appear in all frames

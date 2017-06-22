@@ -329,10 +329,10 @@ calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacond
 }
 
 process_model_fit_chunk <- function(file_ix, strip_samples=FALSE, strip_stats=FALSE) {
-  fit_model.file <- fit_model.files.df[ file_ix, 'filename' ]
-  message( 'Loading ', fit_model.file, '...' )
+  fit_model.file <- fit_model.files.df[file_ix, 'filename']
+  message('Loading ', fit_model.file, '...')
   tmp.env <- new.env(parent = baseenv())
-  load(file.path(fit_model_path, fit_model.file ), envir = tmp.env)
+  load(file.path(fit_model_path, fit_model.file), envir = tmp.env)
   if (strip_samples || strip_stats) {
     tmp.env$vars_results <- lapply( tmp.env$vars_results, function( var_results ) {
       if (strip_samples) { var_results$samples <- NULL }
@@ -346,10 +346,10 @@ process_model_fit_chunk <- function(file_ix, strip_samples=FALSE, strip_stats=FA
 }
 
 process_msglm_chunk <- function(file_ix, sel_contrasts = NULL, condition_shifts = NULL,
-                                   strip_samples=FALSE, strip_stats=FALSE,
-                                   val_trans = NULL, condition.reported = "lhs",
-                                   condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
-                                   condition_agg_col = "condition") {
+                                strip_samples=FALSE, strip_stats=FALSE,
+                                val_trans = NULL, condition.reported = "lhs",
+                                condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
+                                condition_agg_col = "condition") {
   fit_model.file <- fit_model.files.df[ file_ix, 'filename' ]
   message( 'Loading ', fit_model.file, '...' )
   tmp.env <- new.env(parent = baseenv())
@@ -387,7 +387,7 @@ process_msglm_chunk <- function(file_ix, sel_contrasts = NULL, condition_shifts 
 
 join_msglm_reports <- function(section, reports, type) {
   message( 'Assembling joint ', type, ' report for ', section, '...' )
-  res <- join_report_frames( reports, frame_extractor = function(report) {
+  res <- join_report_frames(reports, frame_extractor = function(report) {
     res <- report$vars_results[[section]][[type]]
     if (!is.null(res) && !('majority_protein_acs' %in% colnames(res))
         && "majority_protein_acs" %in% colnames(report$model_data$protgroups)) {
@@ -400,6 +400,6 @@ join_msglm_reports <- function(section, reports, type) {
     }
     res
   },
-  NULL, global_vars = c() )
+  NULL, global_vars = c())
   return(res)
 }

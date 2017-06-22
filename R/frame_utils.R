@@ -7,9 +7,16 @@ join_report_frames <- function(reports, frame_extractor=function(report) stop('n
                                global_vars = c('model_dataset', 'version', 'chunk'),
                                prot_info=NULL)
 {
-  joined_res.df <- bind_rows(lapply( reports, function(report) {
+  if (is.null(names(reports))) {
+    report_names <- seq_along(reports)
+  } else {
+    report_names <- names(reports)
+  }
+  joined_res.df <- bind_rows(lapply(report_names, function(report_name) {
+    report <- reports[[report_name]]
     frame <- frame_extractor(report)
     if (is.null(frame)) return ( NULL )
+    frame$report_name <- report_name
     for (var in global_vars) {
       frame[[var]] <- report[[var]]
     }

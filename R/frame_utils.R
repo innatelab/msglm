@@ -49,3 +49,11 @@ rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NU
   names(res) <- frame_names
   return ( res )
 }
+
+expand_collapsed <- function(df, collapsed_col, separated_col, extra_cols=NULL, sep=";") {
+  exp_list <- strsplit(df[[collapsed_col]], sep, fixed=TRUE)
+  exp_lengths <- sapply(exp_list, length)
+  res <- df[rep.int(1:nrow(df), exp_lengths), c(collapsed_col, extra_cols)]
+  res[[separated_col]] <- unlist(exp_list)
+  res[,c(separated_col, collapsed_col, extra_cols)]
+}

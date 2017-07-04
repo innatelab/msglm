@@ -726,7 +726,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
 
                 agg_ratios.df <- pre_intensities.df %>% dplyr::select(pepmod_id, msrun, ref_intensity, starts_with("Ratio"), mass_error_ppm) %>%
                     dplyr::mutate(ratio_weight = abs(1/mass_error_ppm)/sum(abs(1/mass_error_ppm), na.rm=TRUE)) %>%
-                    dplyr::mutate_at(.cols = inverted_cols, funs(1/.)) %>%
+                    dplyr::mutate_at(inverted_cols, funs(1/.)) %>%
                     dplyr::summarise_each_(funs(if_else(all(is.na(ratio_weight)), NA_real_,
                                                         weighted.mean(.[!is.na(ratio_weight)],
                                                                       ratio_weight[!is.na(ratio_weight)], na.rm=TRUE))),
@@ -772,7 +772,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
         dplyr::mutate(has_ident = TRUE) %>%
         tidyr::spread(ident_type, has_ident, sep=".")
     intensities.df <- dplyr::left_join(intensities.df, ident_types.df) %>%
-        mutate_at(.cols=vars(starts_with("ident_type")), funs(!is.na(.)))
+        mutate_at(vars(starts_with("ident_type")), funs(!is.na(.)))
 
     ratio_columns_sel.df <- dplyr::filter(ratio_columns.df,
                                           mstag_nom < mstag_denom & mstag_denom != 'Sum')

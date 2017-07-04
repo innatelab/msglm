@@ -5,15 +5,15 @@ functions {
 }
 
 data {
-  int<lower=1> Nexperiments;    # number of experiments
-  int<lower=1> Nobjects;       # number of objects
+  int<lower=1> Nexperiments;    // number of experiments
+  int<lower=1> Nobjects;       // number of objects
   int<lower=1> Nconditions;
-  vector[Nexperiments]  experiment_shift; # fixed experiment shifts
+  vector[Nexperiments]  experiment_shift; // fixed experiment shifts
   int<lower=1,upper=Nconditions> experiment2condition[Nexperiments];
 
   matrix<lower=0>[Nobjects, Nexperiments] qData;
 
-  # instrument calibrated parameters 
+  // instrument calibrated parameters 
   real<lower=0> zDetectionFactor;
   real zDetectionIntercept;
   real<lower=0, upper=1> detectionMax;
@@ -56,7 +56,7 @@ transformed data {
         }
     }
 
-    # process the intensity data to optimize likelihood calculation
+    // process the intensity data to optimize likelihood calculation
     for (i in 1:Nexperiments) {
         for (j in 1:Nobjects) {
             qLogStd[j, i] = intensity_log_std(zScore[j, i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
@@ -103,14 +103,14 @@ model {
 
     data_sigma_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
     data_sigma_a ~ normal(0.0, 1.0); // 1.0 = 2/2
-    #data_sigma ~ student_t(2, 0.0, 1.0);
+    //data_sigma ~ student_t(2, 0.0, 1.0);
     condition_sigma_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
     condition_sigma_a ~ normal(0.0, 1.0); // 1.0 = 2/2
-    #condition_sigma ~ student_t(2, 0.0, 1.0);
+    //condition_sigma ~ student_t(2, 0.0, 1.0);
     condition_shift_unscaled ~ normal(0.0, 1.0);
 
     total_experiment_shift = experiment_shift + condition_shift[experiment2condition];
     sum_experiments = exp(rep_matrix(total_experiment_shift', Nexperiments) - rep_matrix(total_experiment_shift, Nexperiments));
-    #print("avg_exps=", average_experiments);
+    //print("avg_exps=", average_experiments);
     to_vector(qDataScaled) ~ double_exponential(to_vector((qData * sum_experiments) .* meanDenomScaled), data_sigma);
 }

@@ -240,10 +240,20 @@ stan_samples_frame <- function(stan_samples, var_names, var_dims) {
     # extract only samples of selected variables
     # convert arrays of samples of selected variables into data frames,
     # add back single copy of dimensions and real iteration information
-    samples.df <- do.call(data.frame, lapply(var_names, function(var_name) as.vector(stan_samples[[var_name]])))
+    if (any(!(var_names %in% names(stan_samples)))) {
+      warning("Variable(s) samples not found: ", paste0(setdiff(var_names, names(stan_samples)), collapse=", "))
+    }
+    avail_var_names <- intersect(var_names, names(stan_samples))
+    samples.df <- do.call(data.frame, lapply(avail_var_names, function(var_name) {
+      as.vector(stan_samples[[var_name]])
+    }))
     if (ncol(samples.df) > 0) {
-        colnames(samples.df) <- var_names
-        samples.df <- cbind(attr(stan_samples, 'iter_info'), samples.df)
+        colnames(samples.df) <- avail_var_names
+        if ('iter_info' %in% names(attributes(stan_samples))) {
+          samples.df <- cbind(attr(stan_samples, 'iter_info'), samples.df)
+        } else {
+          warning("No iter_info found")
+        }
 
         # add additional dimension information
         if (length(var_dims) > 0) {

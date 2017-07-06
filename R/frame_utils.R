@@ -16,7 +16,11 @@ join_report_frames <- function(reports, frame_extractor=function(report) stop('n
     report <- reports[[report_name]]
     frame <- frame_extractor(report)
     if (is.null(frame)) return ( NULL )
-    frame$report_name <- report_name
+    if (nrow(frame) > 0L) {
+      frame$report_name <- report_name
+    } else {
+      frame$report_name <- character()
+    }
     for (var in global_vars) {
       frame[[var]] <- report[[var]]
     }

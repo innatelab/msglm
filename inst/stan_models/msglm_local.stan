@@ -36,6 +36,7 @@ data {
   int<lower=0> NobjEffects;
   int<lower=1,upper=Neffects> obj_effect2effect[NobjEffects];
   int<lower=1,upper=Nobjects> obj_effect2obj[NobjEffects];
+  int<lower=0,upper=1> obj_effect_is_positive[NobjEffects];
   int<lower=0> NeffectsPerObjCumsum[Nobjects+1];
 
   int<lower=0> NobjReplEffects;
@@ -85,6 +86,27 @@ transformed data {
   int<lower=1,upper=Nexperiments> quant2experiment[Nquanted];
   int<lower=1,upper=Niactions> miss2iaction[Nmissed];
   int<lower=1,upper=Nexperiments> miss2experiment[Nmissed];
+  int<lower=0,upper=NobjEffects> NobjEffectsPos;
+  int<lower=0,upper=NobjEffects> NobjEffectsOther;
+  int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects];
+
+  NobjEffectsPos = sum(obj_effect_is_positive);
+  NobjEffectsOther = NobjEffects - NobjEffectsPos;
+  {
+    int cur_pos_eff;
+    int cur_other_eff;
+    cur_pos_eff = 0;
+    cur_other_eff = NobjEffectsPos;
+    for (i in 1:Neffects) {
+      if (obj_effect_is_positive[i]) {
+        cur_pos_eff = cur_pos_eff + 1;
+        obj_effect_reshuffle[i] = cur_pos_eff;
+      } else {
+        cur_other_eff = cur_other_eff + 1;
+        obj_effect_reshuffle[i] = cur_other_eff;
+      }
+    }
+  }
 
   {
     vector[Nquanted] qLogData;
@@ -160,7 +182,8 @@ parameters {
   //real<lower=0.0> obj_effect_tau;
   vector<lower=0.0>[NobjEffects] obj_effect_lambda_t;
   vector<lower=0.0>[NobjEffects] obj_effect_lambda_a;
-  vector[NobjEffects] obj_effect_unscaled;
+  vector<lower=0.0>[NobjEffectsPos] obj_effect_unscaled_pos;
+  vector[NobjEffectsOther] obj_effect_unscaled_other;
 
   //real<lower=0> obj_repl_effect_sigma;
   //vector<lower=0>[Nobjects*Nexperiments] repl_shift_lambda;
@@ -195,7 +218,7 @@ transformed parameters {
 
   // calculate effects lambdas and scale effects
   obj_effect_lambda = obj_effect_lambda_a ./ sqrt(obj_effect_lambda_t);
-  obj_effect = obj_effect_unscaled .* obj_effect_lambda * obj_effect_tau;
+  obj_effect = append_row(obj_effect_unscaled_pos, obj_effect_unscaled_other)[obj_effect_reshuffle] .* obj_effect_lambda * obj_effect_tau;
   obj_repl_shift_sigma = obj_repl_shift_lambda_a ./ sqrt(obj_repl_shift_lambda_t) * obj_repl_shift_tau;
 
   // calculate iaction_labu
@@ -249,7 +272,8 @@ model {
     //obj_effect_lambda ~ student_t(2, 0.0, obj_effect_tau);
     obj_effect_lambda_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
     obj_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
-    obj_effect_unscaled ~ normal(0.0, 1.0);
+    obj_effect_unscaled_pos ~ normal(0.0, 1.0);
+    obj_effect_unscaled_other ~ normal(0.0, 1.0);
     // batch effect parameters, cauchy prior on sigma
     //condition_repl_effect_sigma ~ inv_gamma(1.5, 1.0);
 

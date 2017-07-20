@@ -103,9 +103,9 @@ read.MaxQuant <- function(filename, layout = c("wide", "long"),
 
     #print(str(res))
     #print( quant.columns.df )
-    res <- res %>% mutate_each_(funs(as.numeric), backquote(quant.columns)) %>%
+    res <- res %>% mutate_at(quant.columns, funs(as.numeric)) %>%
         group_by_(.dots = paste0('`', row_id_cols, '`')) %>%
-        summarise_each_(funs(max), backquote(quant.columns)) %>%
+        summarise_at(quant.columns, funs(max)) %>%
         dplyr::ungroup()
 
     if ( match.arg( layout ) == 'long' ) {
@@ -168,7 +168,7 @@ read.MaxQuant.ProteinGroups <- function(folder_path, file_name = 'proteinGroups.
         intensities.df <- proteinGroups.df %>% dplyr::select(starts_with("Intensity")) %>%
             gsub_columns("^Intensity\\s([LMH](\\s|$))", "Intensity.\\1") %>%
             gsub_columns("^Intensity(\\s|$)", "Intensity.Sum\\1") %>%
-            mutate_each(., funs(ifelse(.==0.0, NA, .)))
+            mutate_all(., funs(ifelse(.==0.0, NA, .)))
         res.df <- bind_cols(res.df, intensities.df)
         col_info$intensity <- colnames(intensities.df)
     }
@@ -176,7 +176,7 @@ read.MaxQuant.ProteinGroups <- function(folder_path, file_name = 'proteinGroups.
         lfq.df <- proteinGroups.df %>% dplyr::select(starts_with("LFQ intensity")) %>%
             gsub_columns("^LFQ intensity\\s([LMH](\\s|$))", "LFQ_Intensity.\\1") %>%
             gsub_columns("^LFQ intensity(\\s|$)", "LFQ_Intensity.Sum\\1") %>%
-            mutate_each(., funs(ifelse(.==0.0, NA, .)))
+            mutate_all(., funs(ifelse(.==0.0, NA, .)))
         res.df <- bind_cols(res.df, lfq.df)
         col_info$LFQ <- colnames(lfq.df)
     }
@@ -184,7 +184,7 @@ read.MaxQuant.ProteinGroups <- function(folder_path, file_name = 'proteinGroups.
         ibaq.df <- proteinGroups.df %>% dplyr::select(starts_with("iBAQ")) %>%
             gsub_columns("^iBAQ\\s([LMH](\\s|$))", "iBAQ.\\1") %>%
             gsub_columns("^iBAQ(\\s|$)", "iBAQ.Sum\\1") %>%
-            mutate_each(., funs(ifelse(.==0.0, NA, .)))
+            mutate_all(., funs(ifelse(.==0.0, NA, .)))
         res.df <- bind_cols(res.df, ibaq.df)
         col_info$iBAQ <- colnames(ibaq.df)
     }
@@ -232,7 +232,7 @@ read.MaxQuant.Peptides <- function(folder_path, file_name = 'peptides.txt',
         intensities.df <- peptides.df %>% dplyr::select(starts_with("Intensity")) %>%
             gsub_columns("^Intensity\\s([LMH](\\s|$))", "Intensity.\\1") %>%
             gsub_columns("^Intensity(\\s|$)", "Intensity.Sum\\1") %>%
-            mutate_each(., funs(ifelse(.==0.0, NA, .)))
+            mutate_all(., funs(ifelse(.==0.0, NA, .)))
         res.df <- bind_cols(res.df, intensities.df)
         col_info$intensity <- colnames(intensities.df)
     }
@@ -310,8 +310,8 @@ read.MaxQuant.Sites <- function(folder_path, file_name, nrows = Inf, modif = "Ph
             gsub_columns("^Intensity\\s([LMH](\\s|_|$))", "Intensity.\\1") %>%
             gsub_columns("^Intensity(\\s|_|$)", "Intensity.Sum\\1") %>%
             gsub_columns("^Intensity.Sum(.+)(___\\d+)$", "Intensity.Sum\\2\\1") %>%
-            mutate_each(., funs(as.numeric)) %>%
-            mutate_each(., funs(ifelse(.==0.0, NA_real_, .)))
+            mutate_all(., funs(as.numeric)) %>%
+            mutate_all(., funs(ifelse(.==0.0, NA_real_, .)))
         res.df <- bind_cols(res.df, intensities.df)
         col_info$intensity <- colnames(intensities.df)
     }
@@ -320,14 +320,14 @@ read.MaxQuant.Sites <- function(folder_path, file_name, nrows = Inf, modif = "Ph
             gsub_columns("^(Occupancy\\s|Occupancy ratio|Occupancy error scale\\s)([LMH](\\s|$))", "\\1.\\2") %>%
             gsub_columns("^Occupancy ratio", "occupancy_ratio") %>%
             gsub_columns("^Occupancy error scale", "occupancy_error_scale") %>%
-            mutate_each(., funs(as.numeric))
+            mutate_all(funs(as.numeric))
         res.df <- bind_cols(res.df, occupancies.df)
         col_info$occupancy <- colnames(occupancies.df)
     }
     if ('ratio' %in% import_data) {
         ratios.df <- data.df %>% dplyr::select(starts_with("Ratio mode/base")) %>%
             gsub_columns("^Ratio mod/base\\s", "ratio_mod2base.") %>%
-            mutate_each(funs(as.numeric))
+            mutate_all(funs(as.numeric))
         res.df <- bind_cols(res.df, ratios.df)
         col_info$ratio <- colnames(ratios.df)
     }

@@ -51,6 +51,45 @@ effects_cumsum <- function(df, group_col) {
   }
 }
 
+# compose replicate effects design matrix
+replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", cond_col="condition", replicate_col="msrun") {
+  # compose replicate effects
+  # ~ (replicate %in% condition) doesn't work because of assymetrical design (diff. N of replicates)
+  mschannels_df <- dplyr::select_at(mschannels_df, c("msrun"=msrun_col, "condition"=cond_col, "replicate"=replicate_col))
+  msrunXreplEffect_pre.df <- dplyr::group_by(mschannels_df, condition) %>%
+    dplyr::do({
+      if (nrow(.) <= 1) {
+        # return stub to keep msrun
+        warning(.$condition[[1]], ": single replicate (", .$msrun[[1]], "), no replicate effects")
+        data.frame(msrun = as.character(.$msrun[[1]]),
+                   repl_effect = paste0("__ignore_replicate__", .$msrun[[1]]),
+                   Freq = 0.0,
+                   stringsAsFactors = FALSE)
+      } else {
+        cond_msruns.df <- dplyr::mutate(., replicate=factor(replicate))
+        mtx <- model.matrix(~ replicate,
+                          cond_msruns.df,
+                          contrasts.arg = list("replicate" = "contr.sum"))
+        mtx <- mtx[, colnames(mtx) != "(Intercept)"]
+        dimnames(mtx) <- list(msrun = cond_msruns.df$msrun,
+                              repl_effect = paste0(cond_col, cond_msruns.df$condition[1], ':', colnames(mtx)))
+        as.data.frame(as.table(mtx)) %>% dplyr::filter(Freq != 0.0) %>%
+          dplyr::mutate(msrun = as.character(msrun),
+                        repl_effect = as.character(repl_effect))
+      }
+    }) %>% dplyr::ungroup()
+  msrunXreplEffect_wide.df <- reshape(msrunXreplEffect_pre.df, direction="wide",
+                                      idvar="msrun", timevar="repl_effect", v.names="Freq") %>%
+    dplyr::select(-condition, -starts_with("Freq.__ignore_replicate__")) %>%
+    dplyr::mutate_at(vars(starts_with("Freq")), funs(if_else(is.na(.), 0.0, .)))
+  res <- dplyr::select(msrunXreplEffect_wide.df, -msrun) %>% as.matrix()
+  mXre_dims <- list(msrun = msrunXreplEffect_wide.df$msrun,
+                    repl_effect = str_replace(colnames(res), "^Freq\\.", ""))
+  names(mXre_dims) <- c(msrun_col, paste0(replicate_col, "_effect"))
+  dimnames(res) <- mXre_dims
+  res
+}
+
 normalize_experiments <- function(norm_model, def_norm_data, df,
                                   quant_col = "intensity", obj_col = "protgroup_id",
                                   exp_col = "mschannel_ix", cond_col = "bait_orf",

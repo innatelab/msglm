@@ -51,7 +51,7 @@ data {
 
   // global model constants
   real global_labu_shift;   // shift to be applied to all XXX_labu variables to get the real log intensity
-  real<lower=0> obj_effect_tau;
+  vector<lower=0>[Neffects] effect_tau;
   real<lower=0> obj_repl_shift_tau;
   real<lower=0> obj_batch_effect_tau;
   real<lower=0> obj_base_labu_sigma;
@@ -89,6 +89,7 @@ transformed data {
   int<lower=0,upper=NobjEffects> NobjEffectsPos;
   int<lower=0,upper=NobjEffects> NobjEffectsOther;
   int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects];
+  vector<lower=0>[NobjEffects] obj_effect_tau;
 
   NobjEffectsPos = sum(obj_effect_is_positive);
   NobjEffectsOther = NobjEffects - NobjEffectsPos;
@@ -107,6 +108,7 @@ transformed data {
       }
     }
   }
+  obj_effect_tau = effect_tau[obj_effect2effect];
 
   {
     vector[Nquanted] qLogData;
@@ -218,7 +220,7 @@ transformed parameters {
 
   // calculate effects lambdas and scale effects
   obj_effect_lambda = obj_effect_lambda_a ./ sqrt(obj_effect_lambda_t);
-  obj_effect = append_row(obj_effect_unscaled_pos, obj_effect_unscaled_other)[obj_effect_reshuffle] .* obj_effect_lambda * obj_effect_tau;
+  obj_effect = append_row(obj_effect_unscaled_pos, obj_effect_unscaled_other)[obj_effect_reshuffle] .* obj_effect_lambda .* obj_effect_tau;
   obj_repl_shift_sigma = obj_repl_shift_lambda_a ./ sqrt(obj_repl_shift_lambda_t) * obj_repl_shift_tau;
 
   // calculate iaction_labu

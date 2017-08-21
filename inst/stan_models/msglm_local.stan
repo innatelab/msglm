@@ -41,7 +41,7 @@ data {
 
   int<lower=0> NobjReplEffects;
   int<lower=1,upper=NreplEffects> obj_repl_effect2repl_effect[NobjReplEffects];
-  int<lower=0> NreplEffectsPerObjCumsum[Nobjects+1];
+  int<lower=0> NreplEffectsPerObjCumsum[NobjReplEffects > 0 ? Nobjects+1 : 1];
 
   int<lower=0> NobjBatchEffects;
   int<lower=1,upper=NbatchEffects> obj_batch_effect2batch_effect[NobjBatchEffects];
@@ -189,8 +189,8 @@ parameters {
 
   //real<lower=0> obj_repl_effect_sigma;
   //vector<lower=0>[Nobjects*Nexperiments] repl_shift_lambda;
-  vector<lower=0>[Nconditions] obj_repl_shift_lambda_t;
-  vector<lower=0>[Nconditions] obj_repl_shift_lambda_a;
+  vector<lower=0>[NreplEffects > 0 ? Nconditions : 0] obj_repl_shift_lambda_t;
+  vector<lower=0>[NreplEffects > 0 ? Nconditions : 0] obj_repl_shift_lambda_a;
   vector[NobjReplEffects] obj_repl_effect_unscaled;
 
   //real<lower=0> obj_batch_effect_sigma;
@@ -206,7 +206,7 @@ transformed parameters {
 
   vector[Niactions] iaction_labu;
 
-  vector[Nconditions] obj_repl_shift_sigma;
+  vector[NreplEffects > 0 ? Nconditions : 0] obj_repl_shift_sigma;
   matrix[Nobjects, Nexperiments] objXexp_repl_shift_unscaled; // unscaled replicate shifts for all potential observations (including unobserved)
   vector[Nobservations] obs_labu; // iaction_labu + objXexp_repl_shift * obj_repl_shift_sigma
 
@@ -221,7 +221,6 @@ transformed parameters {
   // calculate effects lambdas and scale effects
   obj_effect_lambda = obj_effect_lambda_a ./ sqrt(obj_effect_lambda_t);
   obj_effect = append_row(obj_effect_unscaled_pos, obj_effect_unscaled_other)[obj_effect_reshuffle] .* obj_effect_lambda .* obj_effect_tau;
-  obj_repl_shift_sigma = obj_repl_shift_lambda_a ./ sqrt(obj_repl_shift_lambda_t) * obj_repl_shift_tau;
 
   // calculate iaction_labu
   {
@@ -234,11 +233,12 @@ transformed parameters {
     }
   }
   // calculate objXexp_repl_shift and obs_labu
-  {
+  if (NreplEffects > 0) {
     vector[NobjReplEffects] obj_repl_effect;
     vector[NobjReplEffects] obj_repl_effect_lambda;
 
     // note: linear transform of obj_repl_effect_unscaled, Jacobian is zero
+    obj_repl_shift_sigma = obj_repl_shift_lambda_a ./ sqrt(obj_repl_shift_lambda_t) * obj_repl_shift_tau;
     objXexp_repl_shift_unscaled = csr_to_dense_matrix(Nobjects, NreplEffects, obj_repl_effect_unscaled,
                                         obj_repl_effect2repl_effect, NreplEffectsPerObjCumsum) * replEffectXexperiment;
     for (i in 1:Nobservations) {
@@ -248,6 +248,9 @@ transformed parameters {
                   + objXexp_repl_shift_unscaled[iaction2obj[iaction_ix], observation2experiment[i]] *
                     obj_repl_shift_sigma[iaction2condition[iaction_ix]];
     }
+  } else {
+    obs_labu = iaction_labu[observation2iaction];
+    objXexp_repl_shift_unscaled = rep_matrix(0.0, Nobjects, Nexperiments);
   }
   // calculate objXexp_batch_shift (doesn't make sense to add to obs_labu)
   if (NbatchEffects > 0) {
@@ -283,10 +286,12 @@ model {
 
     //repl_shift_lambda ~ student_t(2, 0.0, repl_shift_tau);
     //obj_repl_effect_lambda ~ student_t(2, 0.0, obj_repl_effect_tau);
-    obj_repl_shift_lambda_t ~ gamma(1.0, 1.0);
-    obj_repl_shift_lambda_a ~ normal(0.0, 1.0);
     //obj_repl_effect ~ normal(0.0, obj_repl_effect_lambda);
-    to_vector(objXexp_repl_shift_unscaled) ~ normal(0.0, 1.0);
+    if (NreplEffects > 0) {
+      obj_repl_shift_lambda_t ~ gamma(1.0, 1.0);
+      obj_repl_shift_lambda_a ~ normal(0.0, 1.0);
+      to_vector(objXexp_repl_shift_unscaled) ~ normal(0.0, 1.0);
+    }
     //to_vector(repl_shift) ~ normal(0.0, repl_shift_lambda);
 
     //obj_batch_effect_lambda ~ student_t(2, 0.0, obj_batch_effect_tau);

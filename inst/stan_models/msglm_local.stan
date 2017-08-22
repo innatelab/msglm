@@ -19,6 +19,7 @@ data {
   int<lower=1,upper=Nobjects> underdef_objs[NunderdefObjs];
 
   matrix[Neffects, Nconditions] effectXcondition;
+  matrix<lower=0>[Neffects, Nconditions] inv_effectXcondition;
   matrix[NreplEffects, Nexperiments] replEffectXexperiment;
   matrix[NbatchEffects, Nexperiments] batchEffectXexperiment;
   int<lower=1,upper=Nconditions> experiment2condition[Nexperiments];
@@ -324,4 +325,18 @@ model {
         1 ~ bernoulli_logit(q_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         0 ~ bernoulli_logit(m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
     }
+}
+
+generated quantities {
+  vector[Neffects] effect_shift_replCI_sigma;
+  vector[Niactions] iaction_labu_replCI;
+  vector[NobjEffects] obj_effect_replCI;
+
+  for (i in 1:Niactions) {
+    iaction_labu_replCI[i] = normal_rng(iaction_labu[i], obj_repl_shift_sigma[iaction2condition[i]]);
+  }
+  effect_shift_replCI_sigma = inv_effectXcondition * obj_repl_shift_sigma;
+  for (i in 1:NobjEffects) {
+    obj_effect_replCI[i] = normal_rng(obj_effect[i], effect_shift_replCI_sigma[obj_effect2effect[i]]);
+  }
 }

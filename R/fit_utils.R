@@ -290,7 +290,7 @@ normalize_experiments <- function(norm_model, def_norm_data, df,
 
 calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacondition, conditionXmetacondition.df, contrastXcondition.df,
                            mschannel_col = "mschannel_ix",
-                           condition_agg_col = "condition", var_names = c('iaction_labu', 'obs_labu'),
+                           condition_agg_col = "condition", var_names = c('iaction_labu', 'iaction_labu_replCI', 'obs_labu'),
                            obj_dims = 'glm_object_ix', var_info_cols = 'glm_object_ix', val_trans = NULL,
                            condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1)) {
   for (vars_category in names(vars_results)) {

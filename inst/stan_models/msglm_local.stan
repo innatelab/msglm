@@ -276,7 +276,7 @@ model {
     // treatment effect parameters, horseshoe prior
     //obj_effect_tau ~ student_t(2, 0.0, 1.0);
     //obj_effect_lambda ~ student_t(2, 0.0, obj_effect_tau);
-    obj_effect_lambda_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
+    obj_effect_lambda_t ~ chi_square(2.0);
     obj_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
     obj_effect_unscaled_pos ~ normal(0.0, 1.0);
     obj_effect_unscaled_other ~ normal(0.0, 1.0);
@@ -286,17 +286,16 @@ model {
     //underdef_obj_shift ~ normal(0.0, 10.0);
 
     //repl_shift_lambda ~ student_t(2, 0.0, repl_shift_tau);
-    //obj_repl_effect_lambda ~ student_t(2, 0.0, obj_repl_effect_tau);
     //obj_repl_effect ~ normal(0.0, obj_repl_effect_lambda);
     if (NreplEffects > 0) {
-      obj_repl_shift_lambda_t ~ gamma(1.0, 1.0);
+      obj_repl_shift_lambda_t ~ chi_square(4.0);
       obj_repl_shift_lambda_a ~ normal(0.0, 1.0);
       to_vector(objXexp_repl_shift_unscaled) ~ normal(0.0, 1.0);
     }
     //to_vector(repl_shift) ~ normal(0.0, repl_shift_lambda);
 
     //obj_batch_effect_lambda ~ student_t(2, 0.0, obj_batch_effect_tau);
-    obj_batch_effect_lambda_t ~ gamma(1.0, 1.0);
+    obj_batch_effect_lambda_t ~ chi_square(3.0);
     obj_batch_effect_lambda_a ~ normal(0.0, 1.0);
     //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
     obj_batch_effect_unscaled ~ normal(0.0, 1.0);

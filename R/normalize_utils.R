@@ -3,194 +3,200 @@
 # Author: astukalov
 ###############################################################################
 
-normalize_experiments <- function(norm_model, def_norm_data, df,
+normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
                                   quant_col = "intensity", obj_col = "protgroup_id",
-                                  exp_col = "mschannel_ix", cond_col = "bait_orf",
-                                  cond_group_col = NULL, exp_shifts = NULL, shift_col="shift",
-                                  missing_exp.ratio=0.1, missing_cond.ratio=if (exp_col==cond_col) missing_exp.ratio else 0.0,
-                                  method = c("optimizing", "mcmc", "vb"), center_shifts=TRUE,
-                                  max_quant.ratio=NA, exp_shift.min = -0.5, Rhat_max = 1.1,
+                                  mschan_col = "mschannel", cond_col = "condition",
+                                  cond_group_col = NULL, mschan_shifts = NULL, shift_col="shift",
+                                  stan_method = c("optimizing", "mcmc", "vb"),
                                   max_objs=1000L,
+                                  quant_ratio.max=NA, mschan_shift.min = -0.5,
+                                  nmschan_ratio.min=0.9, ncond_ratio.min=if (mschan_col==cond_col) nmschan_ratio.min else 1.0,
                                   mcmc.iter=2000L, mcmc.chains=4, mcmc.thin=4, mcmc.adapt_delta=0.9,
                                   vb.iter=100000L,
+                                  Rhat.max = 1.1, neff_ratio.min = 0.25,
+                                  shifts_constraint=c("none", "mean=0", "median=0"),
                                   verbose=FALSE)
 {
-    method <- match.arg(method)
+    stan_method <- match.arg(stan_method)
+    shifts_constraint <- match.arg(shifts_constraint)
     if (is.null(cond_group_col)) {
-      df$`__all__` <- TRUE
+      msdata_df$`__all__` <- TRUE
       cond_group_col <- "__all__"
     }
     # prepare "standartized" data frame
-    df_std <- df[,c(obj_col, exp_col, cond_col, cond_group_col, quant_col)]
-    names(df_std) <-c("obj", "experiment", "condition", "cond_group", "quant")
-    if (is.null(exp_shifts)) {
+    msdata_df_std <- msdata_df[,c(obj_col, mschan_col, cond_col, cond_group_col, quant_col)]
+    names(msdata_df_std) <-c("obj", "mschannel", "condition", "cond_group", "quant")
+    if (is.null(mschan_shifts)) {
       # no shifts by default
-      exp_shifts <- data.frame(experiment = sort(unique(df_std$experiment)),
-                               shift = rep.int(0.0, n_distinct(df_std$experiment)),
-                               stringsAsFactors = TRUE)
+      mschan_shifts <- data.frame(mschannel = sort(unique(msdata_df_std$mschannel)),
+                                  shift = rep.int(0.0, n_distinct(msdata_df_std$mschannel)),
+                                  stringsAsFactors = TRUE)
     } else {
-      exp_shifts <- exp_shifts[,c(exp_col, shift_col)]
-      colnames(exp_shifts) <- c("experiment", "shift")
+      mschan_shifts <- mschan_shifts[,c(mschan_col, shift_col)]
+      colnames(mschan_shifts) <- c("mschannel", "shift")
     }
-    if (!is.na(exp_shift.min) && is.finite(exp_shift.min)) {
-      exp_shifts <- dplyr::mutate(exp_shifts, is_used = shift >= exp_shift.min)
-      if (!all(exp_shifts$is_used)) {
-        warning(sum(!exp_shifts$is_used), " experiment(s) with low shifts excluded from ", cond_col, " normalization: ",
-                paste0(exp_shifts$experiment[!exp_shifts$is_used], collapse=" "))
-        exp_shifts <- dplyr::filter(exp_shifts, is_used)
+    if (!is.na(mschan_shift.min) && is.finite(mschan_shift.min)) {
+      mschan_shifts <- dplyr::mutate(mschan_shifts, is_used = shift >= mschan_shift.min)
+      if (!all(mschan_shifts$is_used)) {
+        warning(sum(!mschan_shifts$is_used), " mschannel(s) with low shifts excluded from ", cond_col, " normalization: ",
+                paste0(mschan_shifts$mschannel[!mschan_shifts$is_used], collapse=" "))
+        mschan_shifts <- dplyr::filter(mschan_shifts, is_used)
       }
-      df_std <- dplyr::inner_join(df_std, exp_shifts %>% dplyr::select(experiment, shift)) %>%
+      msdata_df_std <- dplyr::inner_join(msdata_df_std, mschan_shifts %>% dplyr::select(mschannel, shift)) %>%
         dplyr::mutate(norm_quant = quant*exp(-shift)) %>% dplyr::select(-shift)
     } else {
-      exp_shifts <- dplyr::mutate(exp_shifts, is_used = TRUE)
-      df_std$norm_quant <- df_std$quant
+      mschan_shifts <- dplyr::mutate(mschan_shifts, is_used = TRUE)
+      msdata_df_std$norm_quant <- msdata_df_std$quant
     }
-    exp_shifts$experiment <- as.character(exp_shifts$experiment)
-    obj_group_stats <- df_std %>% dplyr::filter(!is.na(quant)) %>%
+    mschan_shifts$mschannel <- as.character(mschan_shifts$mschannel)
+    obj_condgrp_stats <- msdata_df_std %>% dplyr::filter(!is.na(quant)) %>%
       dplyr::group_by(obj, cond_group) %>%
-      dplyr::summarise(n_experiments = n_distinct(experiment),
+      dplyr::summarise(n_mschannels = n_distinct(mschannel),
                        n_conditions = n_distinct(condition)) %>%
       dplyr::ungroup()
-    group_stats <- dplyr::group_by(obj_group_stats, cond_group) %>%
-      dplyr::summarise(n_max_experiments = max(n_experiments),
+    condgrp_stats <- dplyr::group_by(obj_condgrp_stats, cond_group) %>%
+      dplyr::summarise(n_max_mschannels = max(n_mschannels),
                        n_max_conditions = max(n_conditions))
-    valid_objs <- dplyr::inner_join(obj_group_stats, group_stats) %>%
-      dplyr::filter(n_experiments > 1L & n_experiments >= (1-missing_exp.ratio)*n_max_experiments &
-                    n_conditions >= (1-missing_cond.ratio)*n_max_conditions)
-    message(n_distinct(group_stats$cond_group), " condition group(s)")
+    message(n_distinct(condgrp_stats$cond_group), " condition group(s)")
+    valid_objs <- dplyr::inner_join(obj_condgrp_stats, condgrp_stats) %>%
+      dplyr::filter(n_mschannels > 1L & n_mschannels >= nmschan_ratio.min*n_max_mschannels &
+                    n_conditions >= ncond_ratio.min*n_max_conditions)
     res <- dplyr::group_by(valid_objs, cond_group) %>% do({
-        df_group <- dplyr::inner_join(df_std, .)
-        group_objs <- df_group %>%
-          dplyr::group_by(obj, n_max_experiments, n_max_conditions, cond_group) %>%
+        condgrp_msdata_df <- dplyr::inner_join(msdata_df_std, .)
+        condgrp_objs <- condgrp_msdata_df %>%
+          dplyr::group_by(obj, n_max_mschannels, n_max_conditions, cond_group) %>%
           dplyr::summarise(quant_med = median(norm_quant, na.rm=TRUE),
                            quant_min = min(norm_quant, na.rm=TRUE),
                            quant_max = max(norm_quant, na.rm=TRUE),
                            sd = sd(norm_quant, na.rm=TRUE)) %>% dplyr::ungroup() %>%
           dplyr::mutate(sd_rel = sd/quant_med,
                         sd_quantile = percent_rank(if_else(!is.na(sd_rel), sd_rel, Inf)),
-                        is_valid = is.na(max_quant.ratio) |
-                                   (quant_min*max_quant.ratio > quant_med &
-                                    quant_max < max_quant.ratio*quant_med))
+                        is_valid = is.na(quant_ratio.max) |
+                                   (quant_min*quant_ratio.max > quant_med &
+                                    quant_max < quant_ratio.max*quant_med))
         # max sure at least 25% of group objects or max_objs (if specified) are valid for normalization
-        if (sum(group_objs$is_valid) < pmin(0.25*nrow(group_objs),
+        if (sum(condgrp_objs$is_valid) < pmin(0.25*nrow(condgrp_objs),
                                             ifelse(max_objs > 0L, max_objs, Inf))) {
-            group_objs$is_valid <- group_objs$sd_quantile <= 0.25
+            condgrp_objs$is_valid <- condgrp_objs$sd_quantile <= 0.25
         }
-        valid_group_objs <- dplyr::filter(group_objs, is_valid)
-        sel_group_objs <- if (max_objs > 0L && nrow(valid_group_objs) > max_objs) {
-          sample_n(valid_group_objs, max_objs)
+        valid_condgrp_objs <- dplyr::filter(condgrp_objs, is_valid)
+        sel_condgrp_objs <- if (max_objs > 0L && nrow(valid_condgrp_objs) > max_objs) {
+          sample_n(valid_condgrp_objs, max_objs)
         } else {
-          valid_group_objs
+          valid_condgrp_objs
         }
-        df_group <- dplyr::semi_join(df_group, sel_group_objs)
-        norm_data <- def_norm_data
-        norm_data$Nexperiments <- sel_group_objs$n_max_experiments[1]
-        norm_data$Nconditions <- sel_group_objs$n_max_conditions[1]
-        norm_data$Nobjects <- nrow(sel_group_objs)
-        message("Normalizing group '", sel_group_objs$cond_group[1], "', ",
-                norm_data$Nobjects, " object(s), ",
-                norm_data$Nconditions, " condition(s), ",
-                norm_data$Nexperiments, " experiment(s)")
-        if (nrow(df_group) == 0L) {
+        condgrp_msdata_df <- dplyr::semi_join(condgrp_msdata_df, sel_condgrp_objs)
+        stan_input <- stan_input_base
+        stan_input$Nmschannels <- sel_condgrp_objs$n_max_mschannels[1]
+        stan_input$Nconditions <- sel_condgrp_objs$n_max_conditions[1]
+        stan_input$Nobjects <- nrow(sel_condgrp_objs)
+        message("Normalizing group '", sel_condgrp_objs$cond_group[1], "', ",
+                stan_input$Nobjects, " object(s), ",
+                stan_input$Nconditions, " condition(s), ",
+                stan_input$Nmschannels, " mschannel(s)")
+        if (nrow(condgrp_msdata_df) == 0L) {
             # degenerated case
             warning("No valid observations in group ", .$cond_group[1])
-            res <- data.frame(condition = as.character(df_group$condition[1]),
+            res <- data.frame(condition = as.character(condgrp_msdata_df$condition[1]),
                               shift = 0.0,
                               stringsAsFactors = FALSE)
             colnames(res) <- c(cond_col, "shift")
-            return (res)
-        } else if (norm_data$Nconditions == 1L) {
+        } else if (stan_input$Nconditions == 1L) {
             # another degenerated case
-            res <- data.frame(condition = as.character(df_group$condition[1]),
+            res <- data.frame(condition = as.character(condgrp_msdata_df$condition[1]),
                               shift = 0.0,
                               stringsAsFactors = FALSE)
             colnames(res) <- c(cond_col, "shift")
-            return (res)
-        }
-        #if (any(is.na(df_group$quant))) {
+        } else {
+        #if (any(is.na(condgrp_msdata_df$quant))) {
         #  stop("Non-quanted observations detected")
         #}
-        exp_df <- dplyr::select(df_group, experiment, condition) %>%
-          dplyr::distinct() %>% dplyr::arrange(condition, experiment) %>%
-          dplyr::mutate(experiment = as.character(experiment),
+        mschan_df <- dplyr::select(condgrp_msdata_df, mschannel, condition) %>%
+          dplyr::distinct() %>% dplyr::arrange(condition, mschannel) %>%
+          dplyr::mutate(mschannel = as.character(mschannel),
                         condition= as.character(condition)) %>%
-          dplyr::left_join(exp_shifts) %>%
-          dplyr::mutate(experiment = factor(experiment, levels=experiment),
+          dplyr::left_join(mschan_shifts) %>%
+          dplyr::mutate(mschannel = factor(mschannel, levels=mschannel),
                         condition = factor(condition, levels=unique(condition))) %>%
-          dplyr::arrange(as.integer(experiment))
-        if (any(is.na(exp_df$shift))) {
-          warning("No shifts for experiments: ",
-                  paste0(exp_df$experiment[is.na(exp_df$shift)], collapse=" "))
+          dplyr::arrange(as.integer(mschannel))
+        if (any(is.na(mschan_df$shift))) {
+          warning("No shifts for mschannels: ",
+                  paste0(mschan_df$mschannel[is.na(mschan_df$shift)], collapse=" "))
         }
-        norm_data$experiment2condition <- as.array(as.integer(exp_df$condition))
-        norm_data$experiment_shift <- as.array(exp_df$shift)
-        df_group <- dplyr::mutate(df_group,
-                                  experiment = factor(as.character(experiment),
-                                                      levels=levels(exp_df$experiment)))
-        df_group <- dplyr::left_join(tidyr::expand(df_group, obj, experiment), df_group) %>%
-            dplyr::arrange(as.integer(obj), as.integer(experiment)) %>%
+        stan_input$mschannel2condition <- as.array(as.integer(mschan_df$condition))
+        stan_input$mschannel_shift <- as.array(mschan_df$shift)
+        condgrp_msdata_df <- dplyr::mutate(condgrp_msdata_df,
+                                  mschannel = factor(as.character(mschannel),
+                                                     levels=levels(mschan_df$mschannel)))
+        condgrp_msdata_df <- dplyr::left_join(tidyr::expand(condgrp_msdata_df, obj, mschannel), condgrp_msdata_df) %>%
+            dplyr::arrange(as.integer(obj), as.integer(mschannel)) %>%
             dplyr::mutate(safe_quant = if_else(is.na(quant), 0.0, quant))
 
-        norm_data$qData <- matrix(df_group$safe_quant, ncol = nrow(exp_df), byrow=TRUE) #nrow=nrow(valid_group_objs)
+        stan_input$qData <- matrix(condgrp_msdata_df$safe_quant, ncol = nrow(mschan_df), byrow=TRUE) #nrow=nrow(valid_condgrp_objs)
         message("Running Stan optimization...")
         out_params <- c("data_sigma", "condition_sigma", "condition_shift")
-        if (method == 'optimizing') {
-          norm_fit <- optimizing(norm_model, norm_data, algorithm="LBFGS",
-                                 init=list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, norm_data$Nconditions-1L))),
+        if (stan_method == 'optimizing') {
+          norm_fit <- optimizing(stan_norm_model, stan_input, algorithm="LBFGS",
+                                 init=list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, stan_input$Nconditions-1L))),
                                  history_size=10L)
           cond_shift_pars <- norm_fit$par[str_detect(names(norm_fit$par), "^condition_shift\\[\\d+\\]$")]
           cond_shift_ixs <- as.integer(str_match(names(cond_shift_pars), "\\[(\\d+)\\]$")[,2])
-          res <- data.frame(condition = levels(exp_df$condition)[cond_shift_ixs],
+          res <- data.frame(condition = levels(mschan_df$condition)[cond_shift_ixs],
                             shift = as.numeric(cond_shift_pars),
                             stringsAsFactors=FALSE)
-        } else if (method == 'mcmc') {
-          norm_fit <- sampling(norm_model, norm_data, chains=mcmc.chains, iter=mcmc.iter, thin=mcmc.thin,
+        } else if (stan_method == 'mcmc') {
+          norm_fit <- sampling(stan_norm_model, stan_input, chains=mcmc.chains, iter=mcmc.iter, thin=mcmc.thin,
                                pars=out_params, include=TRUE,
-                               init=function() list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, norm_data$Nconditions-1L))),
+                               init=function() list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, stan_input$Nconditions-1L))),
                                control = list(adapt_delta=mcmc.adapt_delta))
           norm_fit_stat <- monitor(norm_fit)
           cond_shift_mask <- str_detect(rownames(norm_fit_stat), "^condition_shift\\[\\d+\\]$")
-          nonconv_mask <- norm_fit_stat[cond_shift_mask, 'Rhat'] > Rhat_max
+          nonconv_mask <- norm_fit_stat[cond_shift_mask, 'Rhat'] > Rhat.max
           if (any(nonconv_mask)) {
-            warning("Rhat>", Rhat_max, " for ", sum(nonconv_mask), " shift(s)")
+            warning("Rhat>", Rhat.max, " for ", sum(nonconv_mask), " shift(s)")
           }
-          n_eff_min <- 0.1*mcmc.iter
-          nonconv_mask <- norm_fit_stat[cond_shift_mask, 'n_eff'] < n_eff_min
+          neff_min <- neff_ratio.min*mcmc.iter
+          nonconv_mask <- norm_fit_stat[cond_shift_mask, 'n_eff'] < neff_min
           if (any(nonconv_mask)) {
-            warning("n_eff<", n_eff_min, " for ", sum(nonconv_mask), " shift(s)")
+            warning("n_eff<", neff_min, " for ", sum(nonconv_mask), " shift(s)")
           }
           cond_shift_pars <- norm_fit_stat[cond_shift_mask, 'mean']
           cond_shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[cond_shift_mask], "\\[(\\d+)\\]$")[,2])
-          res <- data.frame(condition = levels(exp_df$condition)[cond_shift_ixs],
+          res <- data.frame(condition = levels(mschan_df$condition)[cond_shift_ixs],
                             shift = as.numeric(cond_shift_pars),
                             Rhat = norm_fit_stat[cond_shift_mask, 'Rhat'],
                             n_eff = norm_fit_stat[cond_shift_mask, 'n_eff'],
                             stringsAsFactors=FALSE)
-        } else if (method == 'vb') {
-          norm_fit <- vb(norm_model, norm_data, iter=vb.iter,
+        } else if (stan_method == 'vb') {
+          norm_fit <- vb(stan_norm_model, stan_input, iter=vb.iter,
                          pars=out_params, include=TRUE,
-                         init=function() list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, norm_data$Nconditions-1L))) )
+                         init=function() list(condition_sigma=1.0, condition_shift0=as.array(rep.int(0.0, stan_input$Nconditions-1L))) )
           norm_fit_stat <- monitor(norm_fit)
           cond_shift_mask <- str_detect(rownames(norm_fit_stat), "^condition_shift\\[\\d+\\]$")
           cond_shift_pars <- norm_fit_stat[cond_shift_mask, 'mean']
           cond_shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[cond_shift_mask], "\\[(\\d+)\\]$")[,2])
-          res <- data.frame(condition = levels(exp_df$condition)[cond_shift_ixs],
+          res <- data.frame(condition = levels(mschan_df$condition)[cond_shift_ixs],
                             shift = as.numeric(cond_shift_pars),
                             stringsAsFactors=FALSE)
         } else {
-          stop('Unknown method ', method)
+          stop('Unknown method ', stan_method)
         }
-        if (center_shifts) {
+        if (shifts_constraint == "median=0") {
           res$shift <- res$shift - median(res$shift)
+        } else if (shifts_constraint == "mean=0") {
+          res$shift <- res$shift - mean(res$shift)
         }
         col_renames <- "condition"
         names(col_renames) <- cond_col
         res <- dplyr::rename_(res, .dots=col_renames) %>%
           dplyr::mutate(
-            method = method,
-            n_objects = norm_data$Nobjects,
-            n_experiments = norm_data$Nexperiments)
+            stan_method = stan_method,
+            n_objects = stan_input$Nobjects,
+            n_mschannels = stan_input$Nmschannels)
+        }
+        res
     }) %>% dplyr::ungroup()
+    # back to user-specified name of the condition group column
     if (cond_group_col == "__all__") {
       res$cond_group <- NULL
     } else {

@@ -5,13 +5,13 @@ functions {
 }
 
 data {
-  int<lower=1> Nexperiments;    // number of experiments
+  int<lower=1> Nmschannels;    // number of MS channels
   int<lower=1> Nobjects;       // number of objects
   int<lower=1> Nconditions;
-  vector[Nexperiments]  experiment_shift; // fixed experiment shifts
-  int<lower=1,upper=Nconditions> experiment2condition[Nexperiments];
+  vector[Nmschannels]  mschannel_shift; // fixed mschannel shifts
+  int<lower=1,upper=Nconditions> mschannel2condition[Nmschannels];
 
-  matrix<lower=0>[Nobjects, Nexperiments] qData;
+  matrix<lower=0>[Nobjects, Nmschannels] qData;
 
   // instrument calibrated parameters 
   real<lower=0> zDetectionFactor;
@@ -29,11 +29,11 @@ data {
 }
 
 transformed data {
-    matrix[Nexperiments, Nexperiments] identity_experiments;
-    matrix[Nobjects, Nexperiments] zScore;
-    matrix[Nobjects, Nexperiments] qLogStd;
-    matrix<lower=0>[Nobjects, Nexperiments] qDataScaled;
-    matrix<lower=0>[Nobjects, Nexperiments] meanDenomScaled;
+    matrix[Nmschannels, Nmschannels] identity_mschannels;
+    matrix[Nobjects, Nmschannels] zScore;
+    matrix[Nobjects, Nmschannels] qLogStd;
+    matrix<lower=0>[Nobjects, Nmschannels] qDataScaled;
+    matrix<lower=0>[Nobjects, Nmschannels] meanDenomScaled;
     int<lower=0> NobsPerObject[Nobjects];
     matrix[Nconditions, Nconditions-1] condition_shift_transform;
 
@@ -43,12 +43,12 @@ transformed data {
         condition_shift_transform[Nconditions, i] = -1.0;
     }
 
-    identity_experiments = diag_matrix(rep_vector(1.0, Nexperiments));
+    identity_mschannels = diag_matrix(rep_vector(1.0, Nmschannels));
 
     zScore = (log(qData) - zShift) * zScale;
 
     NobsPerObject = rep_array(0, Nobjects);
-    for (i in 1:Nexperiments) {
+    for (i in 1:Nmschannels) {
         for (j in 1:Nobjects) {
             if (qData[j,i] > 0.0) {
                 NobsPerObject[j] = NobsPerObject[j] + 1;
@@ -57,12 +57,12 @@ transformed data {
     }
 
     // process the intensity data to optimize likelihood calculation
-    for (i in 1:Nexperiments) {
+    for (i in 1:Nmschannels) {
         for (j in 1:Nobjects) {
             qLogStd[j, i] = intensity_log_std(zScore[j, i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
         }
     }
-    for (i in 1:Nexperiments) {
+    for (i in 1:Nmschannels) {
         for (j in 1:Nobjects) {
             if (qData[j, i] > 0.0) {
                 real qScale;
@@ -98,8 +98,8 @@ transformed parameters {
 }
 
 model {
-    vector[Nexperiments] total_experiment_shift;
-    matrix[Nexperiments, Nexperiments] sum_experiments;
+    vector[Nmschannels] total_mschannel_shift;
+    matrix[Nmschannels, Nmschannels] sum_mschannels;
 
     data_sigma_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
     data_sigma_a ~ normal(0.0, 1.0); // 1.0 = 2/2
@@ -109,8 +109,8 @@ model {
     //condition_sigma ~ student_t(2, 0.0, 1.0);
     condition_shift_unscaled ~ normal(0.0, 1.0);
 
-    total_experiment_shift = experiment_shift + condition_shift[experiment2condition];
-    sum_experiments = exp(rep_matrix(total_experiment_shift', Nexperiments) - rep_matrix(total_experiment_shift, Nexperiments));
-    //print("avg_exps=", average_experiments);
-    to_vector(qDataScaled) ~ double_exponential(to_vector((qData * sum_experiments) .* meanDenomScaled), data_sigma);
+    total_mschannel_shift = mschannel_shift + condition_shift[mschannel2condition];
+    sum_mschannels = exp(rep_matrix(total_mschannel_shift', Nmschannels) - rep_matrix(total_mschannel_shift, Nmschannels));
+    //print("avg_exps=", average_mschannels);
+    to_vector(qDataScaled) ~ double_exponential(to_vector((qData * sum_mschannels) .* meanDenomScaled), data_sigma);
 }

@@ -108,7 +108,12 @@ rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NU
       res[sapply(res, function(fname) is.data.frame(frames_coll[[fname]]))]
     }))
     frame_names_freq <- table(all_frame_names)
-    frame_names <- names(frame_names_freq)[frame_names_freq == max(frame_names_freq)]
+    all_frames_mask <- frame_names_freq == max(frame_names_freq)
+    if (!all(all_frames_mask)) {
+      warning("Frames ", paste0(names(frame_names_freq)[!all_frames_mask], collapse=", "),
+              " are missing in some of the lists, ignored")
+    }
+    frame_names <- names(frame_names_freq)[all_frame_names]
   }
   res <- lapply(frame_names, function(fname) {
     bind_rows(lapply(seq_along(frames_coll_list), function(coll_ix) {

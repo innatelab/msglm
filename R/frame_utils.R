@@ -101,24 +101,24 @@ join_msglm_reports <- function(section, reports, type) {
 
 rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NULL)
 {
-  if ( is.null(frame_names) ) {
+  if (is.null(frame_names)) {
     # select names that appear in all frames
-    all_frame_names <- unlist( lapply( frames_coll_list, function( frames_coll ) {
+    all_frame_names <- unlist(lapply(frames_coll_list, function(frames_coll) {
       res <- names(frames_coll)
-      res[ sapply( res, function(fname) is.data.frame(frames_coll[[fname]]) ) ]
-    } ) )
+      res[sapply(res, function(fname) is.data.frame(frames_coll[[fname]]))]
+    }))
     frame_names_freq <- table(all_frame_names)
-    frame_names <- names(frame_names_freq)[ frame_names_freq == max(frame_names_freq) ]
+    frame_names <- names(frame_names_freq)[frame_names_freq == max(frame_names_freq)]
   }
-  res <- lapply( frame_names, function( fname ) {
-    bind_rows( lapply( seq_along(frames_coll_list), function( coll_ix ) {
+  res <- lapply(frame_names, function(fname) {
+    bind_rows(lapply(seq_along(frames_coll_list), function(coll_ix) {
       res <- frames_coll_list[[coll_ix]][[fname]]
-      if ( !is.null(link_col) && nrow(res)>0 ) res[[link_col]] <- if (!is.null(names(frames_coll_list))) names(frames_coll_list)[[coll_ix]] else coll_ix
-      return ( res )
-    } ) )
-  } )
+      if (!is.null(link_col) && nrow(res)>0) res[[link_col]] <- if (!is.null(names(frames_coll_list))) names(frames_coll_list)[[coll_ix]] else coll_ix
+      return (res)
+    }))
+  })
   names(res) <- frame_names
-  return ( res )
+  return (res)
 }
 
 expand_collapsed <- function(df, collapsed_col, separated_col, extra_cols=NULL, sep=";") {

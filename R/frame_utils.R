@@ -3,35 +3,15 @@
 # Author: Alexey Stukalov
 ###############################################################################
 
-process_model_fit_chunk <- function(file_ix, strip_samples=FALSE, strip_stats=FALSE) {
-  fit_model.file <- fit_model.files.df[file_ix, 'filename']
-  message('Loading ', fit_model.file, '...')
-  tmp.env <- new.env(parent = baseenv())
-  load(file.path(fit_model_path, fit_model.file), envir = tmp.env)
-  if (strip_samples || strip_stats) {
-    tmp.env$vars_results <- lapply( tmp.env$vars_results, function( var_results ) {
-      if (strip_samples) { var_results$samples <- NULL }
-      if (strip_stats) { var_results$stats <- NULL }
-      return ( var_results )
-    } )
-  }
-  gc()
-  res <- mget(ls(envir=tmp.env), envir=tmp.env)
-  return ( res )
-}
-
-process_msglm_chunk <- function(file_ix, sel_contrasts = NULL, condition_shifts = NULL,
-                                strip_samples=FALSE, strip_stats=FALSE,
-                                val_trans = NULL, condition.reported = "lhs",
-                                condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
-                                condition_agg_col = "condition") {
-  fit_model.file <- fit_model.files.df[ file_ix, 'filename' ]
-  message( 'Loading ', fit_model.file, '...' )
-  tmp.env <- new.env(parent = baseenv())
-  load(file.path(fit_model_path, fit_model.file ), envir = tmp.env)
-  if (!is.null(sel_contrasts)) {
+calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
+                                  contrasts = NULL, condition_shifts = NULL,
+                                  val_trans = NULL,
+                                  condition.reported = "lhs",
+                                  condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
+                                  condition_agg_col = "condition")
+{
     # FIXME do once per assembly
-    sel_contrastXmetacondition <- contrastXmetacondition[sel_contrasts, , drop=FALSE]
+    sel_contrastXmetacondition <- contrastXmetacondition[contrasts, , drop=FALSE]
     sel_contrastXmetacondition <- sel_contrastXmetacondition[, colSums(abs(sel_contrastXmetacondition)) != 0, drop=FALSE]
     sel_conditionXmetacondition.df <- dplyr::filter(conditionXmetacondition.df,
                                                     metacondition %in% colnames(sel_contrastXmetacondition))
@@ -39,14 +19,25 @@ process_msglm_chunk <- function(file_ix, sel_contrasts = NULL, condition_shifts 
       sel_conditionXmetacondition.df <- dplyr::inner_join(sel_conditionXmetacondition.df, condition_shifts)
     }
     sel_contrastXcondition.df <- dplyr::semi_join(contrastXcondition.df, sel_conditionXmetacondition.df) %>%
-        dplyr::filter(contrast %in% sel_contrasts)
-    tmp.env$vars_results <- calc_contrasts(tmp.env$vars_results, tmp.env$vars_info, tmp.env$dims_info,
-                                           sel_contrastXmetacondition, sel_conditionXmetacondition.df,
-                                           sel_contrastXcondition.df, val_trans = val_trans,
-                                           condition_agg_col = condition_agg_col,
-                                           condition.reported = condition.reported,
-                                           condition.quantiles_lhs = condition.quantiles_lhs,
-                                           condition.quantiles_rhs = condition.quantiles_rhs)
+        dplyr::filter(contrast %in% contrasts)
+    calc_contrasts(vars_results, vars_info, dims_info,
+                   sel_contrastXmetacondition, sel_conditionXmetacondition.df,
+                   sel_contrastXcondition.df, val_trans = val_trans,
+                   condition_agg_col = condition_agg_col,
+                   condition.reported = condition.reported,
+                   condition.quantiles_lhs = condition.quantiles_lhs,
+                   condition.quantiles_rhs = condition.quantiles_rhs)
+}
+
+process_msglm_chunk <- function(file_ix,
+                                strip_samples=FALSE, strip_stats=FALSE,
+                                postprocess.f = NULL) {
+  fit_model.file <- fit_model.files.df[ file_ix, 'filename' ]
+  message( 'Loading ', fit_model.file, '...' )
+  tmp.env <- new.env(parent = baseenv())
+  load(file.path(fit_model_path, fit_model.file ), envir = tmp.env)
+  if (!is.null(postprocess.f)) {
+    postprocess.f(envir = tmp.env, fit_model.file)
   }
   if (strip_samples || strip_stats) {
     tmp.env$vars_results <- lapply( tmp.env$vars_results, function( var_results ) {

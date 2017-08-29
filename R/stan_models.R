@@ -22,6 +22,19 @@ msglm.vars_info <- list(
   object_batch_shifts = list(names = c('objXexp_batch_shift'), dims = c('object', 'msrun'))
 )
 
+# get the indices of the first rows in a group
+# also get the index+1 of the last row
+nrows_cumsum <- function(df, group_col) {
+  n_rows <- df %>% dplyr::arrange_(group_col) %>% dplyr::group_by_(group_col) %>%
+    dplyr::summarize(n_rows = n()) %>% .$n_rows
+  if (length(n_rows)>0) {
+    res <- cumsum(as.integer(n_rows))
+    c(1L, res+1L)
+  } else {
+    return(0L)
+  }
+}
+
 stan.prepare_data <- function(base_input_data, model_data,
                               global_labu_shift = global_protgroup_labu_shift,
                               repl_tau=0.25, batch_tau=0.3)
@@ -46,16 +59,16 @@ stan.prepare_data <- function(base_input_data, model_data,
     Neffects = length(all_effects),
     NobjEffects = nrow(model_data$object_effects),
     obj_effect_is_positive = model_data$object_effects$is_positive,
-    NeffectsPerObjCumsum = as.array(effects_cumsum(model_data$object_effects, 'glm_object_ix')),
+    NeffectsPerObjCumsum = as.array(nrows_cumsum(model_data$object_effects, 'glm_object_ix')),
     obj_effect2obj = as.array(as.integer(model_data$object_effects$glm_object_ix)),
     obj_effect2effect = as.array(as.integer(model_data$object_effects$effect)),
     NreplEffects = length(all_repl_effects),
     NobjReplEffects = nrow(model_data$object_repl_effects),
-    NreplEffectsPerObjCumsum = as.array(effects_cumsum(model_data$object_repl_effects, 'glm_object_ix')),
+    NreplEffectsPerObjCumsum = as.array(nrows_cumsum(model_data$object_repl_effects, 'glm_object_ix')),
     obj_repl_effect2repl_effect = as.array(as.integer(model_data$object_repl_effects$replicate_effect)),
     NbatchEffects = length(all_batch_effects),
     NobjBatchEffects = nrow(model_data$object_batch_effects),
-    NbatchEffectsPerObjCumsum = as.array(effects_cumsum(model_data$object_batch_effects, 'glm_object_ix')),
+    NbatchEffectsPerObjCumsum = as.array(nrows_cumsum(model_data$object_batch_effects, 'glm_object_ix')),
     obj_batch_effect2batch_effect = as.array(as.integer(model_data$object_batch_effects$batch_effect)),
     NunderdefObjs = sum(model_data$objects$is_underdefined),
     underdef_objs = as.array(dplyr::filter(model_data$objects, is_underdefined) %>% .$glm_object_ix),

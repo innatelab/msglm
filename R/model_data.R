@@ -36,17 +36,6 @@ obj2effect <- function(expXeff, obj_class, objs, data2obj, data2exp) {
   res
 }
 
-effects_cumsum <- function(df, group_col) {
-  n_effects <- df %>% dplyr::arrange_(group_col) %>% dplyr::group_by_(group_col) %>%
-    dplyr::summarize(n_effects = n()) %>% .$n_effects
-  if (length(n_effects)>0) {
-    res <- cumsum(as.integer(n_effects))
-    c(1L, res+1L)
-  } else {
-    return(0L)
-  }
-}
-
 # use experimental design matrices and add
 # object/replicate/batch effects information to model_data
 prepare_effects <- function(model_data, underdefined_iactions=FALSE)

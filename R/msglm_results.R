@@ -381,3 +381,65 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
                    condition.quantiles_lhs = condition.quantiles_lhs,
                    condition.quantiles_rhs = condition.quantiles_rhs)
 }
+
+process.stan_fit <- function(msglm.stan_fit, dims_info, keep.samples=FALSE, verbose=FALSE)
+{
+  message( 'Extracting MCMC samples...' )
+  msglm.stan_samples <- stan.extract_samples(msglm.stan_fit,
+                                             pars = unlist(sapply(msglm.vars_info, function(vi) vi$names)),
+                                             min.iteration = min.iteration,
+                                             permuted = TRUE)
+
+  message('Computing parameters statistics...')
+  msglm.stan_stats <- msglm.stan_fit %>%
+    stan.extract_samples(pars = unlist(sapply(msglm.vars_info, function(vi) vi$names)),
+                         min.iteration = min.iteration) %>%
+    monitor(print = FALSE) %>% as.data.frame
+  msglm.stan_stats$var_name <- rownames(msglm.stan_stats)
+
+  message( 'Composing results...' )
+  res <- lapply(names(msglm.vars_info), vars_statistics, msglm.stan_stats, msglm.stan_samples,
+                msglm.vars_info, dims_info)
+  names(res) <- names(msglm.vars_info)
+
+  # add interaction CI with respect to observations variability
+  res$iactions_obsCI <- list(stats = vars_contrast_stats(res$observations$samples,
+                                                         c('obs_labu'),
+                                                         c('glm_iaction_ix', 'protgroup_id', 'condition'),
+                                                         condition_col = NA, contrastXcondition = NULL, 'msrun_ix') %>%
+                                    dplyr::ungroup() %>%
+                                    dplyr::select(-index_contrast, -contrast))
+
+  message( 'Calculating P-values..' )
+  local({
+    for (ctg in names(res)) {
+      ctg_subset_info <- msglm.vars_info[[ctg]]
+      ctg_subset_info$names <- intersect(ctg_subset_info$names, c('obj_effect', 'obj_effect_replCI', 'obj_batch_effect_unscaled'))
+
+      if (length(ctg_subset_info$names) > 0 & !is.null(res[[ctg]]$samples)) {
+        message( 'Calculating P-values for ', ctg, ' variables...' )
+        p_value.df <- vars_effect_pvalue(res[[ctg]]$samples, ctg_subset_info, dims_info)
+        #print(str(p_value.df))
+        #print(str(stats.df))
+        res[[ctg]]$stats <<- left_join(res[[ctg]]$stats %>% mutate(p_value = NULL), p_value.df)
+      }
+  }})
+
+  message("Calculating contrasts...")
+  res <- calc_contrasts(res, msglm.vars_info[c("iactions", "observations", "object_batch_shifts")], dims_info,
+                        contrastXmetacondition.mtx, conditionXmetacondition.df, contrastXcondition.df,
+                        mschannel_col = 'msrun')
+
+  message("Removing MCMC samples...")
+  if (is.character(keep.samples)) {
+    samples_mask <- !(names(res) %in% keep.samples)
+  } else {
+    samples_mask <- rep.int(!keep.samples, length(res))
+  }
+  for (ctg_ix in which(samples_mask)) {
+    if (verbose) message("Removing ", names(res)[[ctg_ix]], " samples")
+    res[[ctg_ix]]$samples <- NULL
+  }
+
+  return (res)
+}

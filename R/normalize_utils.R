@@ -206,3 +206,71 @@ normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
     }
     res
 }
+
+multilevel_normalize_experiments <- function(stan_norm_model, instr_calib,
+                                             mschannels_df, msdata_df,
+                                  quant_col = "intensity", obj_col = "protgroup_id",
+                                  mschan_col = "mschannel",
+                                  norm_levels,
+                                  max_objs=1000L,
+                                  nmschan_ratio.min=0.9, ncond_ratio.min=1.0,
+                                  quant_ratio.max=NA, mschan_shift.min = -0.5, Rhat.max = 1.1, neff_ratio.min = 0.25,
+                                  stan_method = c("mcmc", "optimizing", "vb"),
+                                  mcmc.iter=2000L, mcmc.chains=4, mcmc.thin=4, mcmc.adapt_delta=0.9,
+                                  vb.iter=100000L,
+                                  shifts_constraint=c("none", "median=0", "mean=0"),
+                                  verbose=FALSE)
+{
+  stan_method <- match.arg(stan_method)
+  shifts_constraint <- match.arg(shifts_constraint)
+  stan_input_base <- instr_calib[c('zDetectionFactor', 'zDetectionIntercept',
+                               'detectionMax', 'sigmaScaleHi', 'sigmaScaleLo',
+                               'sigmaOffset', 'sigmaBend', 'sigmaSmooth',
+                               'zShift', 'zScale')]
+  # FIXME compose msrun info
+  lev_cols <- unique(c(unlist(lapply(norm_levels, function(lev) c(lev$cond_col, lev$cond_group_col))), mschan_col))
+  lev_cols <- lev_cols[!is.na(lev_cols)]
+  mschan_df <- dplyr::select_(mschannels_df, .dots=lev_cols) %>% dplyr::distinct()
+  msdata_df <- dplyr::select_(msdata_df, .dots=c(obj_col, mschan_col, quant_col)) %>%
+    dplyr::left_join(mschan_df)
+
+  mschan_shifts_df <- NULL
+  lev_norm_res <- list()
+  for (i in seq_along(norm_levels)) {
+    lev_info <- norm_levels[[i]]
+    next_lev_info <- if (i < length(norm_levels)) norm_levels[[i+1]] else list()
+    lev_name <- names(norm_levels)[[i]]
+    if (verbose) {
+      message("Normalizing ", lev_name, " (level #", i, ")...")
+    }
+    lev_shifts_df <- normalize_experiments(stan_norm_model, stan_input_base, msdata_df,
+                                           obj_col = obj_col, quant_col = quant_col,
+                                           mschan_col = mschan_col, cond_col = lev_info$cond_col,
+                                           cond_group_col = lev_info$cond_group_col %||% (next_lev_info$cond_col %||% NULL),
+                                           mschan_shifts = mschan_shifts_df,
+                                           shift_col = if (is.null(mschan_shifts_df)) NA_character_ else "total_mschannel_shift",
+                                           shifts_constraint = lev_info$shifts_contraint %||% shifts_constraint,
+                                           stan_method = lev_info$stan_method %||% stan_method,
+                                           max_objs = lev_info$max_objs %||% max_objs,
+                                           Rhat.max = Rhat.max, neff_ratio.min = neff_ratio.min,
+                                           nmschan_ratio.min = lev_info$nmschan_ratio.min %||% nmschan_ratio.min,
+                                           ncond_ratio.min = lev_info$ncond_ratio.min %||% ncond_ratio.min,
+                                           quant_ratio.max = lev_info$quant_ratio.max %||% quant_ratio.max,
+                                           mschan_shift.min = lev_info$mschan_shift.min %||% mschan_shift.min,
+                                           mcmc.iter=mcmc.iter, mcmc.chains=mcmc.chains, mcmc.thin=mcmc.thin, mcmc.adapt_delta=mcmc.adapt_delta,
+                                           vb.iter=vb.iter, verbose=verbose)
+    if (is.null(mschan_shifts_df)) {
+      # initialize mschannel shifts
+      mschan_shifts_df <- dplyr::mutate(dplyr::inner_join(lev_shifts_df, mschan_df), total_mschannel_shift = 0.0)
+    } else {
+      mschan_shifts_df <- dplyr::inner_join(mschan_shifts_df, dplyr::select_(lev_shifts_df, .dots=c(lev_info$cond_col, "shift")))
+    }
+    lev_shift_col <- paste0(lev_name, "_shift")
+    colnames(mschan_shifts_df)[colnames(mschan_shifts_df)=="shift"] <- lev_shift_col
+    mschan_shifts_df$total_mschannel_shift <- mschan_shifts_df$total_mschannel_shift + mschan_shifts_df[[lev_shift_col]]
+    lev_norm_res[[lev_name]] <- list(level_shifts = lev_shifts_df,
+                                     mschannel_shifts = mschan_shifts_df)
+  }
+  return(list(levels=lev_norm_res,
+              mschannel_shifts=mschan_shifts_df))
+}

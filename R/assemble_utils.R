@@ -9,7 +9,7 @@ process_msglm_chunk <- function(file_ix,
     postprocess.f(envir = tmp.env, fit_model.file)
   }
   if (strip_samples || strip_stats) {
-    tmp.env$vars_results <- lapply( tmp.env$vars_results, function( var_results ) {
+    tmp.env$msglm_results <- lapply( tmp.env$msglm_results, function( var_results ) {
       if (strip_samples) { var_results$samples <- NULL }
       if (strip_stats) { var_results$stats <- NULL }
       return ( var_results )
@@ -53,7 +53,7 @@ join_report_frames <- function(reports, frame_extractor=function(report) stop('n
 join_msglm_reports <- function(section, reports, type) {
   message( 'Assembling joint ', type, ' report for ', section, '...' )
   res <- join_report_frames(reports, frame_extractor = function(report) {
-    res <- report$vars_results[[section]][[type]]
+    res <- report$msglm_results[[section]][[type]]
     # add object id columns
     # FIXME sites support?
     # FIXME model_data$objects support?

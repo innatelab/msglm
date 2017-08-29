@@ -42,3 +42,42 @@ effects_cumsum <- function(df, group_col) {
     return(0L)
   }
 }
+
+prepare_effects <- function(model_data, underdefined_iactions=FALSE)
+{
+  model_data$object_effects <- obj2effect(conditionXeffect.mtx, "glm_object_ix", model_data$objects$glm_object_ix,
+                                          model_data$interactions$glm_object_ix,
+                                          model_data$interactions$condition_ix) %>%
+    dplyr::mutate(glm_object_ix = as.integer(glm_object_ix),
+                  is_positive = effect %in% positive_effects)
+  
+  model_data$object_repl_effects <- obj2effect(msrunXreplEffect.mtx[model_data$mschannels$msrun, , drop=FALSE], "glm_object_ix",
+                                               model_data$objects$glm_object_ix,
+                                               model_data$ms_data$glm_object_ix,
+                                               model_data$ms_data$msrun_ix) %>%
+    dplyr::mutate(glm_object_ix = as.integer(glm_object_ix))
+  
+  model_data$object_batch_effects <- obj2effect(msrunXbatchEffect.mtx[model_data$mschannels$msrun, , drop=FALSE], "glm_object_ix",
+                                                model_data$objects$glm_object_ix,
+                                                model_data$ms_data$glm_object_ix,
+                                                model_data$ms_data$msrun_ix) %>%
+    dplyr::mutate(glm_object_ix = as.integer(glm_object_ix))
+  
+  if (underdefined_iactions) {
+    # detect proteins that have no quantifications for estimating object_shift
+    oe2iact.df <- model_data$object_effects %>%
+      dplyr::inner_join(conditionXeffect.df) %>%
+      dplyr::inner_join(model_data$interactions)
+    effectless_iactions.df <- model_data$interactions %>% dplyr::anti_join(oe2iact.df)
+    underdefined_objects.df <- dplyr::anti_join(model_data$objects,
+                                                effectless_iactions.df %>% dplyr::filter(!is_virtual)) %>%
+      dplyr::select(glm_object_ix)
+    
+    model_data$objects <- dplyr::mutate(model_data$objects,
+                                        is_underdefined = glm_object_ix %in% underdefined_objects.df$glm_object_ix)
+  } else {
+    model_data$objects <- dplyr::mutate(model_data$objects,
+                                        is_underdefined = FALSE)
+  }
+  return(model_data)
+}

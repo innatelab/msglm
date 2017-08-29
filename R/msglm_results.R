@@ -1,6 +1,36 @@
 require(rstan)
 require(insilicoMop)
 
+msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
+{
+  objs_df <- model_data$objects
+  if (!is.null(object_cols)) {
+    objs_df <- dplyr::select_(objs_df, .dots=unique(c("glm_object_ix", object_cols)))
+  }
+  list(iteration = NULL,
+    effect = data.frame(effect = all_effects, stringsAsFactors = FALSE),
+    repl_effect = data.frame(repl_effect = all_repl_effects, stringsAsFactors = FALSE),
+    batch_effect = data.frame(batch_effect = all_batch_effects, stringsAsFactors = FALSE),
+    condition = data.frame(condition = all_conditions, index_condition = seq_along(all_conditions),
+                           stringsAsFactors = FALSE),
+    msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, condition),
+    iaction = dplyr::select(model_data$interactions, glm_iaction_ix, glm_object_ix, iaction_id, condition_ix, condition) %>%
+        dplyr::inner_join(objs_df),
+    observation = dplyr::select(model_data$ms_data, glm_iaction_ix, glm_object_ix, condition_ix, condition, msrun, msrun_ix) %>%
+        dplyr::inner_join(objs_df),
+    object = model_data$objects, # use full object information
+    object_effect = model_data$object_effects %>%
+        dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
+        dplyr::inner_join(objs_df),
+    object_repl_effect = model_data$object_repl_effects %>%
+        dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
+        dplyr::inner_join(objs_df),
+    object_batch_effect = model_data$object_batch_effects %>%
+        dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
+        dplyr::inner_join(objs_df)
+  )
+}
+
 vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info, tail = c("both", "negative", "positive"))
 {
    tail = match.arg(tail)

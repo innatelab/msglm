@@ -37,3 +37,21 @@ expand_collapsed <- function(df, collapsed_col, separated_col, extra_cols=NULL, 
   res[[separated_col]] <- unlist(exp_list)
   res[,c(separated_col, collapsed_col, extra_cols)]
 }
+
+# converts data.frame df (long format) into a matrix
+# using row_col and col_col as its rows and columns and val_col as its values
+frame2matrix <- function(df, row_col, col_col, val_col, cols=NULL, rows=NULL) {
+  df_wide <- reshape(dplyr::select_(df, .dots=c(row_col, col_col, val_col)),
+        direction = "wide", timevar=col_col, idvar=row_col,
+        v.names = val_col) %>%
+  dplyr::mutate_at(vars(starts_with(val_col)), funs(if_else(is.na(.), 0.0, .)))
+  nz_mtx <- as.matrix(dplyr::select(df_wide, -one_of(row_col)))
+  rownames(nz_mtx) <- df_wide[[row_col]]
+  colnames(nz_mtx) <- str_replace(colnames(nz_mtx), fixed(paste0(val_col, ".")), "")
+  mtx_dims <- list(rows %||% rownames(nz_mtx),
+                   cols %||% colnames(nz_mtx))
+  names(mtx_dims) <- c(row_col, col_col)
+  mtx <- do.call(zero_matrix, mtx_dims)
+  mtx[rownames(nz_mtx), colnames(nz_mtx)] <- nz_mtx
+  return(mtx)
+}

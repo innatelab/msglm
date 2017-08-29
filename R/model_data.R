@@ -1,3 +1,4 @@
+# prepare observations array
 prepare_observations <- function(data.mtx)
 {
   data.vec <- as.vector(data.mtx)
@@ -5,12 +6,15 @@ prepare_observations <- function(data.mtx)
   data.obs.mask <- !is.na( data.vec )
   data.idx <- ifelse( data.obs.mask, cumsum( data.obs.mask ), -cumsum( !data.obs.mask ) )
   data.idx.arr <- matrix( data.idx, ncol = ncol( data.mtx ) )
-  list( Nobserved = sum(data.obs.mask),
-        oData = array( data.vec[ data.obs.mask ] ),
-        dataIndex = as.array(data.idx.arr)
+  list( Nobserved = sum(data.obs.mask), # total non-NA  datapoints
+        oData = array( data.vec[ data.obs.mask ] ), # only non-NA values
+        dataIndex = as.array(data.idx.arr) # either index in oData if observed, or -index of non-observed
   )
 }
 
+# given a experimentXeffect matrix,
+# and mapping of the data to objects and experiments, construct
+# a data.frame of all related objectXeffect combinations
 obj2effect <- function(expXeff, obj_class, objs, data2obj, data2exp) {
   effXexp <- t(expXeff)
   expXeff_mask <- apply(effXexp, c(2, 1), function(x) x != 0.0)
@@ -43,6 +47,8 @@ effects_cumsum <- function(df, group_col) {
   }
 }
 
+# use experimental design matrices and add
+# object/replicate/batch effects information to model_data
 prepare_effects <- function(model_data, underdefined_iactions=FALSE)
 {
   model_data$object_effects <- obj2effect(conditionXeffect.mtx, "glm_object_ix", model_data$objects$glm_object_ix,

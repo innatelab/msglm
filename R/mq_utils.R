@@ -266,6 +266,8 @@ read.MaxQuant.AllPeptides <- function( folder_path, file_name = 'allPeptides.txt
     allPeptides.df <- dplyr::rename(allPeptides.df,
                                     pep_type = Type,
                                     raw_file = `Raw file`,
+                                    protein_acs = `Proteins`,
+                                    dp_protein_acs = `DP Proteins`,
                                     #protgroup_ids = `Protein group IDs`,
                                     #fasta_headers = `Fasta headers`,
                                     dp_modif = `DP Modification`,

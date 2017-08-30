@@ -573,7 +573,8 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
                                        glm.min_intensity = 50*min_intensity,
                                        glm.max_factor = 50, glm.max_npepmods=25L,
                                        glm.group_by = c("protgroup", "pepmod"),
-                                       glm.reldelta_range = c(-1+1E-5, 99.0))
+                                       glm.reldelta_range = c(-1+1E-5, 99.0),
+                                       multidplyr_cluster = NULL )
 {
     quant_mode <- match.arg(mode)
     glm_group_by <- match.arg(glm.group_by)
@@ -696,6 +697,22 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
                     glm_status = "skipped",
                     glm_method = NA_character_,
                     glm_ndup_effects = 0L)
+    } else if (!is.null(multidplyr_cluster)) {
+        message('Distributing GLM tasks over the cluster')
+        parallel::clusterEvalQ(cl=multidplyr_cluster, require(quantreg))
+        parallel::clusterExport(cl=multidplyr_cluster, "glm_corrected_intensities")
+        parallel::clusterExport(cl=multidplyr_cluster, c("glm.max_factor", "glm.reldelta_range", "glm.max_npepmods", "min_intensity"),
+                                envir=environment())
+        distr.df <- switch(glm_group_by,
+                           pepmod = multidplyr::partition(pms_full_intensities_long.df, pepmod_id, msprotocol, cluster=multidplyr_cluster),
+                           protgroup = multidplyr::partition(pms_full_intensities_long.df, protgroup_ids, msprotocol, cluster=multidplyr_cluster)) %>%
+        #multidplyr::partition_(pms_full_intensities_long.df, c(glm_group_col, "msprotocol"), cluster=multidplyr_cluster) %>%
+        dplyr::do({glm_corrected_intensities(., glm_max_factor = glm.max_factor,
+                                             glm_reldelta_range = glm.reldelta_range,
+                                             max_npepmods = glm.max_npepmods,
+                                             min_intensity = min_intensity)})
+        message("Collecting GLM results")
+        dplyr::collect(distr.df)
     } else {
         dplyr::group_by_(pms_full_intensities_long.df, c(glm_group_col, "msprotocol")) %>%
             dplyr::do({glm_corrected_intensities(., glm_max_factor = glm.max_factor, glm_reldelta_range = glm.reldelta_range,
@@ -926,7 +943,8 @@ read.MaxQuant.Evidence <- function(folder_path, file_name = 'evidence.txt', layo
                                    min_pepmod_state_freq = 0.9, min_essential_freq = 0.0,
                                    correct_ratios = TRUE, correct_by_ratio.ref_label = NA,
                                    mode = c("labeled", "label-free"), mschannel_annotate.f = NULL,
-                                   glm.group_by = c("protgroup", "pepmod"), glm.max_npepmods=50L)
+                                   glm.group_by = c("protgroup", "pepmod"), glm.max_npepmods=50L,
+                                   multidplyr_cluster = NULL)
 {
     process.MaxQuant.Evidence(read.MaxQuant.Evidence_internal(
         folder_path = folder_path, file_name = file_name, nrows = nrows, guess_max=guess_max),
@@ -935,7 +953,8 @@ read.MaxQuant.Evidence <- function(folder_path, file_name = 'evidence.txt', layo
         correct_ratios = correct_ratios,
         correct_by_ratio.ref_label = correct_by_ratio.ref_label,
         mode = mode, glm.group_by = glm.group_by, glm.max_npepmods = glm.max_npepmods,
-        mode = mode, mschannel_annotate.f = mschannel_annotate.f)
+        mschannel_annotate.f = mschannel_annotate.f,
+        multidplyr_cluster = multidplyr_cluster)
 }
 
 msrun_code_parser.f = function(msruns, chunk_names = c('dataset', 'batch', 'frac_protocol', 'fraction', 'tech_replicate')) {

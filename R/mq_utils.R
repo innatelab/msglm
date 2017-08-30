@@ -31,6 +31,22 @@ expand_sites <- function(sites_df, by=c("protgroup_id", "protein_ac"),
                    c("site_id", keep_cols))
 }
 
+expand_peptides <- function(peptides_df, by=c("protgroup_id", "protein_ac"),
+                            keep_cols=c("start_pos", "end_pos"))
+{
+    exp_by <- match.arg(by)
+    expand_collapsed(peptides_df, paste0(exp_by,"s"), exp_by,
+                     c("peptide_id", keep_cols))
+}
+
+expand_pepmods <- function(pepmods_df, by=c("protgroup_id", "protein_ac"),
+                           keep_cols=c("peptide_id"))
+{
+  exp_by <- match.arg(by)
+  expand_collapsed(pepmods_df, paste0(exp_by,"s"), exp_by,
+                   c("pepmod_id", keep_cols))
+}
+
 selectUniprotACs <- function(acs, valid_acs)
 {
     acs_noiso <- stripUniprotIsoform(acs)

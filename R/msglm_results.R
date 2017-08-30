@@ -319,6 +319,9 @@ calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacond
         # no samples
         vars_results[[vars_category]]$contrast_stats <- NULL
       } else {
+        # include only the object columns that are included in the processed vars_category
+        objs_df <- dplyr::select_(dims_info$object, .dots=intersect(colnames(vars_results[[vars_category]]$stats),
+                                                                    colnames(dims_info$object)))
         # adjust samples w.r.t. condition shift
         if ('condition_shift' %in% colnames(samples.df)) {
           for (shift_name in vars_cat_subset_info$names) {
@@ -349,7 +352,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacond
           dplyr::filter((metacondition_reported == "lhs" & contrast_weight > 0) |
                         (metacondition_reported == "enriched" & contrast_weight * `50%` > 0)) %>%
           dplyr::select(-metacondition_reported, -contrast_type) %>%
-          dplyr::inner_join(dims_info$object)
+          dplyr::inner_join(objs_df)
       }
     }
   }

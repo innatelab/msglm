@@ -833,8 +833,8 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
                  raw_files = msruns.df,
                  mschannels = mschannels.df,
                  peaks = peaks.df,
-                 intensities = intensities.df,
-                 ratios = ratios.df))
+                 pepmod_intensities = intensities.df,
+                 pepmod_ratios = ratios.df))
 }
 
 read.MaxQuant.Evidence <- function(folder_path, file_name = 'evidence.txt', layout = c("wide", "long"), nrows = -1,

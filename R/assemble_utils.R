@@ -58,13 +58,13 @@ join_msglm_reports <- function(section, reports, type) {
     # FIXME sites support?
     # FIXME model_data$objects support?
     if (!is.null(res) && !('majority_protein_acs' %in% colnames(res))
-        && "majority_protein_acs" %in% colnames(report$model_data$protgroups)) {
-      res$majority_protein_acs <- rep_len(report$model_data$protgroups$majority_protein_acs[1], nrow(res))
-      res$protgroup_id <- rep_len(report$model_data$protgroups$protgroup_id[1], nrow(res))
+        && "majority_protein_acs" %in% colnames(report$model_data$objects)) {
+      res$majority_protein_acs <- rep_len(report$model_data$objects$majority_protein_acs[1], nrow(res))
+      res$protgroup_id <- rep_len(report$model_data$objects$protgroup_id[1], nrow(res))
     }
     if (!is.null(res) && !('pepmod_id' %in% colnames(res))
-        && "pepmod_id" %in% colnames(report$model_data$pepmods)) {
-      res$pepmod_id <- rep_len(report$model_data$pepmods$pepmod_id[1], nrow(res))
+        && "pepmod_id" %in% colnames(report$model_data$objects)) {
+      res$pepmod_id <- rep_len(report$model_data$objects$pepmod_id[1], nrow(res))
     }
     res
   },

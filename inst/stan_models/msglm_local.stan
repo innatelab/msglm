@@ -80,7 +80,7 @@ transformed data {
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
   matrix[Nexperiments, Nconditions] experimentXcondition;
 
-  int<lower=1> NconditionExperiments[Nconditions];
+  int<lower=0> NconditionExperiments[Nconditions];
   matrix[Nexperiments, Nexperiments-Nconditions] experimentXrepl_effect;
 
   int<lower=1,upper=Niactions> quant2iaction[Nquanted];

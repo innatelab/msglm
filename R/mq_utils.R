@@ -23,14 +23,12 @@ expand_protgroups <- function(protgroup_ids) {
                 stringsAsFactors = FALSE )
 }
 
-expand_sites <- function(sites_df) {
-    protgroups2protgroup.list <- strsplit(sites_df$protgroup_ids, ';', fixed=TRUE)
-    positions2position.list <- strsplit(sites_df$positions, ';', fixed=TRUE)
-    data.frame( protgroup_ids = rep.int(sites_df$protgroup_ids, sapply(protgroups2protgroup.list, length)),
-                positions = rep.int(sites_df$positions, sapply(positions2position.list, length)),
-                protgroup_id = as.integer(unlist(protgroups2protgroup.list)),
-                position = as.integer(unlist(positions2position.list)),
-                stringsAsFactors = FALSE )
+expand_sites <- function(sites_df, by=c("protgroup_id", "protein_ac"),
+                         keep_cols=c("position"))
+{
+  exp_by <- match.arg(by)
+  expand_collapsed(sites_df, paste0(exp_by,"s"), exp_by,
+                   c("site_id", keep_cols))
 }
 
 selectUniprotACs <- function(acs, valid_acs)

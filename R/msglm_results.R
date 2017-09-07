@@ -135,7 +135,10 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
   contrast_stats.df <- dplyr::arrange_(samples.df,
                                        .dots = c(group_cols, experiment_col, 'iteration', 'chain') ) %>%
     group_by_( .dots = group_cols ) %>%
-    do( contrast_stats_all_samples(.) )
+    do( contrast_stats_all_samples(.) ) %>%
+    dplyr::mutate(mean_log2 = mean/log(2),
+                  median_log2 = `50%`/log(2),
+                  sd_log2 = sd/log(2))
   if ( 'fraction' %in% group_cols ) {
     contrast_stats.df$fraction <- as.integer( contrast_stats.df$fraction )
   }
@@ -236,6 +239,10 @@ vars_statistics <- function(vars_category, stan_stats, stan_samples, vars_info, 
     # process convergence information
     stats.df <- subset( stan_stats, grepl( paste0( '^(', paste0( vars_cat_info$names, collapse='|' ), ')(\\[|$)' ), var_name ) )
     stats.df$var <- extract_var( stats.df$var_name )
+    stats.df <- dplyr::mutate(stats.df,
+                              mean_log2 = mean/log(2),
+                              median_log2 = `50%`/log(2),
+                              sd_log2 = sd/log(2))
     if ( nrow(stats.df) > 0 && length(vars_cat_info$dims) > 0 ) {
         stats.df <- .attach_dim_info.by_var_name( stats.df, dim_info[vars_cat_info$dims] )
     }

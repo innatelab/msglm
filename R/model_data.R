@@ -43,8 +43,10 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
   model_data$object_effects <- obj2effect(conditionXeffect.mtx, "glm_object_ix", model_data$objects$glm_object_ix,
                                           model_data$interactions$glm_object_ix,
                                           model_data$interactions$condition_ix) %>%
-    dplyr::mutate(glm_object_ix = as.integer(glm_object_ix),
-                  is_positive = effect %in% positive_effects)
+    dplyr::mutate(glm_object_ix = as.integer(glm_object_ix))
+  model_data$object_effects <- dplyr::left_join(model_data$object_effects,
+      dplyr::select(effects.df, effect, is_positive) %>%
+      dplyr::mutate(effect = factor(effect, levels=levels(model_data$object_effects$effect))))
   
   model_data$object_repl_effects <- obj2effect(msrunXreplEffect.mtx[model_data$mschannels$msrun, , drop=FALSE], "glm_object_ix",
                                                model_data$objects$glm_object_ix,

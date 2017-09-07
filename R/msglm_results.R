@@ -8,10 +8,10 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
     objs_df <- dplyr::select_(objs_df, .dots=unique(c("glm_object_ix", object_cols)))
   }
   list(iteration = NULL,
-    effect = data.frame(effect = all_effects, stringsAsFactors = FALSE),
-    repl_effect = data.frame(repl_effect = all_repl_effects, stringsAsFactors = FALSE),
-    batch_effect = data.frame(batch_effect = all_batch_effects, stringsAsFactors = FALSE),
-    condition = data.frame(condition = all_conditions, index_condition = seq_along(all_conditions),
+    effect = data.frame(effect = colnames(conditionXeffect.mtx), stringsAsFactors = FALSE),
+    repl_effect = data.frame(repl_effect = colnames(msrunXreplEffect.mtx), stringsAsFactors = FALSE),
+    batch_effect = data.frame(batch_effect = colnames(msrunXbatchEffect.mtx), stringsAsFactors = FALSE),
+    condition = data.frame(condition = rownames(conditionXeffect.mtx), index_condition = 1:nrow(conditionXeffect.mtx),
                            stringsAsFactors = FALSE),
     msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, condition),
     iaction = dplyr::select(model_data$interactions, glm_iaction_ix, glm_object_ix, iaction_id, condition_ix, condition) %>%

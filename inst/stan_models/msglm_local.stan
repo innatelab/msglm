@@ -204,6 +204,7 @@ transformed parameters {
   row_vector[Nobjects] obj_base_labu;
   vector[NobjEffects] obj_effect;
   vector<lower=0>[NobjEffects] obj_effect_lambda;
+  vector[NobjBatchEffects] obj_batch_effect;
 
   vector[Niactions] iaction_labu;
 
@@ -255,7 +256,6 @@ transformed parameters {
   }
   // calculate objXexp_batch_shift (doesn't make sense to add to obs_labu)
   if (NbatchEffects > 0) {
-    vector[NobjBatchEffects] obj_batch_effect;
     vector[NobjBatchEffects] obj_batch_effect_lambda;
 
     obj_batch_effect_lambda = obj_batch_effect_lambda_a ./ sqrt(obj_batch_effect_lambda_t);
@@ -295,10 +295,12 @@ model {
     //to_vector(repl_shift) ~ normal(0.0, repl_shift_lambda);
 
     //obj_batch_effect_lambda ~ student_t(2, 0.0, obj_batch_effect_tau);
-    obj_batch_effect_lambda_t ~ chi_square(3.0);
-    obj_batch_effect_lambda_a ~ normal(0.0, 1.0);
-    //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
-    obj_batch_effect_unscaled ~ normal(0.0, 1.0);
+    if (NbatchEffects > 0) {
+      obj_batch_effect_lambda_t ~ chi_square(3.0);
+      obj_batch_effect_lambda_a ~ normal(0.0, 1.0);
+      //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
+      obj_batch_effect_unscaled ~ normal(0.0, 1.0);
+    }
 
     // calculate the likelihood
     {

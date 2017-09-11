@@ -393,6 +393,7 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
 }
 
 process.stan_fit <- function(msglm.stan_fit, dims_info,
+                             mschannel_col = "msrun_ix",
                              effect_vars = unlist(lapply(msglm.vars_info, function(vi) str_subset(vi$names, "_effect(?:_replCI)?$"))),
                              keep.samples=FALSE, verbose=FALSE)
 {
@@ -417,8 +418,8 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   # add interaction CI with respect to observations variability
   res$iactions_obsCI <- list(stats = vars_contrast_stats(res$observations$samples,
                                                          c('obs_labu'),
-                                                         c('glm_iaction_ix', 'protgroup_id', 'condition'),
-                                                         condition_col = NA, contrastXcondition = NULL, 'msrun_ix') %>%
+                                                         c('glm_iaction_ix', 'glm_iaction_ix', 'condition'),
+                                                         condition_col = NA, contrastXcondition = NULL, mschannel_col) %>%
                                     dplyr::ungroup() %>%
                                     dplyr::select(-index_contrast, -contrast))
 
@@ -440,7 +441,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   message("Calculating contrasts...")
   res <- calc_contrasts(res, msglm.vars_info[c("iactions", "observations", "object_batch_shifts")], dims_info,
                         contrastXmetacondition.mtx, conditionXmetacondition.df, contrastXcondition.df,
-                        mschannel_col = 'msrun')
+                        mschannel_col = mschannel_col)
 
   message("Removing MCMC samples...")
   if (is.character(keep.samples)) {

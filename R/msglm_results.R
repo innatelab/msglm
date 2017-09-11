@@ -392,7 +392,9 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
                    condition.quantiles_rhs = condition.quantiles_rhs)
 }
 
-process.stan_fit <- function(msglm.stan_fit, dims_info, keep.samples=FALSE, verbose=FALSE)
+process.stan_fit <- function(msglm.stan_fit, dims_info,
+                             effect_vars = unlist(lapply(msglm.vars_info, function(vi) str_subset(vi$names, "_effect(?:_replCI)?$"))),
+                             keep.samples=FALSE, verbose=FALSE)
 {
   message( 'Extracting MCMC samples...' )
   msglm.stan_samples <- stan.extract_samples(msglm.stan_fit,
@@ -424,7 +426,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info, keep.samples=FALSE, verb
   local({
     for (ctg in names(res)) {
       ctg_subset_info <- msglm.vars_info[[ctg]]
-      ctg_subset_info$names <- intersect(ctg_subset_info$names, c('obj_effect', 'obj_effect_replCI', 'obj_batch_effect_unscaled'))
+      ctg_subset_info$names <- intersect(ctg_subset_info$names, effect_vars)
 
       if (length(ctg_subset_info$names) > 0 & !is.null(res[[ctg]]$samples)) {
         message( 'Calculating P-values for ', ctg, ' variables...' )

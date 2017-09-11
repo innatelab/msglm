@@ -395,6 +395,10 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
 process.stan_fit <- function(msglm.stan_fit, dims_info,
                              mschannel_col = "msrun_ix",
                              effect_vars = unlist(lapply(msglm.vars_info, function(vi) str_subset(vi$names, "_effect(?:_replCI)?$"))),
+                             contrast_vars = unlist(lapply(msglm.vars_info, function(vi) {
+                               rel_dims <- names(dims_info)[sapply(names(dims_info), function(dname) any(str_detect(colnames(dims_info[[dname]]), "^(msrun|mschannel|condition)")))]
+                               if (any(vi$dims %in% rel_dims)) str_subset(vi$names, "(?:labu|shift)(?:_replCI)?$") else c()
+                              })),
                              keep.samples=FALSE, verbose=FALSE)
 {
   message( 'Extracting MCMC samples...' )
@@ -439,8 +443,9 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   }})
 
   message("Calculating contrasts...")
-  res <- calc_contrasts(res, msglm.vars_info[c("iactions", "observations", "object_batch_shifts")], dims_info,
+  res <- calc_contrasts(res, msglm.vars_info, dims_info,
                         contrastXmetacondition.mtx, conditionXmetacondition.df, contrastXcondition.df,
+                        var_names = contrast_vars,
                         mschannel_col = mschannel_col)
 
   message("Removing MCMC samples...")

@@ -284,11 +284,18 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
     return ( res.df )
 }
 
-calc_contrasts <- function(vars_results, vars_info, dims_info, contrastXmetacondition, conditionXmetacondition.df, contrastXcondition.df,
+calc_contrasts <- function(vars_results, vars_info, dims_info,
+                           contrastXmetacondition, conditionXmetacondition.df, contrasts.df,
                            mschannel_col = "mschannel_ix",
                            condition_agg_col = "condition", var_names = c('iaction_labu', 'iaction_labu_replCI', 'obs_labu'),
                            obj_dims = 'glm_object_ix', var_info_cols = 'glm_object_ix', val_trans = NULL,
                            condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1)) {
+  contrastXcondition.df <- as.data.frame(as.table(contrastXmetacondition)) %>% dplyr::filter(Freq != 0) %>%
+    dplyr::rename(weight=Freq) %>%
+    dplyr::inner_join(conditionXmetacondition.df) %>%
+    dplyr::inner_join(contrasts.df) %>%
+    dplyr::arrange(contrast, contrast_type, metacondition, condition)
+
   for (vars_category in names(vars_results)) {
     vars_cat_subset_info <- vars_info[[vars_category]]
     vars_cat_subset_info$names <- intersect(vars_cat_subset_info$names, var_names)
@@ -381,11 +388,11 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
     if (!is.null(condition_shifts)) {
       sel_conditionXmetacondition.df <- dplyr::inner_join(sel_conditionXmetacondition.df, condition_shifts)
     }
-    sel_contrastXcondition.df <- dplyr::semi_join(contrastXcondition.df, sel_conditionXmetacondition.df) %>%
-        dplyr::filter(contrast %in% contrasts)
+    sel_contrasts.df <- dplyr::filter(contrasts.df, contrast %in% contrasts)
+
     calc_contrasts(vars_results, vars_info, dims_info,
                    sel_contrastXmetacondition, sel_conditionXmetacondition.df,
-                   sel_contrastXcondition.df, val_trans = val_trans,
+                   sel_contrasts.df, val_trans = val_trans,
                    condition_agg_col = condition_agg_col,
                    condition.reported = condition.reported,
                    condition.quantiles_lhs = condition.quantiles_lhs,
@@ -444,7 +451,8 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
 
   message("Calculating contrasts...")
   res <- calc_contrasts(res, msglm.vars_info, dims_info,
-                        contrastXmetacondition.mtx, conditionXmetacondition.df, contrastXcondition.df,
+                        contrastXmetacondition.mtx, conditionXmetacondition.df,
+                        dplyr::distinct(contrastXmetacondition.df, contrast, contrast_type),
                         var_names = contrast_vars,
                         mschannel_col = mschannel_col)
 

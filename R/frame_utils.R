@@ -3,9 +3,10 @@
 # Author: Alexey Stukalov
 ###############################################################################
 
-rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NULL)
+rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NULL, verbose=FALSE)
 {
   if (is.null(frame_names)) {
+    if (verbose) message("Determining which frames to bind...")
     # select names that appear in all frames
     all_frame_names <- unlist(lapply(frames_coll_list, function(frames_coll) {
       res <- names(frames_coll)
@@ -19,7 +20,9 @@ rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NU
     }
     frame_names <- names(frame_names_freq)[all_frames_mask]
   }
+  if (verbose) message("Binding rows of the following frame(s): ", paste0(frame_names, collapse=", "))
   res <- lapply(frame_names, function(fname) {
+    if (verbose) message("Binding rows of ", fname)
     bind_rows(lapply(seq_along(frames_coll_list), function(coll_ix) {
       res <- frames_coll_list[[coll_ix]][[fname]]
       if (!is.null(link_col) && nrow(res)>0) res[[link_col]] <- if (!is.null(names(frames_coll_list))) names(frames_coll_list)[[coll_ix]] else coll_ix

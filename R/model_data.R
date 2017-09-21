@@ -59,7 +59,10 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
                                                 model_data$ms_data$glm_object_ix,
                                                 model_data$ms_data$msrun_ix) %>%
     dplyr::mutate(glm_object_ix = as.integer(glm_object_ix))
-  
+  model_data$batch_effects <- dplyr::select(batch_effects.df, batch_effect, is_positive) %>%
+      dplyr::mutate(batch_effect = factor(batch_effect, levels=levels(model_data$object_batch_effects$batch_effect))) %>%
+      dplyr::arrange(batch_effect)
+
   if (underdefined_iactions) {
     # detect proteins that have no quantifications for estimating object_shift
     oe2iact.df <- model_data$object_effects %>%

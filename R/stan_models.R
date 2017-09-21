@@ -9,7 +9,7 @@ msglm_normalize.stan_model <- stan_model(file.path(stan_models_path , "msglm_nor
 msglm.vars_info <- list(
   global = list( names = c(), dims=c() ),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
   effects = list( names = c('effect_shift_replCI_sigma'), dims = c('effect') ),
-  #batch_effects = list(names = c('obj_batch_effect_sigma'), dims = c('batch_effect')),
+  #batch_effects = list(names = c('batch_effect_sigma'), dims = c('batch_effect')),
   conditions = list(names = c('obj_repl_shift_sigma'), dims = c("condition")),
   iactions = list(names = c('iaction_labu', 'iaction_labu_replCI'), dims = c('iaction')),
   observations = list(names = c('obs_labu'), dims = c('observation')),
@@ -43,6 +43,9 @@ stan.prepare_data <- function(base_input_data, model_data,
   if (any(as.integer(model_data$effects$effect) != seq_len(nrow(model_data$effects)))) {
     stop("model_data$effects are not ordered")
   }
+  if (any(as.integer(model_data$batch_effects$batch_effect) != seq_len(nrow(model_data$batch_effects)))) {
+    stop("model_data$batch_effects are not ordered")
+  }
   res <- list(
     Niactions = nrow(model_data$interactions),
     Nobservations = nrow(model_data$ms_data),
@@ -70,6 +73,7 @@ stan.prepare_data <- function(base_input_data, model_data,
     NreplEffectsPerObjCumsum = as.array(nrows_cumsum(model_data$object_repl_effects, 'glm_object_ix')),
     obj_repl_effect2repl_effect = as.array(as.integer(model_data$object_repl_effects$replicate_effect)),
     NbatchEffects = ncol(msrunXbatchEffect.mtx),
+    batch_effect_is_positive = as.array(as.integer(model_data$batch_effects$is_positive)),
     NobjBatchEffects = nrow(model_data$object_batch_effects),
     NbatchEffectsPerObjCumsum = as.array(nrows_cumsum(model_data$object_batch_effects, 'glm_object_ix')),
     obj_batch_effect2batch_effect = as.array(as.integer(model_data$object_batch_effects$batch_effect)),

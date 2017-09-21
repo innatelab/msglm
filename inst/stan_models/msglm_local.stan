@@ -46,6 +46,7 @@ data {
 
   int<lower=0> NobjBatchEffects;
   int<lower=1,upper=NbatchEffects> obj_batch_effect2batch_effect[NobjBatchEffects];
+  int<lower=0,upper=1> batch_effect_is_positive[NbatchEffects];
   int<lower=0> NbatchEffectsPerObjCumsum[NobjBatchEffects > 0 ? Nobjects+1 : 1];
 
   vector<lower=0>[Nquanted] qData; // quanted data
@@ -92,6 +93,10 @@ transformed data {
   int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects];
   vector<lower=0>[NobjEffects] obj_effect_tau;
 
+  int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsPos;
+  int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsOther;
+  int<lower=1,upper=NobjBatchEffects> obj_batch_effect_reshuffle[NobjBatchEffects];
+
   NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   NobjEffectsOther = NobjEffects - NobjEffectsPos;
   {
@@ -110,6 +115,24 @@ transformed data {
     }
   }
   obj_effect_tau = effect_tau[obj_effect2effect];
+
+  NobjBatchEffectsPos = sum(batch_effect_is_positive[obj_batch_effect2batch_effect]);
+  NobjBatchEffectsOther = NobjBatchEffects - NobjBatchEffectsPos;
+  {
+    int cur_pos_eff;
+    int cur_other_eff;
+    cur_pos_eff = 0;
+    cur_other_eff = NobjBatchEffectsPos;
+    for (i in 1:NobjBatchEffects) {
+      if (batch_effect_is_positive[obj_batch_effect2batch_effect[i]]) {
+        cur_pos_eff = cur_pos_eff + 1;
+        obj_batch_effect_reshuffle[i] = cur_pos_eff;
+      } else {
+        cur_other_eff = cur_other_eff + 1;
+        obj_batch_effect_reshuffle[i] = cur_other_eff;
+      }
+    }
+  }
 
   {
     vector[Nquanted] qLogData;
@@ -197,7 +220,8 @@ parameters {
   //real<lower=0> obj_batch_effect_sigma;
   vector<lower=0>[NobjBatchEffects] obj_batch_effect_lambda_t;
   vector<lower=0>[NobjBatchEffects] obj_batch_effect_lambda_a;
-  vector[NobjBatchEffects] obj_batch_effect_unscaled;
+  vector<lower=0.0>[NobjBatchEffectsPos] obj_batch_effect_unscaled_pos;
+  vector[NobjBatchEffectsOther] obj_batch_effect_unscaled_other;
 }
 
 transformed parameters {
@@ -259,7 +283,7 @@ transformed parameters {
     vector[NobjBatchEffects] obj_batch_effect_lambda;
 
     obj_batch_effect_lambda = obj_batch_effect_lambda_a ./ sqrt(obj_batch_effect_lambda_t);
-    obj_batch_effect = obj_batch_effect_unscaled .* obj_batch_effect_lambda * obj_batch_effect_tau;
+    obj_batch_effect = append_row(obj_batch_effect_unscaled_pos, obj_batch_effect_unscaled_other)[obj_batch_effect_reshuffle] .* obj_batch_effect_lambda * obj_batch_effect_tau;
 
     objXexp_batch_shift = csr_to_dense_matrix(Nobjects, NbatchEffects, obj_batch_effect,
                                               obj_batch_effect2batch_effect, NbatchEffectsPerObjCumsum) * batchEffectXexperiment;
@@ -299,7 +323,8 @@ model {
       obj_batch_effect_lambda_t ~ chi_square(3.0);
       obj_batch_effect_lambda_a ~ normal(0.0, 1.0);
       //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
-      obj_batch_effect_unscaled ~ normal(0.0, 1.0);
+      obj_batch_effect_unscaled_pos ~ normal(0.0, 1.0);
+      obj_batch_effect_unscaled_other ~ normal(0.0, 1.0);
     }
 
     // calculate the likelihood

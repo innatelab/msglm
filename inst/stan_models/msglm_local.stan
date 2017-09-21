@@ -99,7 +99,7 @@ transformed data {
     int cur_other_eff;
     cur_pos_eff = 0;
     cur_other_eff = NobjEffectsPos;
-    for (i in 1:Neffects) {
+    for (i in 1:NobjEffects) {
       if (obj_effect_is_positive[i]) {
         cur_pos_eff = cur_pos_eff + 1;
         obj_effect_reshuffle[i] = cur_pos_eff;

@@ -39,6 +39,8 @@ stan.prepare_data <- function(base_input_data, model_data,
                               global_labu_shift = global_protgroup_labu_shift,
                               repl_tau=0.25, batch_tau=0.3)
 {
+  batchEffXmsrun.mtx <- t(msrunXbatchEffect.mtx[unique(model_data$mschannels$msrun),, drop=FALSE])
+  replEffXmsrun.mtx <- t(msrunXreplEffect.mtx[unique(model_data$mschannels$msrun),, drop=FALSE])
   message('Converting MSGLM model data to Stan-readable format...')
   if (any(as.integer(model_data$effects$effect) != seq_len(nrow(model_data$effects)))) {
     stop("model_data$effects are not ordered")
@@ -56,8 +58,8 @@ stan.prepare_data <- function(base_input_data, model_data,
     effectXcondition = t(conditionXeffect.mtx),
     inv_effectXcondition = t(inv_conditionXeffect.mtx),
     experiment_shift = as.array(model_data$mschannels$model_mschannel_shift),
-    batchEffectXexperiment = t(msrunXbatchEffect.mtx),
-    replEffectXexperiment = t(msrunXreplEffect.mtx),
+    batchEffectXexperiment = batchEffXmsrun.mtx,
+    replEffectXexperiment = replEffXmsrun.mtx,
     observation2experiment = as.array(model_data$ms_data$msrun_ix),
     observation2iaction = as.array(model_data$ms_data$glm_iaction_ix),
     iaction2obj = as.array(model_data$interactions$glm_object_ix),

@@ -37,7 +37,7 @@ data {
   int<lower=0> NobjEffects;
   int<lower=1,upper=Neffects> obj_effect2effect[NobjEffects];
   int<lower=1,upper=Nobjects> obj_effect2obj[NobjEffects];
-  int<lower=0,upper=1> obj_effect_is_positive[NobjEffects];
+  int<lower=0,upper=1> effect_is_positive[Neffects];
   int<lower=0> NeffectsPerObjCumsum[Nobjects+1];
 
   int<lower=0> NobjReplEffects;
@@ -92,7 +92,7 @@ transformed data {
   int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects];
   vector<lower=0>[NobjEffects] obj_effect_tau;
 
-  NobjEffectsPos = sum(obj_effect_is_positive);
+  NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   NobjEffectsOther = NobjEffects - NobjEffectsPos;
   {
     int cur_pos_eff;
@@ -100,7 +100,7 @@ transformed data {
     cur_pos_eff = 0;
     cur_other_eff = NobjEffectsPos;
     for (i in 1:NobjEffects) {
-      if (obj_effect_is_positive[i]) {
+      if (effect_is_positive[obj_effect2effect[i]]) {
         cur_pos_eff = cur_pos_eff + 1;
         obj_effect_reshuffle[i] = cur_pos_eff;
       } else {

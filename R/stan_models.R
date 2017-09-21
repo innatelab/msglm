@@ -40,6 +40,9 @@ stan.prepare_data <- function(base_input_data, model_data,
                               repl_tau=0.25, batch_tau=0.3)
 {
   message('Converting MSGLM model data to Stan-readable format...')
+  if (any(as.integer(model_data$effects$effect) != seq_len(nrow(model_data$effects)))) {
+    stop("model_data$effects are not ordered")
+  }
   res <- list(
     Niactions = nrow(model_data$interactions),
     Nobservations = nrow(model_data$ms_data),
@@ -57,8 +60,8 @@ stan.prepare_data <- function(base_input_data, model_data,
     iaction2obj = as.array(model_data$interactions$glm_object_ix),
     iaction2condition = as.array(model_data$interactions$condition_ix),
     Neffects = ncol(conditionXeffect.mtx),
+    effect_is_positive = as.array(as.integer(model_data$effects$is_positive)),
     NobjEffects = nrow(model_data$object_effects),
-    obj_effect_is_positive = model_data$object_effects$is_positive,
     NeffectsPerObjCumsum = as.array(nrows_cumsum(model_data$object_effects, 'glm_object_ix')),
     obj_effect2obj = as.array(as.integer(model_data$object_effects$glm_object_ix)),
     obj_effect2effect = as.array(as.integer(model_data$object_effects$effect)),

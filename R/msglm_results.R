@@ -143,7 +143,11 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
     contrast_stats.df$fraction <- as.integer( contrast_stats.df$fraction )
   }
   if ( !is.null(dimnames(contrastXcondition)[[1]]) ) {
-    contrast_stats.df$contrast <- dimnames(contrastXcondition)[[1]][contrast_stats.df$index_contrast]
+    contrast_col <- names(dimnames(contrastXcondition))[[1]]
+    if (is.null(contrast_col)) {
+      contrast_col <- "contrast"
+    }
+    contrast_stats.df[[contrast_col]] <- dimnames(contrastXcondition)[[1]][contrast_stats.df$index_contrast]
   }
   return ( contrast_stats.df )
 }

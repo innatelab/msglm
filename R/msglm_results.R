@@ -60,8 +60,8 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
                                 quant.probs = c(0.025, 0.25, 0.50, 0.75, 0.975),
                                 val_trans = NULL)
 {
-  n_samples <- n_distinct(samples.df$unpermuted_ix)
-  if (n_samples == 0L) {
+  n_max_samples <- n_distinct(samples.df$unpermuted_ix)
+  if (n_max_samples == 0L) {
     warning("No samples for ", paste0(var_names, collapse=" "), " ", condition_col)
     return(data.frame())
   }
@@ -99,6 +99,16 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
   contrast_stats_all_samples <- function( samples ) {
     #print(str(samples))
     # recode experiment indices to match what is in the samples
+    samples_grouped <- dplyr::group_by_(samples, .dots=c(condition_col, experiment_col))
+    samples_stats <- samples_grouped %>%
+      dplyr::summarise(n_samples = n_distinct(unpermuted_ix)) %>% dplyr::ungroup()
+    n_min_samples <- min(samples_stats$n_samples)
+    if (n_distinct(samples_stats$n_samples) > 1L) {
+      warning("Different number of samples per experiment: ",
+              paste(unique(samples_stats$n_samples), collapse=" "),
+              ", sub-sampling")
+      samples <- samples_grouped %>% dplyr::sample_n(size = n_min_samples) %>% dplyr::ungroup()
+    }
     cur_experiments = unique(samples[[experiment_col]])
     cur_cond2expr.df <- dplyr::filter(condition2experiments.df, experiment %in% cur_experiments) %>%
       dplyr::mutate(experiment = factor(as.character(experiment), levels=cur_experiments))
@@ -118,7 +128,7 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
           stop("Unknown val_trans=\"", val_trans, "\". Supported transforms: exp")
         }
       }
-      samples.arr <- matrix(sample_vals, nrow=n_samples)
+      samples.arr <- matrix(sample_vals, nrow=n_min_samples, ncol=nrow(samples_stats))
 
       #print(str(samples.arr))
       res <- insilicoMop:::ContrastStatistics( 

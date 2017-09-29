@@ -42,7 +42,7 @@ normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
                 paste0(mschan_shifts$mschannel[!mschan_shifts$is_used], collapse=" "))
         mschan_shifts <- dplyr::filter(mschan_shifts, is_used)
       }
-      msdata_df_std <- dplyr::inner_join(msdata_df_std, mschan_shifts %>% dplyr::select(mschannel, shift)) %>%
+      msdata_df_std <- dplyr::inner_join(msdata_df_std, dplyr::select(mschan_shifts, mschannel, shift)) %>%
         dplyr::mutate(norm_quant = quant*exp(-shift)) %>% dplyr::select(-shift)
     } else {
       mschan_shifts <- dplyr::mutate(mschan_shifts, is_used = TRUE)
@@ -87,8 +87,6 @@ normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
         }
         condgrp_msdata_df <- dplyr::semi_join(condgrp_msdata_df, sel_condgrp_objs)
         stan_input <- stan_input_base
-        stan_input$Nmschannels <- sel_condgrp_objs$n_max_mschannels[1]
-        stan_input$Nconditions <- sel_condgrp_objs$n_max_conditions[1]
         stan_input$Nobjects <- nrow(sel_condgrp_objs)
         message("Normalizing group '", sel_condgrp_objs$cond_group[1], "', ",
                 stan_input$Nobjects, " object(s), ",
@@ -101,7 +99,7 @@ normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
                               shift = 0.0,
                               stringsAsFactors = FALSE)
             colnames(res) <- c(cond_col, "shift")
-        } else if (stan_input$Nconditions == 1L) {
+        } else if (n_distinct(condgrp_msdata_df$condition) == 1L) {
             # another degenerated case
             res <- data.frame(condition = as.character(condgrp_msdata_df$condition[1]),
                               shift = 0.0,
@@ -115,7 +113,7 @@ normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
           dplyr::distinct() %>% dplyr::arrange(condition, mschannel) %>%
           dplyr::mutate(mschannel = as.character(mschannel),
                         condition= as.character(condition)) %>%
-          dplyr::left_join(mschan_shifts) %>%
+          dplyr::inner_join(mschan_shifts) %>%
           dplyr::mutate(mschannel = factor(mschannel, levels=mschannel),
                         condition = factor(condition, levels=unique(condition))) %>%
           dplyr::arrange(as.integer(mschannel))
@@ -123,6 +121,8 @@ normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
           warning("No shifts for mschannels: ",
                   paste0(mschan_df$mschannel[is.na(mschan_df$shift)], collapse=" "))
         }
+        stan_input$Nmschannels <- nrow(mschan_df)
+        stan_input$Nconditions <- n_distinct(mschan_df$condition)
         stan_input$mschannel2condition <- as.array(as.integer(mschan_df$condition))
         stan_input$mschannel_shift <- as.array(mschan_df$shift)
         condgrp_msdata_df <- dplyr::mutate(condgrp_msdata_df,

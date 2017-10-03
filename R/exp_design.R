@@ -12,9 +12,9 @@ conditionXeffect_frame <- function(conditionXeffect_mtx, effects_df) {
     # estimate the weight of a condition in an effect
     dplyr::inner_join(dplyr::select(effects_df, effect, tau)) %>%
     dplyr::mutate(w = tau * mult) %>%
-    dplyr::group_by(condition) %>%
+    dplyr::group_by_(.dots=names(dimnames(conditionXeffect_mtx))[[1]]) %>%
     dplyr::mutate(eff_w = w/sum(w)) %>%
-    dplyr::group_by(effect) %>%
+    dplyr::group_by_(.dots=names(dimnames(conditionXeffect_mtx))[[2]]) %>%
     dplyr::mutate(cond_w = eff_w/sum(eff_w)) %>%
     dplyr::ungroup()
 }

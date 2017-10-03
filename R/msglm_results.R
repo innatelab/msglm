@@ -466,7 +466,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   message("Calculating contrasts...")
   res <- calc_contrasts(res, msglm.vars_info, dims_info,
                         contrastXmetacondition.mtx, conditionXmetacondition.df,
-                        dplyr::distinct(contrastXmetacondition.df, contrast, contrast_type),
+                        dplyr::distinct(dplyr::select(contrastXmetacondition.df, contrast, contrast_type)),
                         var_names = contrast_vars,
                         mschannel_col = mschannel_col)
 

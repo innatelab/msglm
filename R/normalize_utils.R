@@ -3,6 +3,11 @@
 # Author: astukalov
 ###############################################################################
 
+# coalesce with null (y if x is null or empty, x otherwise)
+"%||%" <- function(x, y) {
+  if (!is.null(x) && length(x) > 0) x else y
+}
+
 normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
                                   quant_col = "intensity", obj_col = "protgroup_id",
                                   mschan_col = "mschannel", cond_col = "condition",

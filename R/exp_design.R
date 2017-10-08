@@ -1,9 +1,5 @@
 require(stringr)
 
-"%||%" <- function(x, y) {
-  if (!is.null(x) && length(x) > 0) x else y
-}
-
 # convert conditionXeffect matrix to a frame and calculate
 # condition2effect weights
 conditionXeffect_frame <- function(conditionXeffect_mtx, effects_df) {

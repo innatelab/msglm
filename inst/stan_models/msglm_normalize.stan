@@ -29,7 +29,6 @@ data {
 }
 
 transformed data {
-    matrix[Nmschannels, Nmschannels] identity_mschannels;
     matrix[Nobjects, Nmschannels] zScore;
     matrix[Nobjects, Nmschannels] qLogStd;
     matrix<lower=0>[Nobjects, Nmschannels] qDataScaled;
@@ -42,8 +41,6 @@ transformed data {
         condition_shift_transform[i, i] = 1.0;
         condition_shift_transform[Nconditions, i] = -1.0;
     }
-
-    identity_mschannels = diag_matrix(rep_vector(1.0, Nmschannels));
 
     zScore = (log(qData) - zShift) * zScale;
 

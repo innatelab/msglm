@@ -5,12 +5,13 @@ functions {
 }
 
 data {
-  int<lower=1> Nmschannels;    // number of MS channels
   int<lower=1> Nobjects;       // number of objects
-  int<lower=1> Nconditions;
-  vector[Nmschannels]  mschannel_shift; // fixed mschannel shifts
-  int<lower=1,upper=Nconditions> mschannel2condition[Nmschannels];
 
+  int<lower=1> Nmschannels;    // number of MS channels
+  int<lower=1> Nshifts;        // number of mschannel_shifts to estimate
+  int<lower=1,upper=Nshifts> mschannel2shift[Nmschannels];
+
+  vector[Nmschannels]  mschannel_preshift; // fixed mschannel pre-shifts
   matrix<lower=0>[Nobjects, Nmschannels] qData;
 
   // instrument calibrated parameters 
@@ -34,12 +35,12 @@ transformed data {
     matrix<lower=0>[Nobjects, Nmschannels] qDataScaled;
     matrix<lower=0>[Nobjects, Nmschannels] meanDenomScaled;
     int<lower=0> NobsPerObject[Nobjects];
-    matrix[Nconditions, Nconditions-1] condition_shift_transform;
+    matrix[Nshifts, Nshifts-1] shift_transform;
 
-    condition_shift_transform = rep_matrix(0.0, Nconditions, Nconditions-1);
-    for (i in 1:Nconditions-1) {
-        condition_shift_transform[i, i] = 1.0;
-        condition_shift_transform[Nconditions, i] = -1.0;
+    shift_transform = rep_matrix(0.0, Nshifts, Nshifts-1);
+    for (i in 1:Nshifts-1) {
+        shift_transform[i, i] = 1.0;
+        shift_transform[Nshifts, i] = -1.0;
     }
 
     zScore = (log(qData) - zShift) * zScale;
@@ -77,37 +78,38 @@ transformed data {
 parameters {
     real<lower=0> data_sigma_a;
     real<lower=0> data_sigma_t;
-    real<lower=0> condition_sigma_a;
-    real<lower=0> condition_sigma_t;
-    vector[Nconditions-1] condition_shift0_unscaled;
+    real<lower=0> shift_sigma_a;
+    real<lower=0> shift_sigma_t;
+    vector[Nshifts-1] shift0_unscaled;
 }
 
 transformed parameters {
     real<lower=0> data_sigma;
-    real<lower=0> condition_sigma;
-    vector[Nconditions] condition_shift_unscaled;
-    vector[Nconditions] condition_shift;
+    real<lower=0> shift_sigma;
+    vector[Nshifts] shift_unscaled;
+    vector[Nshifts] shift;
 
     data_sigma = data_sigma_a ./ sqrt(data_sigma_t);
-    condition_sigma = condition_sigma_a ./ sqrt(condition_sigma_t);
-    condition_shift_unscaled = condition_shift_transform * condition_shift0_unscaled;
-    condition_shift = condition_shift_unscaled * condition_sigma;
+    shift_sigma = shift_sigma_a ./ sqrt(shift_sigma_t);
+    shift_unscaled = shift_transform * shift0_unscaled;
+    shift = shift_unscaled * shift_sigma;
 }
 
 model {
-    vector[Nmschannels] total_mschannel_shift;
-    matrix[Nmschannels, Nmschannels] sum_mschannels;
+    vector[Nmschannels] total_mschan_shift;
+    matrix[Nmschannels, Nmschannels] sum_mschans;
 
     data_sigma_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
     data_sigma_a ~ normal(0.0, 1.0); // 1.0 = 2/2
     //data_sigma ~ student_t(2, 0.0, 1.0);
-    condition_sigma_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
-    condition_sigma_a ~ normal(0.0, 1.0); // 1.0 = 2/2
-    //condition_sigma ~ student_t(2, 0.0, 1.0);
-    condition_shift_unscaled ~ normal(0.0, 1.0);
+    shift_sigma_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
+    shift_sigma_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+    //shift_sigma ~ student_t(2, 0.0, 1.0);
+    shift_unscaled ~ normal(0.0, 1.0);
 
-    total_mschannel_shift = mschannel_shift + condition_shift[mschannel2condition];
-    sum_mschannels = exp(rep_matrix(total_mschannel_shift', Nmschannels) - rep_matrix(total_mschannel_shift, Nmschannels));
-    //print("avg_exps=", average_mschannels);
-    to_vector(qDataScaled) ~ double_exponential(to_vector((qData * sum_mschannels) .* meanDenomScaled), data_sigma);
+    total_mschan_shift = mschannel_preshift + shift[mschannel2shift];
+    // operator to sum channel intensities in each mschannel and copy it to all mschannels
+    sum_mschans = exp(rep_matrix(total_mschan_shift', Nmschannels) - rep_matrix(total_mschan_shift, Nmschannels));
+    //print("avg_exps=", average_mschans);
+    to_vector(qDataScaled) ~ double_exponential(to_vector((qData * sum_mschans) .* meanDenomScaled), data_sigma);
 }

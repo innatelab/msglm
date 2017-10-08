@@ -109,14 +109,14 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
                              control = list(adapt_delta=mcmc.adapt_delta))
         norm_fit_stat <- monitor(norm_fit)
         cond_shift_mask <- str_detect(rownames(norm_fit_stat), "^condition_shift\\[\\d+\\]$")
-        nonconv_mask <- norm_fit_stat[cond_shift_mask, 'Rhat'] > Rhat.max
-        if (any(nonconv_mask)) {
-            warning("Rhat>", Rhat.max, " for ", sum(nonconv_mask), " shift(s)")
+        nonconv_mask.Rhat <- norm_fit_stat[cond_shift_mask, 'Rhat'] > Rhat.max
+        if (any(nonconv_mask.Rhat)) {
+            warning("Rhat>", Rhat.max, " for ", sum(nonconv_mask.Rhat), " shift(s)")
         }
         neff_min <- neff_ratio.min*mcmc.iter
-        nonconv_mask <- norm_fit_stat[cond_shift_mask, 'n_eff'] < neff_min
-        if (any(nonconv_mask)) {
-            warning("n_eff<", neff_min, " for ", sum(nonconv_mask), " shift(s)")
+        nonconv_mask.neff <- norm_fit_stat[cond_shift_mask, 'n_eff'] < neff_min
+        if (any(nonconv_mask.neff)) {
+            warning("n_eff<", neff_min, " for ", sum(nonconv_mask.neff), " shift(s)")
         }
         cond_shift_pars <- norm_fit_stat[cond_shift_mask, 'mean']
         cond_shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[cond_shift_mask], "\\[(\\d+)\\]$")[,2])
@@ -124,6 +124,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
                           shift = as.numeric(cond_shift_pars),
                           Rhat = norm_fit_stat[cond_shift_mask, 'Rhat'],
                           n_eff = norm_fit_stat[cond_shift_mask, 'n_eff'],
+                          converged = !nonconv_mask.Rhat & !nonconv_mask.neff,
                           stringsAsFactors=FALSE)
     } else if (stan_method == 'vb') {
         norm_fit <- vb(stan_norm_model, stan_input, iter=vb.iter,

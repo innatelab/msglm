@@ -50,10 +50,10 @@ join_report_frames <- function(reports, frame_extractor=function(report) stop('n
   return ( joined_res.df )
 }
 
-join_msglm_reports <- function(section, reports, type) {
+join_msglm_reports <- function(section, reports, type, results_tag="msglm_results") {
   message( 'Assembling joint ', type, ' report for ', section, '...' )
   res <- join_report_frames(reports, frame_extractor = function(report) {
-    res <- report$msglm_results[[section]][[type]]
+    res <- report[[results_tag]][[section]][[type]]
     # add object id columns
     # FIXME sites support?
     # FIXME model_data$objects support?
@@ -69,5 +69,12 @@ join_msglm_reports <- function(section, reports, type) {
     res
   },
   NULL, global_vars = c())
+  return(res)
+}
+
+join_msglm_reports_allsections <- function(reports, type, results_tag="msglm_results") {
+  sections <- names(reports[[1]][[results_tag]])
+  res <- lapply(sections, join_msglm_reports, reports, type, results_tag=results_tag)
+  names(res) <- sections
   return(res)
 }

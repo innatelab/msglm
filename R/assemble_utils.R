@@ -1,12 +1,12 @@
 process_msglm_chunk <- function(file_ix,
                                 strip_samples=FALSE, strip_stats=FALSE,
                                 postprocess.f = NULL) {
-  fit_model.file <- fit_model.files.df[ file_ix, 'filename' ]
-  message( 'Loading ', fit_model.file, '...' )
+  fit_file <- fit_files.df[file_ix, 'filename']
+  message( 'Loading ', fit_file, '...' )
   tmp.env <- new.env(parent = baseenv())
-  load(file.path(fit_model_path, fit_model.file ), envir = tmp.env)
+  load(file.path(fit_path, fit_file), envir = tmp.env)
   if (!is.null(postprocess.f)) {
-    postprocess.f(envir = tmp.env, fit_model.file)
+    postprocess.f(envir = tmp.env, fit_file)
   }
   if (strip_samples || strip_stats) {
     tmp.env$msglm_results <- lapply( tmp.env$msglm_results, function( var_results ) {

@@ -347,6 +347,10 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
         # no samples
         vars_results[[vars_category]]$contrast_stats <- NULL
       } else {
+        invalid_contrast_types <- !(contrastXmetacondition.df$contrast_type %in% c("filter", "filtering", "comparison"))
+        if (any(invalid_contrast_types)) {
+          stop("Unsupported contrast types: ", paste0(unique(contrastXmetacondition.df$contrast_type[invalid_contrast_types]), collapse=" "))
+        }
         # include only the object columns that are included in the processed vars_category
         objs_df <- dplyr::select_(dims_info$object, .dots=intersect(colnames(vars_results[[vars_category]]$stats),
                                                                     colnames(dims_info$object)))
@@ -374,7 +378,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
           ) %>%
           #dplyr::select(-index_observation, -msrun, -msrun_ix) %>% dplyr::distinct() %>%
           left_join(contrastXmetacondition.df %>% dplyr::filter(contrast %in% rownames(contrastXmetacondition)) %>% dplyr::rename(contrast_weight = weight) %>%
-                      dplyr::mutate(metacondition_reported = case_when(.$contrast_type == "filtering" ~ "lhs",
+                      dplyr::mutate(metacondition_reported = case_when(.$contrast_type %in% c("filter", "filtering") ~ "lhs",
                                                                        .$contrast_type == "comparison" ~ "enriched",
                                                                        TRUE ~ NA_character_))) %>%
           dplyr::filter((metacondition_reported == "lhs" & contrast_weight > 0) |

@@ -189,7 +189,10 @@ normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
       colnames(mschan_preshifts) <- c("mschannel", "preshift")
     }
     if (!is.na(mschan_shift.min) && is.finite(mschan_shift.min)) {
-      mschan_preshifts <- dplyr::mutate(mschan_preshifts, is_used = preshift >= mschan_shift.min)
+      mschan_preshifts <- dplyr::inner_join(mschan_preshifts, dplyr::distinct(dplyr::select(msdata_df_std, mschannel, condgroup))) %>%
+          dplyr::group_by(condgroup) %>%
+          dplyr::mutate(is_used = preshift >= mean(preshift) + mschan_shift.min) %>%
+          dplyr::ungroup()
       if (!all(mschan_preshifts$is_used)) {
         warning(sum(!mschan_preshifts$is_used), " mschannel(s) with low pre-shifts excluded from ", cond_col, " normalization: ",
                 paste0(mschan_preshifts$mschannel[!mschan_preshifts$is_used], collapse=" "))

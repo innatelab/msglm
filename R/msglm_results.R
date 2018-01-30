@@ -68,8 +68,10 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
   if (is.na(condition_col)) {
     # no conditions specified, assume the same condition for all experiments
     # FIXME checking user-defined condition2experiments.df and constrastXcondition
-    condition2experiments.df <- dplyr::distinct(dplyr::select_(samples.df, .dots=c("experiment" = experiment_col))) %>%
-      dplyr::mutate(condition = '__all__')
+    condition2experiments.df <- dplyr::distinct(dplyr::select_(samples.df, experiment_col)) %>%
+      dplyr::mutate(tmp_condition = '__all__')
+    samples.df$tmp_condition <- "__all__"
+    condition_col <- "tmp_condition"
     # no contrastXcondition matrix, assume contrast===condition,
     # i.e. combine all the experiments and calculate the summary statistics
     if (is.null(contrastXcondition)) {
@@ -84,22 +86,21 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
       if (!is.null(condition2experiments.df)) {
         stop("Ambiguous experiment design specification: condition2experiment.df provided, but ", condition_col, " is also present in the samples.df")
       }
-      condition2experiments.df <- dplyr::distinct(dplyr::select_(samples.df, .dots=c("condition" = condition_col, "experiment" = experiment_col)))
+      condition2experiments.df <- dplyr::distinct(dplyr::select_(samples.df, c(condition_col, experiment_col)))
     } else {
       if (is.null(condition2experiments.df)) {
         stop("No experiment design: provide condition2experiment.df or ", condition_col, " in the samples.df")
       }
-      condition2experiments.df <- dplyr::select_(condition2experiments.df, .dots=c("condition" = condition_col, "experiment" = experiment_col))
+      condition2experiments.df <- dplyr::select_at(condition2experiments.df, c(condition_col, experiment_col))
     }
-  } else {
-    condition2experiments.df <- dplyr::distinct(dplyr::select_(samples.df, .dots=c("condition" = condition_col))) %>%
-      dplyr::mutate(experiment = condition)
+  } else { # condition_col == experiment_col
+    condition2experiments.df <- dplyr::distinct(dplyr::select_(samples.df, condition_col))
   }
 
   contrast_stats_all_samples <- function( samples ) {
     #print(str(samples))
     # recode experiment indices to match what is in the samples
-    samples_grouped <- dplyr::group_by_(samples, .dots=c(condition_col, experiment_col))
+    samples_grouped <- dplyr::group_by_(samples, .dots=c(experiment_col))
     samples_stats <- samples_grouped %>%
       dplyr::summarise(n_samples = n_distinct(unpermuted_ix)) %>% dplyr::ungroup()
     n_min_samples <- min(samples_stats$n_samples)
@@ -109,13 +110,14 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
               ", sub-sampling")
       samples <- samples_grouped %>% dplyr::sample_n(size = n_min_samples) %>% dplyr::ungroup()
     }
-    cur_experiments = unique(samples[[experiment_col]])
-    cur_cond2expr.df <- dplyr::filter(condition2experiments.df, experiment %in% cur_experiments) %>%
-      dplyr::mutate(experiment = factor(as.character(experiment), levels=cur_experiments))
+    cur_experiments = unique(as.character(samples[[experiment_col]]))
+    cur_cond2expr.df <- condition2experiments.df[as.character(condition2experiments.df[[experiment_col]]) %in% cur_experiments, , drop=FALSE]
+    cur_cond2expr.df[[experiment_col]] <- factor(as.character(cur_cond2expr.df[[experiment_col]]),
+                                                 levels=cur_experiments)
     # recode condition indices
-    cur_contrastXcondition <- contrastXcondition[,colnames(contrastXcondition) %in% unique(cur_cond2expr.df$condition),drop=FALSE]
-    cur_cond2expr.df <- dplyr::mutate(cur_cond2expr.df,
-      condition = factor(as.character(condition), levels=colnames(cur_contrastXcondition)))
+    cur_contrastXcondition <- contrastXcondition[,colnames(contrastXcondition) %in% unique(as.character(cur_cond2expr.df[[condition_col]])),drop=FALSE]
+    cur_cond2expr.df[[condition_col]] <- factor(as.character(cur_cond2expr.df[[condition_col]]),
+                                                levels=colnames(cur_contrastXcondition))
 
     bind_rows(lapply(var_names, function(var_col) {
       sample_vals <- samples[[var_col]]
@@ -132,7 +134,7 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
 
       #print(str(samples.arr))
       res <- insilicoMop:::ContrastStatistics( 
-        samples.arr, as.integer(cur_cond2expr.df$experiment), as.integer(cur_cond2expr.df$condition),
+        samples.arr, as.integer(cur_cond2expr.df[[experiment_col]]), as.integer(cur_cond2expr.df[[condition_col]]),
         cur_contrastXcondition,
         nsteps = nsteps, maxBandwidth = maxBandwidth,
         quant_probs = quant.probs ) %>%

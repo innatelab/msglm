@@ -246,6 +246,7 @@ multilevel_normalize_experiments <- function(stan_norm_model, instr_calib,
                                              mschannels_df, msdata_df,
                                   quant_col = "intensity", obj_col = "protgroup_id",
                                   mschan_col = "mschannel",
+                                  mschan_preshifts_df = NULL, mschan_preshift_col = "shift",
                                   norm_levels,
                                   max_objs=1000L,
                                   nmschan_ratio.min=0.9, ncond_ratio.min=1.0,
@@ -269,7 +270,17 @@ multilevel_normalize_experiments <- function(stan_norm_model, instr_calib,
   msdata_df <- dplyr::select_(msdata_df, .dots=c(obj_col, mschan_col, quant_col)) %>%
     dplyr::left_join(mschan_df)
   total_shift_col <- paste0("total_",mschan_col,"_shift")
-  mschan_shifts_df <- NULL
+  # initialize mschannel shifts
+  if (is.null(mschan_preshifts_df)) {
+    mschan_shifts_df <- mschan_df
+    mschan_shifts_df[[total_shift_col]] <- 0.0
+  } else {
+    # use exisiting shifts
+    mschan_shifts_df <- mschan_preshifts_df[c(mschan_col, mschan_preshift_col)]
+    mschan_shifts_df <- dplyr::left_join(mschan_df, mschan_shifts_df)
+    mschan_shifts_df[[total_shift_col]] <- if_else(!is.na(mschan_shifts_df[[mschan_preshift_col]]),
+                                                   mschan_shifts_df[[mschan_preshift_col]], 0.0)
+  }
   lev_norm_res <- list()
   for (i in seq_along(norm_levels)) {
     lev_info <- norm_levels[[i]]
@@ -295,17 +306,12 @@ multilevel_normalize_experiments <- function(stan_norm_model, instr_calib,
                                            mschan_shift.min = lev_info$mschan_shift.min %||% mschan_shift.min,
                                            mcmc.iter=mcmc.iter, mcmc.chains=mcmc.chains, mcmc.thin=mcmc.thin, mcmc.adapt_delta=mcmc.adapt_delta,
                                            vb.iter=vb.iter, verbose=verbose)
-    if (is.null(mschan_shifts_df)) {
-      # initialize mschannel shifts
-      mschan_shifts_df <- dplyr::inner_join(lev_shifts_df, mschan_df)
-      mschan_shifts_df[[total_shift_col]] <- 0.0
-    } else {
-      mschan_shifts_df <- dplyr::inner_join(mschan_shifts_df,
-                                            dplyr::select_(lev_shifts_df, .dots=c(lev_info$cond_col, "shift")))
-    }
     lev_shift_col <- paste0(lev_name, "_shift")
+    mschan_shifts_df <- dplyr::left_join(mschan_shifts_df,
+                                          dplyr::select_(lev_shifts_df, .dots=c(lev_info$cond_col, "shift")))
     colnames(mschan_shifts_df)[colnames(mschan_shifts_df)=="shift"] <- lev_shift_col
-    mschan_shifts_df[[total_shift_col]] <- mschan_shifts_df[[total_shift_col]] + mschan_shifts_df[[lev_shift_col]]
+    mschan_shifts_df[[total_shift_col]] <- mschan_shifts_df[[total_shift_col]] +
+          if_else(is.na(mschan_shifts_df[[lev_shift_col]]), 0.0, mschan_shifts_df[[lev_shift_col]])
     lev_norm_res[[lev_name]] <- list(level_shifts = lev_shifts_df,
                                      mschannel_shifts = mschan_shifts_df)
   }

@@ -41,6 +41,7 @@ stan.prepare_data <- function(base_input_data, model_data,
 {
   batchEffXmsrun.mtx <- t(msrunXbatchEffect.mtx[unique(model_data$mschannels$msrun),, drop=FALSE])
   replEffXmsrun.mtx <- t(msrunXreplEffect.mtx[unique(model_data$mschannels$msrun),, drop=FALSE])
+  repl_eff_col <- names(dimnames(replEffXmsrun.mtx))[[1]]
   message('Converting MSGLM model data to Stan-readable format...')
   if (any(as.integer(model_data$effects$effect) != seq_len(nrow(model_data$effects)))) {
     stop("model_data$effects are not ordered")
@@ -73,7 +74,7 @@ stan.prepare_data <- function(base_input_data, model_data,
     NreplEffects = ncol(msrunXreplEffect.mtx),
     NobjReplEffects = nrow(model_data$object_repl_effects),
     NreplEffectsPerObjCumsum = as.array(nrows_cumsum(model_data$object_repl_effects, 'glm_object_ix')),
-    obj_repl_effect2repl_effect = as.array(as.integer(model_data$object_repl_effects$replicate_effect)),
+    obj_repl_effect2repl_effect = as.array(as.integer(model_data$object_repl_effects[[repl_eff_col]])),
     NbatchEffects = ncol(msrunXbatchEffect.mtx),
     batch_effect_is_positive = as.array(as.integer(model_data$batch_effects$is_positive)),
     NobjBatchEffects = nrow(model_data$object_batch_effects),

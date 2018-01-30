@@ -57,6 +57,6 @@ frame2matrix <- function(df, row_col, col_col, val_col, cols=NULL, rows=NULL) {
                    cols %||% colnames(nz_mtx))
   names(mtx_dims) <- c(row_col, col_col)
   mtx <- do.call(zero_matrix, mtx_dims)
-  mtx[rownames(nz_mtx), colnames(nz_mtx)] <- nz_mtx
+  mtx[mtx_dims[[1]], mtx_dims[[2]]] <- nz_mtx
   return(mtx)
 }

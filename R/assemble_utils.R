@@ -55,7 +55,6 @@ join_msglm_reports <- function(section, reports, type, results_tag="msglm_result
   res <- join_report_frames(reports, frame_extractor = function(report) {
     res <- report[[results_tag]][[section]][[type]]
     # add object id columns
-    # FIXME sites support?
     # FIXME model_data$objects support?
     if (!is.null(res) && !('majority_protein_acs' %in% colnames(res))
         && "majority_protein_acs" %in% colnames(report$model_data$objects)) {
@@ -65,6 +64,14 @@ join_msglm_reports <- function(section, reports, type, results_tag="msglm_result
     if (!is.null(res) && !('pepmod_id' %in% colnames(res))
         && "pepmod_id" %in% colnames(report$model_data$objects)) {
       res$pepmod_id <- rep_len(report$model_data$objects$pepmod_id[1], nrow(res))
+    }
+    if (!is.null(res) && !('site_id' %in% colnames(res))
+        && "site_id" %in% colnames(report$model_data$objects)) {
+      res$site_id <- rep_len(report$model_data$objects$site_id[1], nrow(res))
+    }
+    if (!is.null(res) && !('multiplicity' %in% colnames(res))
+        && "site_id" %in% colnames(report$model_data$objects)) {
+      res$multiplicity <- rep_len(report$model_data$objects$multiplicity[1], nrow(res))
     }
     res
   },

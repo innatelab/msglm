@@ -120,9 +120,11 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
             warning("n_eff<", neff_min, " for ", sum(nonconv_mask.neff), " shift(s)")
         }
         shift_pars <- norm_fit_stat[shift_mask, 'mean']
+        shift_sd_pars <- norm_fit_stat[shift_mask, 'sd']
         shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[shift_mask], "\\[(\\d+)\\]$")[,2])
         res <- data.frame(condition = levels(mschan_df$condition)[shift_ixs],
                           shift = as.numeric(shift_pars),
+                          shift_sd = as.numeric(shift_sd_pars),
                           Rhat = norm_fit_stat[shift_mask, 'Rhat'],
                           n_eff = norm_fit_stat[shift_mask, 'n_eff'],
                           converged = !nonconv_mask.Rhat & !nonconv_mask.neff,

@@ -22,11 +22,11 @@ replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", cond_col=
   mschannels_df <- dplyr::select_at(mschannels_df, c("msrun"=msrun_col, "condition"=cond_col, "replicate"=replicate_col))
   msrunXreplEffect_pre.df <- dplyr::group_by(mschannels_df, condition) %>%
     dplyr::do({
-      if (nrow(.) <= 1) {
+      if (n_distinct(.$replicate) <= 1) {
         # return stub to keep msrun
         warning(.$condition[[1]], ": single replicate (", .$msrun[[1]], "), no replicate effects")
-        data.frame(msrun = as.character(.$msrun[[1]]),
-                   repl_effect = paste0("__ignore_replicate__", .$msrun[[1]]),
+        data.frame(msrun = as.character(.$msrun),
+                   repl_effect = paste0("__ignore_replicate__", .$condition[[1]]),
                    Freq = 0.0,
                    stringsAsFactors = FALSE)
       } else {
@@ -43,10 +43,11 @@ replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", cond_col=
       }
     }) %>% dplyr::ungroup()
   repl_col <- paste0(replicate_col, "_effect")
-  frame2matrix(dplyr::filter(msrunXreplEffect_pre.df, !str_detect(repl_effect, "__ignore_replicate__")) %>%
-                             dplyr::rename_at("repl_effect", funs(function(x) repl_col)) %>%
-                             dplyr::rename_at("msrun", funs(function(x) msrun_col)),
-                             msrun_col, repl_col, "Freq")
+  res <- frame2matrix(msrunXreplEffect_pre.df %>%
+                      dplyr::rename_at("repl_effect", funs(function(x) repl_col)) %>%
+                      dplyr::rename_at("msrun", funs(function(x) msrun_col)),
+                      msrun_col, repl_col, "Freq")
+  res[, !str_detect(colnames(res), "__ignore_replicate__"), drop=FALSE]
 }
 
 # extracts the value of given factor from the effect label

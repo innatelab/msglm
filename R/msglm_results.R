@@ -209,7 +209,7 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
         if ( !is.null(dim_info[[dim_ix]]) ) {
             res.df[[dim_name]] <- NULL
             if ( nrow(dim_info[[dim_ix]]) != max(res_index[,dim_ix]) ) {
-                stop( 'Dimension ', dim_ix, ' info contains ', nrow(dim_info[[dim_ix]]),
+                stop( 'Dimension #', dim_ix, '(', dim_name,') info contains ', nrow(dim_info[[dim_ix]]),
                       ' elements, the data contain ', max(res_index[,dim_ix]) )
             }
             res_dim_info.df <- dim_info[[dim_ix]][ res_index[,dim_ix], , drop=FALSE ]

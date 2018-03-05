@@ -1,5 +1,6 @@
 require(rstan)
 require(insilicoMop)
+require(stringr)
 
 msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
 {
@@ -332,10 +333,28 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
                       cond_min_qtile = cume_dist(cond_min_mean) - 1/n()) %>% dplyr::ungroup() %>%
         dplyr::select_(.dots = c(obj_dims, "contrast", "metacondition", condition_agg_col,
                                  "is_lhs", "cond_min_qtile", "cond_max_qtile", "cond_max_mean", "cond_min_mean"))
-
+      # compose threshold dataframe
+      contrast_quantile_thresholds <- function(cond_qtls, is_lhs) {
+        res <- data.frame(contrast = unique(cond_agg_stats.df$contrast),
+                          cond_qtile.min_thresh = 0, cond_qtile.max_thresh = 1,
+                          is_lhs = is_lhs,
+                          stringsAsFactors = FALSE)
+        if (is.list(cond_qtls)) {
+          rownames(res) <- res$contrast
+          res[names(cond_qtls), 'cond_qtile.min_thresh'] <- sapply(cond_qtls, function(qtl) qtl[[1]])
+          res[names(cond_qtls), 'cond_qtile.max_thresh'] <- sapply(cond_qtls, function(qtl) qtl[[2]])
+        } else {
+          res$cond_qtile.min_thresh <- cond_qtls[[1]]
+          res$cond_qtile.max_thresh <- cond_qtls[[2]]
+        }
+        return(res)
+      }
+      contr_qtl_thresh.df <- bind_rows(contrast_quantile_thresholds(condition.quantiles_lhs, is_lhs = TRUE),
+                                       contrast_quantile_thresholds(condition.quantiles_rhs, is_lhs = FALSE))
       cond_stats.df <- dplyr::inner_join(cond_stats.df, cond_agg_stats.df) %>%
-        dplyr::mutate(is_accepted = (is_lhs & cond_min_qtile >= condition.quantiles_lhs[[1]] & cond_max_qtile <= condition.quantiles_lhs[[2]]) |
-                                    (!is_lhs & cond_min_qtile >= condition.quantiles_rhs[[1]] & cond_max_qtile <= condition.quantiles_rhs[[2]]))
+        dplyr::left_join(contr_qtl_thresh.df) %>%
+        dplyr::mutate(is_accepted = (cond_min_qtile >= cond_qtile.min_thresh) &
+                                    (cond_max_qtile <= cond_qtile.max_thresh))
       cond_stats.df <- dplyr::filter(cond_stats.df, is_accepted)
       message( 'Calculating contrasts for ', vars_category, ' variables...' )
       samples.df <- dplyr::semi_join(vars_results[[vars_category]]$samples, cond_stats.df) # exclude unused conditions
@@ -363,7 +382,8 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
           }
         }
         contrast_stats.df <- vars_contrast_stats(samples.df, vars_cat_subset_info$names,
-                                                 group_cols = obj_dims, condition_col = 'metacondition', experiment_col = experiment_col,
+                                                 group_cols = obj_dims, condition_col = 'metacondition',
+                                                 experiment_col = experiment_col,
                                                  condition2experiments.df = metacondition2experiments.df,
                                                  contrastXcondition = contrastXmetacondition, val_trans = val_trans)
         var_info.df <- vars_results[[vars_category]]$stats %>%
@@ -426,6 +446,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                                rel_dims <- names(dims_info)[sapply(names(dims_info), function(dname) any(str_detect(colnames(dims_info[[dname]]), "^(msrun|mschannel|condition)")))]
                                if (any(vi$dims %in% rel_dims)) str_subset(vi$names, "(?:labu|shift)(?:_replCI)?$") else c()
                               })),
+                             condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
                              keep.samples=FALSE, verbose=FALSE)
 {
   message( 'Extracting MCMC samples...' )
@@ -474,7 +495,9 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                         contrastXmetacondition.mtx, conditionXmetacondition.df,
                         dplyr::distinct(dplyr::select(contrastXmetacondition.df, contrast, contrast_type)),
                         var_names = contrast_vars,
-                        mschannel_col = mschannel_col)
+                        mschannel_col = mschannel_col,
+                        condition.quantiles_lhs = condition.quantiles_lhs,
+                        condition.quantiles_rhs = condition.quantiles_rhs)
 
   message("Removing MCMC samples...")
   if (is.character(keep.samples)) {

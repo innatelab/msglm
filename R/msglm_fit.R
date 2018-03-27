@@ -33,20 +33,6 @@ require(Biostrings)
 require(RGraphML)
 require(rstan)
 
-read_innate_fasta <- function(fasta_filename) {
-  ens.fasta <- readAAStringSet(fasta_filename)
-  ens.matches <- regexec( "sp\\|([A-Za-z0-9_]+)\\s(.+)\\sOS=([^=]+)\\sGN=([^=]+)(?:\\sPE=([^=]+)\\sSV=([^=]+))?",
-                          names(ens.fasta) )
-  pre_df <- regmatches(names(ens.fasta), ens.matches)
-  max_cols <- max(sapply(pre_df, length))
-  pre_df <- lapply(pre_df, function(matches) if (length(matches)<max_cols) c(matches, rep.int(NA, max_cols - length(matches))) else matches )
-  res.df <- do.call(rbind, pre_df) %>% as.data.frame(stringsAsFactors=FALSE)
-  colnames(res.df) <- c("src", "protein_id", "description", "organism", "gene_name", "PE", "SV")[1:ncol(res.df)]
-  res.df$seqlen <- nchar(ens.fasta)
-  res.df$seq <- as.character(ens.fasta)
-  res.df
-}
-
 require(rjson)
 require(rstan)
 apms_glm.stan_model <- stan_model(file.path(project_scripts_path, "apms_glm.stan"), "apms_glm")

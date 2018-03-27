@@ -132,7 +132,8 @@ stan.prepare_data <- function(base_input_data, model_data,
   return(res)
 }
 
-stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4, adapt_delta=0.9)
+stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
+                          adapt_delta=0.9, max_treedepth=11)
 {
     message("Running Stan MCMC...")
     vars_info <- msglm.vars_info
@@ -152,5 +153,5 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4, adapt_de
              data = stan_input_data,
              #init = function() { pcp_peaks_glm.generate_init_params(pcp_peaks_glm.model_data) },
              iter = iter, chains = chains, thin = thin,
-             control = list(adapt_delta=adapt_delta, max_treedepth=11))
+             control = list(adapt_delta=adapt_delta, max_treedepth=max_treedepth))
 }

@@ -8,13 +8,14 @@ msglm_normalize.stan_model <- stan_model(file.path(stan_models_path , "msglm_nor
 
 # variables description for msglm_local model
 msglm.vars_info <- list(
-  global = list( names = c('sub_labu_shift_sigma'), dims=c() ),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
+  global = list( names = c('sub_labu_shift_sigma', 'sub_labu_msproto_shift_sigma'), dims=c() ),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
   effects = list( names = c('effect_shift_replCI_sigma'), dims = c('effect') ),
   #batch_effects = list(names = c('batch_effect_sigma'), dims = c('batch_effect')),
   conditions = list(names = c('obj_repl_shift_sigma'), dims = c("condition")),
   iactions = list(names = c('iaction_labu', 'iaction_labu_replCI'), dims = c('iaction')),
   observations = list(names = c('obs_labu'), dims = c('observation')),
   subcomponents = list(names = c('sub_labu_shift_unscaled'), dims = c('subcomponent')),
+  subcomponentXmsprotocol = list(names = c('sub_labu_msproto_shift_unscaled'), dims=c('subcomponent', 'msprotocol')),
   objects = list(names = c('obj_base_labu'), dims = c('object')),
   object_effects = list(names = c('obj_effect_lambda', 'obj_effect', 'obj_effect_replCI'),
                         dims = c('object_effect')),
@@ -111,6 +112,12 @@ stan.prepare_data <- function(base_input_data, model_data,
     res$sub2obj <- as.array(as.integer(model_data$subcomponents$glm_object_ix))
     res$quant2sub <- as.array(as.integer(model_data$ms_data$glm_subcomponent_ix[!is.na(model_data$ms_data$qdata_ix)]))
     res$miss2sub <- as.array(as.integer(model_data$ms_data$glm_subcomponent_ix[!is.na(model_data$ms_data$mdata_ix)]))
+    res$Nmsprotocols <- 0L
+    res$experiment2msproto <- integer(0)
+  }
+  if ('msproto_ix' %in% names(model_data$mschannels)) {
+    res$Nmsprotocols <- n_distinct(model_data$mschannels$msproto_ix)
+    res$experiment2msproto <- as.array(model_data$mschannels$msproto_ix)
   }
   if ("Nsubcomponents" %in% names(res)) {
     message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s) with ",
@@ -136,7 +143,9 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4, adapt_de
       stanmodel <- msglm_local.stan_model
       # exclude subcomponent-related
       vars_info$subcomponents <- NULL
-      vars_info$global$names <- setdiff(vars_info$global$names, 'sub_labu_shift_sigma')
+      vars_info$subcomponentXmsprotocol <- NULL
+      vars_info$global$names <- setdiff(vars_info$global$names,
+                                        c('sub_labu_shift_sigma', 'sub_labu_msproto_shift_sigma'))
     }
     sampling(stanmodel,
              pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,

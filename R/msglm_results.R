@@ -8,7 +8,7 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
   if (!is.null(object_cols)) {
     objs_df <- dplyr::select_(objs_df, .dots=unique(c("glm_object_ix", object_cols)))
   }
-  list(iteration = NULL,
+  res <- list(iteration = NULL,
     effect = data.frame(effect = colnames(conditionXeffect.mtx), stringsAsFactors = FALSE),
     repl_effect = data.frame(repl_effect = colnames(msrunXreplEffect.mtx), stringsAsFactors = FALSE),
     batch_effect = data.frame(batch_effect = colnames(msrunXbatchEffect.mtx), stringsAsFactors = FALSE),
@@ -17,7 +17,9 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
     msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, condition),
     iaction = dplyr::select(model_data$interactions, glm_iaction_ix, glm_object_ix, iaction_id, condition_ix, condition) %>%
         dplyr::inner_join(objs_df),
-    observation = dplyr::select(model_data$ms_data, glm_iaction_ix, glm_object_ix, condition_ix, condition, msrun, msrun_ix) %>%
+    observation = dplyr::select(model_data$ms_data, glm_observation_ix, glm_iaction_ix, glm_object_ix,
+                                condition_ix, condition, msrun, msrun_ix) %>%
+        dplyr::distinct() %>%
         dplyr::inner_join(objs_df),
     object = model_data$objects, # use full object information
     object_effect = model_data$object_effects %>%
@@ -30,6 +32,10 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
         dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
         dplyr::inner_join(objs_df)
   )
+  if ("subcomponents" %in% names(model_data)) {
+    res$subcomponent <- dplyr::select(model_data$subcomponents, glm_object_ix, glm_subcomponent_ix, superprotgroup_id, pepmod_id)
+  }
+  return(res)
 }
 
 vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info, tail = c("both", "negative", "positive"))

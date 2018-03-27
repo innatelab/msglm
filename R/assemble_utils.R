@@ -56,10 +56,17 @@ join_msglm_reports <- function(section, reports, type, results_tag="msglm_result
     res <- report[[results_tag]][[section]][[type]]
     # add object id columns
     # FIXME model_data$objects support?
+    if (!is.null(res) && !('protgroup_id' %in% colnames(res))
+        && "protgroup_id" %in% colnames(report$model_data$objects)) {
+      res$protgroup_id <- rep_len(report$model_data$objects$protgroup_id[1], nrow(res))
+    }
+    if (!is.null(res) && !('superprotgroup_id' %in% colnames(res))
+        && "superprotgroup_id" %in% colnames(report$model_data$objects)) {
+      res$superprotgroup_id <- rep_len(report$model_data$objects$superprotgroup_id[1], nrow(res))
+    }
     if (!is.null(res) && !('majority_protein_acs' %in% colnames(res))
         && "majority_protein_acs" %in% colnames(report$model_data$objects)) {
       res$majority_protein_acs <- rep_len(report$model_data$objects$majority_protein_acs[1], nrow(res))
-      res$protgroup_id <- rep_len(report$model_data$objects$protgroup_id[1], nrow(res))
     }
     if (!is.null(res) && !('pepmod_id' %in% colnames(res))
         && "pepmod_id" %in% colnames(report$model_data$objects)) {

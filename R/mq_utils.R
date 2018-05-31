@@ -994,10 +994,11 @@ msrun_code_parser.f = function(msruns, chunk_names = c('dataset', 'batch', 'frac
 }
 
 expand_protgroup_acs <- function(protgroups, acs_col,
-                                 ac_col = str_replace(acs_col, "_acs", "_ac"),
+                                 ac_col = str_replace(acs_col, "_(ac|id)s", "_\\1"),
                                  id_col="protgroup_id", sep=";") {
   acs <- str_split(protgroups[[acs_col]], sep, simplify = FALSE)
   res <- data.frame(row_ix = rep.int(seq_along(acs), sapply(acs, length)),
+                    prot_ix = unlist(lapply(acs, function(acs) seq_along(acs))),
                     stringsAsFactors = FALSE)
   res[[id_col]] <- protgroups[[id_col]][res$row_ix]
   res[[ac_col]] <- unlist(acs)

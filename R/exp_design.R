@@ -34,7 +34,7 @@ replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", cond_col=
         mtx <- model.matrix(~ replicate,
                           cond_msruns.df,
                           contrasts.arg = list("replicate" = "contr.sum"))
-        mtx <- mtx[, colnames(mtx) != "(Intercept)"]
+        mtx <- mtx[, colnames(mtx) != "(Intercept)", drop=FALSE]
         dimnames(mtx) <- list(msrun = cond_msruns.df$msrun,
                               repl_effect = paste0(cond_col, cond_msruns.df$condition[1], ':', colnames(mtx)))
         as.data.frame(as.table(mtx)) %>% dplyr::filter(Freq != 0.0) %>%

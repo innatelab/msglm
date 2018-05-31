@@ -24,11 +24,36 @@ expand_protgroups <- function(protgroup_ids, sep=";") {
 }
 
 expand_sites <- function(sites_df, by=c("protgroup_id", "protein_ac"),
-                         keep_cols=c("position"), sep=";")
+                         keep_cols=c("site_id"), sep=";")
 {
   exp_by <- match.arg(by)
-  expand_collapsed(sites_df, paste0(exp_by,"s"), exp_by,
-                   c("site_id", keep_cols), sep=sep)
+  collapsed_by <- paste0(exp_by, "s")
+  exp_list <- strsplit(sites_df[[collapsed_by]], sep, fixed=TRUE)
+  exp_lengths <- sapply(exp_list, length)
+  res <- sites_df[rep.int(1:nrow(sites_df), exp_lengths), c(collapsed_by, keep_cols)]
+  res[[exp_by]] <- unlist(exp_list)
+  if ("site_ids" %in% colnames(sites_df)) {
+    site_list <- strsplit(sites_df$site_ids, sep, fixed=TRUE)
+    site_lengths <- sapply(site_list, length)
+    if (any(site_lengths != exp_lengths)) stop("site lengths mismatch")
+    res$site_id <- unlist(site_list)
+  }
+  poses_col <- switch(exp_by,
+    protgroup_id = "positions",
+    protein_ac = "positions_in_proteins"
+  )
+  if (poses_col %in% colnames(sites_df)) {
+    pos_list <- strsplit(sites_df[[poses_col]], sep, fixed=TRUE)
+    pos_lengths <- sapply(pos_list, length)
+    if (any(pos_lengths != exp_lengths)) stop("pos lengths mismatch")
+    res$position <- as.integer(unlist(pos_list))
+  } else {
+    warning("No position information column (", poses_col, ") found")
+  }
+  if ("protgroup_id" %in% colnames(res)) {
+    res$protgroup_id <- as.integer(res$protgroup_id)
+  }
+  return(res)
 }
 
 expand_peptides <- function(peptides_df, by=c("protgroup_id", "protein_ac"),

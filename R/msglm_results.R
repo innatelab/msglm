@@ -451,31 +451,32 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
 
 process.stan_fit <- function(msglm.stan_fit, dims_info,
                              mschannel_col = "msrun_ix",
-                             effect_vars = unlist(lapply(msglm.vars_info, function(vi) str_subset(vi$names, "_effect(?:_replCI)?$"))),
-                             contrast_vars = unlist(lapply(msglm.vars_info, function(vi) {
+                             effect_vars = unlist(lapply(vars_info, function(vi) str_subset(vi$names, "_effect(?:_replCI)?$"))),
+                             contrast_vars = unlist(lapply(vars_info, function(vi) {
                                rel_dims <- names(dims_info)[sapply(names(dims_info), function(dname) any(str_detect(colnames(dims_info[[dname]]), "^(msrun|mschannel|condition)")))]
                                if (any(vi$dims %in% rel_dims)) str_subset(vi$names, "(?:labu|shift)(?:_replCI)?$") else c()
                               })),
                              condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
                              keep.samples=FALSE, verbose=FALSE)
 {
+  vars_info <- attr(msglm.stan_fit, "msglm_vars_info")
   message( 'Extracting MCMC samples...' )
   msglm.stan_samples <- stan.extract_samples(msglm.stan_fit,
-                                             pars = unlist(sapply(msglm.vars_info, function(vi) vi$names)),
+                                             pars = unlist(sapply(vars_info, function(vi) vi$names)),
                                              min.iteration = min.iteration,
                                              permuted = TRUE)
 
   message('Computing parameters statistics...')
   msglm.stan_stats <- msglm.stan_fit %>%
-    stan.extract_samples(pars = unlist(sapply(msglm.vars_info, function(vi) vi$names)),
+    stan.extract_samples(pars = unlist(sapply(vars_info, function(vi) vi$names)),
                          min.iteration = min.iteration) %>%
     monitor(print = FALSE) %>% as.data.frame
   msglm.stan_stats$var_name <- rownames(msglm.stan_stats)
 
   message( 'Composing results...' )
-  res <- lapply(names(msglm.vars_info), vars_statistics, msglm.stan_stats, msglm.stan_samples,
-                msglm.vars_info, dims_info)
-  names(res) <- names(msglm.vars_info)
+  res <- lapply(names(vars_info), vars_statistics, msglm.stan_stats, msglm.stan_samples,
+                vars_info, dims_info)
+  names(res) <- names(vars_info)
 
   # add interaction CI with respect to observations variability
   res$iactions_obsCI <- list(stats = vars_contrast_stats(res$observations$samples,
@@ -488,7 +489,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   message( 'Calculating P-values..' )
   local({
     for (ctg in names(res)) {
-      ctg_subset_info <- msglm.vars_info[[ctg]]
+      ctg_subset_info <- vars_info[[ctg]]
       ctg_subset_info$names <- intersect(ctg_subset_info$names, effect_vars)
 
       if (length(ctg_subset_info$names) > 0 & !is.null(res[[ctg]]$samples)) {
@@ -501,7 +502,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   }})
 
   message("Calculating contrasts...")
-  res <- calc_contrasts(res, msglm.vars_info, dims_info,
+  res <- calc_contrasts(res, vars_info, dims_info,
                         contrastXmetacondition.mtx, conditionXmetacondition.df,
                         dplyr::distinct(dplyr::select(contrastXmetacondition.df, contrast, contrast_type)),
                         var_names = contrast_vars,

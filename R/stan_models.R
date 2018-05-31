@@ -137,7 +137,6 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
 {
     message("Running Stan MCMC...")
     vars_info <- msglm.vars_info
-    stanmodel <- msglm_local.stan_model
     if ("Nsubcomponents" %in% names(stan_input_data)) {
       stanmodel <- msglm_local_multicomponent.stan_model
     } else {
@@ -148,10 +147,12 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
       vars_info$global$names <- setdiff(vars_info$global$names,
                                         c('sub_labu_shift_sigma', 'sub_labu_msproto_shift_sigma'))
     }
-    sampling(stanmodel,
+    res <- sampling(stanmodel,
              pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,
              data = stan_input_data,
              #init = function() { pcp_peaks_glm.generate_init_params(pcp_peaks_glm.model_data) },
              iter = iter, chains = chains, thin = thin,
              control = list(adapt_delta=adapt_delta, max_treedepth=max_treedepth))
+    attr(res, "msglm_vars_info") <- vars_info
+    return(res)
 }

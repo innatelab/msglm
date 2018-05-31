@@ -609,8 +609,9 @@ glm_corrected_intensities <- function(intensities.df,
     return (intensities.df)
 }
 
-process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", "pepmod_mschannel"),
-                                       min_pepmod_state_freq = 0.9, min_essential_freq = 0.0,
+process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod", "pepmodstate"),
+                                       evidence.msobj = c("msrun", "mschannel"),
+                                       min_pepmodstate_freq = 0.9, min_essential_freq = 0.0,
                                        import_data = c("intensity"),
                                        correct_ratios = TRUE,
                                        correct_by_ratio.ref_label = NA,
@@ -619,12 +620,14 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
                                        na_weight = 1E-5, min_intensity = 1E+3,
                                        glm.min_intensity = 50*min_intensity,
                                        glm.max_factor = 50, glm.max_npepmods=25L,
-                                       glm.group_by = c("protgroup", "pepmod"),
+                                       glm.context = c("protgroup", "pepmod"),
                                        glm.reldelta_range = c(-1+1E-5, 99.0),
                                        multidplyr_cluster = NULL )
 {
     quant_mode <- match.arg(mode)
-    glm_group_by <- match.arg(glm.group_by)
+    evidence_pepobj <- match.arg(evidence.pepobj)
+    evidence_msobj <- match.arg(evidence.msobj)
+    glm_context <- match.arg(glm.context)
     complete_names <- function( vars ) {
         res <- vars
         res_names <- names(vars)
@@ -694,34 +697,35 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
     intens_cols <- backquote(intensity_columns.df$old_name)
     names(intens_cols) <- intensity_columns.df$new_name
     evidence.df <- mutate(evidence.df,
-                          pepmod_state = interaction(pepmod_id, charge, drop = TRUE, lex.order = TRUE, sep = '_'),
+                          pepmodstate_id = as.integer(interaction(pepmod_id, charge, drop = TRUE, lex.order = TRUE, sep = '_')),
                           `Intensity Sum` = rowSums(intensities.mtx, na.rm = TRUE),
                           n_quants = rowSums(!is.na(intensities.mtx) & intensities.mtx > 0.0),
                           is_full_quant = !is.na(rowSums(intensities.mtx > 0.0))) %>%
         dplyr::rename_(.dots=intens_cols)
 
     message( 'Extracting pepmod states...' )
-    pepmod_states.df <- dplyr::select(evidence.df, protgroup_ids, pepmod_state, pepmod_id, charge) %>% dplyr::distinct()
+    pepmodstates.df <- dplyr::select(evidence.df, protgroup_ids, pepmodstate_id, pepmod_id, charge) %>% dplyr::distinct() %>%
+      dplyr::arrange(pepmodstate_id)
 
-    # summarize intensities for pepmod_state X msrun pair (there could be multiple ones)
-    message('Reshaping, summarizing & weighting pepmod_state intensities...')
+    # summarize intensities for pepmodstate_id X msrun pair (there could be multiple ones)
+    message('Reshaping, summarizing & weighting pepmodstate intensities...')
     pms_intensities_long.df <- tidyr::gather(evidence.df, mstag, intensity, starts_with("intensity.")) %>%
         dplyr::mutate(mstag = factor(str_replace(mstag, "intensity\\.", ""),
                                      levels = levels(mschannels.df$mstag))) %>%
         dplyr::inner_join(dplyr::select(mschannels.df, msrun, mstag, mschannel)) %>%
-        dplyr::group_by(pepmod_id, pepmod_state, msrun, mstag, mschannel) %>%
+        dplyr::group_by(pepmod_id, pepmodstate_id, msrun, mstag, mschannel) %>%
         dplyr::summarise(weight = weighted.mean(intensity, abs(1/mass_error_ppm)^0.5),
                          intensity = sum(intensity, na.rm=TRUE)) %>%
         dplyr::group_by(pepmod_id, mschannel) %>%
-        dplyr::mutate(weight = pmax(weight/sum(weight), na_weight),
-                      intensity = if_else(!is.na(intensity) & intensity>0, intensity, NA_real_)) %>%
-        dplyr::ungroup()
+        dplyr::mutate(weight = pmax(weight/sum(weight), na_weight)) %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(intensity = if_else(!is.na(intensity) & intensity>0, intensity, NA_real_))
 
     message('Expanding intensities data.frame for every pepmod state and mschannel...')
     pms_full_intensities_long.df <- tidyr::expand(pms_intensities_long.df,
-                                                  mschannel, pepmod_state) %>%
+                                                  mschannel, pepmodstate_id) %>%
         dplyr::left_join(dplyr::select(mschannels.df, mschannel, msrun, one_of(c("mstag", "msprotocol")))) %>%
-        dplyr::left_join(pepmod_states.df) %>%
+        dplyr::left_join(pepmodstates.df) %>%
         dplyr::left_join(pms_intensities_long.df) %>%
         dplyr::mutate(observed = !is.na(intensity) & intensity > 0,
                       weight = if_else(observed & is.finite(weight), weight, na_weight))
@@ -730,9 +734,10 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
     }
 
     message('Correcting & predicting missing intensities...')
-    glm_group_col <- switch(glm_group_by, pepmod = 'pepmod_id',
+    glm_group_col <- switch(glm_context,
+                            pepmod = 'pepmod_id',
                             protgroup = 'protgroup_ids',
-                            stop('Unsupported glm.group_by ', glm_group_by))
+                            stop('Unsupported glm.context ', glm_context))
     pms_full_intensities_long.df <-
         dplyr::filter(pms_full_intensities_long.df, mstag != 'Sum')
     pms_full_intensities_long_glm.df <- if (!correct_ratios) {
@@ -750,7 +755,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
         parallel::clusterExport(cl=multidplyr_cluster, "glm_corrected_intensities")
         parallel::clusterExport(cl=multidplyr_cluster, c("glm.max_factor", "glm.reldelta_range", "glm.max_npepmods", "min_intensity"),
                                 envir=environment())
-        distr.df <- switch(glm_group_by,
+        distr.df <- switch(glm_context,
                            pepmod = multidplyr::partition(pms_full_intensities_long.df, pepmod_id, msprotocol, cluster=multidplyr_cluster),
                            protgroup = multidplyr::partition(pms_full_intensities_long.df, protgroup_ids, msprotocol, cluster=multidplyr_cluster)) %>%
         #multidplyr::partition_(pms_full_intensities_long.df, c(glm_group_col, "msprotocol"), cluster=multidplyr_cluster) %>%
@@ -770,18 +775,22 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
         bind_rows(dplyr::filter(pms_full_intensities_long.df, mstag == 'Sum'))
     print(str(pms_full_intensities_long_glm.df))
 
-    message('Summing intensities of different charges...')
-    full_intensities_long.df <- dplyr::group_by(pms_full_intensities_long_glm.df, pepmod_id, msrun) %>%
-        dplyr::group_by(pepmod_id, msrun, mschannel, mstag) %>%
-        dplyr::summarise(intensity = sum(intensity, na.rm=TRUE),
-                         intensity_glm = sum(intensity_glm, na.rm=TRUE),
-                         intensity_corr = sum(intensity_corr, na.rm=TRUE)) %>%
-        dplyr::ungroup() %>%
-        dplyr::mutate(intensity = if_else(intensity > 0, intensity, NA_real_),
-                      intensity_glm = if_else(mstag == 'Sum', NA_real_, intensity_glm),
-                      intensity_corr = if_else(intensity_corr > glm.min_intensity, intensity_corr, NA_real_),
-                      intensity_glm_reldelta = intensity_glm/intensity - 1.0,
-                      intensity_corr_reldelta = intensity_corr/intensity - 1.0)
+    if (evidence_pepobj == "pepmod") {
+      message('Summing intensities of different charges...')
+      full_intensities_long.df <- dplyr::group_by(pms_full_intensities_long_glm.df, pepmod_id, msrun) %>%
+          dplyr::group_by(pepmod_id, msrun, mschannel, mstag) %>%
+          dplyr::summarise(intensity = sum(intensity, na.rm=TRUE),
+                           intensity_glm = sum(intensity_glm, na.rm=TRUE),
+                           intensity_corr = sum(intensity_corr, na.rm=TRUE))
+    } else {
+      full_intensities_long.df <- pms_full_intensities_long_glm.df
+    }
+    full_intensities_long.df <- dplyr::ungroup(full_intensities_long.df) %>%
+          dplyr::mutate(intensity = if_else(intensity > 0, intensity, NA_real_),
+                        intensity_glm = if_else(mstag == 'Sum', NA_real_, intensity_glm),
+                        intensity_corr = if_else(intensity_corr > glm.min_intensity, intensity_corr, NA_real_),
+                        intensity_glm_reldelta = intensity_glm/intensity - 1.0,
+                        intensity_corr_reldelta = intensity_corr/intensity - 1.0)
 
     message( 'Extracting pepmod information...' )
     pepmodXmsrun_stats.df <- evidence.df %>% dplyr::group_by(protgroup_ids, pepmod_id, msrun) %>%
@@ -825,9 +834,9 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
                       is_shared_by_proteins = grepl( ';', protein_acs, fixed = TRUE ))
 
     message( 'Extracting peaks information...' )
-    peak_columns <- c('pepmod_id', 'msrun', 'evidence_id', 'n_quants', 'is_full_quant',
+    peak_columns <- c('pepmodstate_id', 'pepmod_id', 'charge', 'msrun', 'evidence_id', 'n_quants', 'is_full_quant',
                       # Carbamidomethyl (C) Probabilities, Oxidation (M) Probabilities, Carbamidomethyl (C) Score Diffs, Oxidation (M) Score Diffs, Acetyl (Protein N-term), Carbamidomethyl (C), Oxidation (M),
-                      'ident_type', 'charge', 'pepmod_state', 'label_state', 'ms2_mz', 'mz', 'mass_da', 'resolution',
+                      'ident_type', 'label_state', 'ms2_mz', 'mz', 'mass_da', 'resolution',
                       'delta_mz_ppm', 'delta_mz_da', 'mass_error_ppm', 'Mass Error [mDa]', 'Mass Error [Da]',
                       'Uncalibrated Mass Error [ppm]', 'Uncalibrated Mass Error [mDa]', 'Uncalibrated Mass Error [Da]',
                       'Max intensity m/z 0', 'Max intensity m/z 1',
@@ -918,13 +927,12 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
             }
         }
     }
-    message('Converting intensities to ', match.arg(layout), ' row format...')
-    if (match.arg(layout) == 'pepmod_mschannel') {
-        message('Converting intensities to pepmod_mschannel row format...' )
+    message('Converting intensities to ', evidence_msobj, ' row format...')
+    if (evidence_msobj == 'mschannel') {
         #print(str(intensities.df))
         intensities.df <- full_intensities_long.df %>% dplyr::filter(observed) %>%
             dplyr::mutate( mstag = factor( mstag, levels = as.character(intensity_columns.df$mstag) ) )
-    } else if (match.arg(layout) == 'pepmod_msrun') {
+    } else if (evidence_msobj == 'msrun') {
         fullest.df <- tidyr::gather(full_intensities_long.df, mod, val, starts_with("intensity")) %>%
             dplyr::mutate(mod = str_replace(mod, "intensity", ""),
                           intensity = interaction(mod, mstag, lex.order = TRUE, sep='.')) %>%
@@ -955,7 +963,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
         # fix NA
         ratios.df <- ratios.df %>% mutate_at(ratio_columns_sel.df$new_name,
                                          funs(if_else(!is.na(.) & .==0, NA_real_, .)))
-        if (match.arg(layout) == 'long') {
+        if (evidence_msobj == 'mschannel') {
             message( 'Converting ratios to long format...' )
             ratios.df <- reshape(ratios.df, direction = 'long',
                                  idvar = id_cols,
@@ -976,30 +984,37 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
     protgroups2protgroup.df <- data.frame(protgroup_ids = rep.int(protgroup_ids, sapply(protgroups2protgroup.list, length)),
                                           protgroup_id = as.integer(unlist(protgroups2protgroup.list)),
                                           stringsAsFactors = FALSE)
-    return (list(pepmods = pepmods.df,
+    res <- list(pepmods = pepmods.df,
                  protgroups2protgroup = protgroups2protgroup.df,
                  raw_files = msruns.df,
                  mschannels = mschannels.df,
-                 peaks = peaks.df,
-                 pepmod_intensities = intensities.df,
-                 pepmod_ratios = ratios.df))
+                 peaks = peaks.df)
+    res[[paste0(evidence_pepobj, "_intensities")]] <- intensities.df
+    res[[paste0(evidence_pepobj, "_ratios")]] <- ratios.df
+    if (evidence_pepobj == "pepmodstate") {
+      res$pepmodstates <- pepmodstates.df
+    }
+    return (res)
 }
 
-read.MaxQuant.Evidence <- function(folder_path, file_name = 'evidence.txt', layout = c("wide", "long"),
+read.MaxQuant.Evidence <- function(folder_path, file_name = 'evidence.txt',
+                                   evidence.pepobj = c("pepmod", "pepmodstate"),
+                                   evidence.msobj = c("msrun", "mschannel"),
                                    nrows = Inf, guess_max = min(10000L, nrows),
-                                   min_pepmod_state_freq = 0.9, min_essential_freq = 0.0,
+                                   min_pepmodstate_freq = 0.9, min_essential_freq = 0.0,
                                    correct_ratios = TRUE, correct_by_ratio.ref_label = NA,
                                    mode = c("labeled", "label-free"), mschannel_annotate.f = NULL,
-                                   glm.group_by = c("protgroup", "pepmod"), glm.max_npepmods=50L,
+                                   glm.context = c("protgroup", "pepmod"), glm.max_npepmods=50L,
                                    multidplyr_cluster = NULL)
 {
     process.MaxQuant.Evidence(read.MaxQuant.Evidence_internal(
         folder_path = folder_path, file_name = file_name, nrows = nrows, guess_max=guess_max),
-        min_pepmod_state_freq = min_pepmod_state_freq,
+        evidence.pepobj = evidence.pepobj, evidence.msobj = evidence.msobj,
+        min_pepmodstate_freq = min_pepmodstate_freq,
         min_essential_freq = min_essential_freq,
         correct_ratios = correct_ratios,
         correct_by_ratio.ref_label = correct_by_ratio.ref_label,
-        mode = mode, glm.group_by = glm.group_by, glm.max_npepmods = glm.max_npepmods,
+        mode = mode, glm.context = glm.context, glm.max_npepmods = glm.max_npepmods,
         mschannel_annotate.f = mschannel_annotate.f,
         multidplyr_cluster = multidplyr_cluster)
 }

@@ -16,35 +16,35 @@ recombine_dlms <- function(dlms, sep=";") {
     paste0(dlms_expanded[!is.na(dlms_expanded)], collapse=sep)
 }
 
-expand_protgroups <- function(protgroup_ids) {
-    protgroups2protgroup.list <- strsplit(protgroup_ids, ';', fixed=TRUE)
+expand_protgroups <- function(protgroup_ids, sep=";") {
+    protgroups2protgroup.list <- strsplit(protgroup_ids, sep, fixed=TRUE)
     data.frame( protgroup_ids = rep.int(protgroup_ids, sapply(protgroups2protgroup.list, length)),
                 protgroup_id = as.integer(unlist(protgroups2protgroup.list)),
                 stringsAsFactors = FALSE )
 }
 
 expand_sites <- function(sites_df, by=c("protgroup_id", "protein_ac"),
-                         keep_cols=c("position"))
+                         keep_cols=c("position"), sep=";")
 {
   exp_by <- match.arg(by)
   expand_collapsed(sites_df, paste0(exp_by,"s"), exp_by,
-                   c("site_id", keep_cols))
+                   c("site_id", keep_cols), sep=sep)
 }
 
 expand_peptides <- function(peptides_df, by=c("protgroup_id", "protein_ac"),
-                            keep_cols=c("start_pos", "end_pos"))
+                            keep_cols=c("start_pos", "end_pos"), sep=";")
 {
     exp_by <- match.arg(by)
     expand_collapsed(peptides_df, paste0(exp_by,"s"), exp_by,
-                     c("peptide_id", keep_cols))
+                     c("peptide_id", keep_cols), sep=sep)
 }
 
 expand_pepmods <- function(pepmods_df, by=c("protgroup_id", "protein_ac"),
-                           keep_cols=c("peptide_id"))
+                           keep_cols=c("peptide_id"), sep=";")
 {
   exp_by <- match.arg(by)
   expand_collapsed(pepmods_df, paste0(exp_by,"s"), exp_by,
-                   c("pepmod_id", keep_cols))
+                   c("pepmod_id", keep_cols), sep=sep)
 }
 
 selectUniprotACs <- function(acs, valid_acs)
@@ -970,8 +970,8 @@ msrun_code_parser.f = function(msruns, chunk_names = c('dataset', 'batch', 'frac
 
 expand_protgroup_acs <- function(protgroups, acs_col,
                                  ac_col = str_replace(acs_col, "_acs", "_ac"),
-                                 id_col="protgroup_id") {
-  acs <- str_split(protgroups[[acs_col]], ";", simplify = FALSE)
+                                 id_col="protgroup_id", sep=";") {
+  acs <- str_split(protgroups[[acs_col]], sep, simplify = FALSE)
   res <- data.frame(row_ix = rep.int(seq_along(acs), sapply(acs, length)),
                     stringsAsFactors = FALSE)
   res[[id_col]] <- protgroups[[id_col]][res$row_ix]

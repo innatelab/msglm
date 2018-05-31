@@ -154,7 +154,7 @@ read.MaxQuant <- function(filename, layout = c("wide", "long"),
 }
 
 gsub_columns <- function(df, from, to) {
-  colnames(df) <- gsub(from, to, colnames(df))
+  colnames(df) <- str_replace(colnames(df), from, to)
   df
 }
 
@@ -243,7 +243,7 @@ read.MaxQuant.Peptides <- function(folder_path, file_name = 'peptides.txt',
                       is_reverse, is_contaminant, is_shared_by_groups, is_shared, is_shared_by_proteins)
     col_info <- list(peptide = colnames(res.df))
     if ('intensity' %in% import_data) {
-        intensities.df <- peptides.df %>% dplyr::select(starts_with("Intensity")) %>%
+        intensities.df <- dplyr::select(peptides.df, starts_with("Intensity")) %>%
             gsub_columns("^Intensity\\s([LMH](\\s|$))", "Intensity.\\1") %>%
             gsub_columns("^Intensity(\\s|$)", "Intensity.Sum\\1") %>%
             mutate_all(., funs(ifelse(.==0.0, NA, .)))

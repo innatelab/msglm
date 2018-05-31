@@ -1,5 +1,5 @@
 # MaxQuant data import utils
-# 
+#
 # Author: astukalov
 ###############################################################################
 
@@ -56,7 +56,7 @@ selectUniprotACs <- function(acs, valid_acs)
     if (length(acs_noiso) == 1L) {
         return (acs_noiso)
     } else if (length(acs_noiso) > 1L) {
-        # return the first "classical" UniProt AC starting with O, P or Q 
+        # return the first "classical" UniProt AC starting with O, P or Q
         is_classical_uprot <- str_detect(acs_noiso, '^[POQ]')
         return (acs_noiso[[ order(!is_classical_uprot, acs_noiso)[[1]] ]])
     } else {return (NA_character_)}
@@ -73,9 +73,9 @@ read.MaxQuant <- function(filename, layout = c("wide", "long"),
     measures.fixed <- measures %>% gsub('\\s*\\[\\%\\]', '', .) %>% gsub('/', '', .) %>% gsub('\\+', 'and', .) %>% gsub('\\s', '_', .)
     names(measures.fixed) <- measures
 
-    # separate measure from SILAC label and from the run label and fix the total/summary names 
+    # separate measure from SILAC label and from the run label and fix the total/summary names
     colnames(res) <- colnames(res) %>%
-        sub('^Sequence coverage (.+) \\[\\%\\]$', 'Sequence coverage [%] \\1', .) %>% # fix the position of [%] to make the naming scheme consitent 
+        sub('^Sequence coverage (.+) \\[\\%\\]$', 'Sequence coverage [%] \\1', .) %>% # fix the position of [%] to make the naming scheme consitent
         sub(paste0('^(',paste0(measures.regex, collapse='|'),')(\\s([HLM]))?(\\s([^HLM].*))?$'), '\\1.\\3__\\5', .) %>%
         sub('\\.__', '.Sum__', .) %>% sub('\\__$', '\\__Everything', .)
     #print(colnames(res))
@@ -94,7 +94,7 @@ read.MaxQuant <- function(filename, layout = c("wide", "long"),
                     paste0(res[[ protein_ac_cols[[i]] ]][na_mask], collapse = ' '))
             res <- res[!na_mask, , drop = FALSE]
         }
-        res[, names(protein_ac_cols)[[i]]] <- fixed_acs[!na_mask] 
+        res[, names(protein_ac_cols)[[i]]] <- fixed_acs[!na_mask]
     }
 
     quant.columns.list <- lapply(measures.regex, function(mes) grep(paste0('^', mes, '\\.'), colnames(res), value = TRUE))
@@ -444,7 +444,7 @@ glm_corrected_intensities <- function(intensities.df,
     nmsruns <- n_distinct(glm_intensities.df$msrun)
     msrunXtag <- dplyr::distinct(dplyr::select(dplyr::filter(glm_intensities.df, observed), msrun, mstag))
     nmstags <- max(table(msrunXtag$msrun))
-    rq.method <- ifelse(nmsruns*npepmods > 100L, "lasso", "lasso") 
+    rq.method <- ifelse(nmsruns*npepmods > 100L, "lasso", "lasso")
     rhs_str <- "0"
     if (nmsruns >= 1) {
         if (nmstags > 1) {
@@ -562,7 +562,7 @@ glm_corrected_intensities <- function(intensities.df,
     return (intensities.df)
 }
 
-process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", "pepmod_mschannel" ),
+process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", "pepmod_mschannel"),
                                        min_pepmod_state_freq = 0.9, min_essential_freq = 0.0,
                                        import_data = c("intensity"),
                                        correct_ratios = TRUE,
@@ -646,7 +646,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
     intensities.mtx <- as.matrix(evidence.df[,dplyr::filter(intensity_columns.df, mstag != 'Sum')$old_name])
     intens_cols <- backquote(intensity_columns.df$old_name)
     names(intens_cols) <- intensity_columns.df$new_name
-    evidence.df <- mutate(evidence.df, 
+    evidence.df <- mutate(evidence.df,
                           pepmod_state = interaction(pepmod_id, charge, drop = TRUE, lex.order = TRUE, sep = '_'),
                           `Intensity Sum` = rowSums(intensities.mtx, na.rm = TRUE),
                           n_quants = rowSums(!is.na(intensities.mtx) & intensities.mtx > 0.0),
@@ -799,7 +799,7 @@ process.MaxQuant.Evidence <- function( evidence.df, layout = c( "pepmod_msrun", 
         dplyr::filter(("ratio" %in% import_data) & mstag_nom != mstag_denom) %>%
         mutate(old_name = gsub('\\s$', '', paste0('Ratio ', mstag_nom, '/', mstag_denom, ' ', type)),
                inverted_old_name = gsub('\\s$', '', paste0('Ratio ', mstag_denom, '/', mstag_nom, ' ', type)),
-               suffix = paste0(type, if_else(type != "", '_', ""), mstag_nom, mstag_denom), 
+               suffix = paste0(type, if_else(type != "", '_', ""), mstag_nom, mstag_denom),
                new_name = paste0( measure, '.', suffix ),
                exists = old_name %in% colnames(evidence.df),
                inverted_exists = inverted_old_name %in% colnames(evidence.df))

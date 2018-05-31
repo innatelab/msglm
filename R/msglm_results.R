@@ -144,7 +144,7 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
       samples.arr <- matrix(sample_vals, nrow=n_min_samples, ncol=nrow(samples_stats))
 
       #print(str(samples.arr))
-      res <- insilicoMop:::ContrastStatistics( 
+      res <- insilicoMop:::ContrastStatistics(
         samples.arr, as.integer(cur_cond2expr.df[[experiment_col]]), as.integer(cur_cond2expr.df[[condition_col]]),
         cur_contrastXcondition,
         nsteps = nsteps, maxBandwidth = maxBandwidth,
@@ -287,7 +287,7 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
     if ( !any(res_mask) ) {
         # checkf if the variable is degenerated
         if ( prod( sapply( dim_info[vars_cat_info$dims], nrow ) ) > 0 ) {
-          stop( 'Variables ', paste0( "'", vars_cat_info$names, "'", collapse = ", " ), ' not found in the opt. results' ) 
+          stop( 'Variables ', paste0( "'", vars_cat_info$names, "'", collapse = ", " ), ' not found in the opt. results' )
         } else {
           # skip the degenerated variable
           return ( data.frame() )

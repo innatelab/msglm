@@ -233,6 +233,13 @@ read.MaxQuant.ProteinGroups <- function(folder_path, file_name = 'proteinGroups.
         res.df <- bind_cols(res.df, ratios.df)
         col_info$ratio <- colnames(ratios.df)
     }
+    if ('ident_type' %in% import_data) {
+        ident_types.df <- proteinGroups.df %>% dplyr::select(starts_with("Identification type")) %>%
+          gsub_columns("^Identification\\stype\\s", "ident_type.") %>%
+          mutate_all(., funs(factor(., levels=c("By matching", "By MS/MS"))))
+        res.df <- bind_cols(res.df, ident_types.df)
+        col_info$ident_type <- colnames(ident_types.df)
+    }
     attr(res.df, "column_groups") <- col_info
     return (res.df)
 }
@@ -275,6 +282,21 @@ read.MaxQuant.Peptides <- function(folder_path, file_name = 'peptides.txt',
         res.df <- bind_cols(res.df, intensities.df)
         col_info$intensity <- colnames(intensities.df)
     }
+    if ('aa_stats' %in% import_data) {
+       aa_stats.df <- dplyr::select(peptides.df, matches("^[A-Z] Count$")) %>%
+        gsub_columns("([A-Z]) Count", "count_\\1")
+       print(str(aa_stats.df))
+       res.df <- bind_cols(res.df, aa_stats.df)
+       col_info$aa_stats <- colnames(aa_stats.df)
+    }
+    if ('ident_type' %in% import_data) {
+        ident_types.df <- dplyr::select(peptides.df, starts_with("Identification type")) %>%
+          gsub_columns("^Identification\\stype\\s", "ident_type.") %>%
+          mutate_all(., funs(factor(., levels=c("By matching", "By MS/MS"))))
+        res.df <- bind_cols(res.df, ident_types.df)
+        col_info$ident_type <- colnames(ident_types.df)
+    }
+    attr(res.df, "column_groups") <- col_info
     return (res.df)
 }
 

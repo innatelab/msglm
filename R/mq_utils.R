@@ -3,7 +3,7 @@
 # Author: astukalov
 ###############################################################################
 
-source( file.path( base_scripts_path, 'misc/reshape.R' ) )
+source(file.path(base_scripts_path, 'R/misc/reshape.R'))
 
 require(readr)
 require(tidyr)

@@ -1,5 +1,5 @@
 # Misc utilities for STAN output processing
-# 
+#
 # Author: astukalov
 ###############################################################################
 
@@ -24,16 +24,16 @@ stan.iterations_frame <- function(stan_result)
             unpermuted_ix = row_number() )
 }
 
-stan.extract_samples <- function( stan_result, pars, min.iteration = NA, permuted = FALSE )
+stan.extract_samples <- function(stan_result, pars, min.iteration = NA, permuted = FALSE)
 {
-  res <- rstan::extract( stan_result, pars = pars, permuted = permuted, inc_warmup = !is.na(min.iteration) )
+  res <- rstan::extract(stan_result, pars = pars, permuted = permuted, inc_warmup = !is.na(min.iteration))
   if ( permuted ) {
-    attr(res, 'iter_info') <- stan.iterations_frame( stan_result )
+    attr(res, 'iter_info') <- stan.iterations_frame(stan_result)
   }
   if ( !is.na(min.iteration) ) {
     n_thin <- stan_result@sim$thin
     if ( permuted ) {
-      iter_info <- attr(res, 'iter_info') %>% dplyr::filter( iteration >= min.iteration - stan_result@sim$warmup )
+      iter_info <- attr(res, 'iter_info') %>% dplyr::filter(iteration >= min.iteration - stan_result@sim$warmup)
       sample_ixs <- sort(iter_info$unpermuted_ix)
       res <- lapply( res, function(var_samples) {
         new_dims <- dim(var_samples)
@@ -42,24 +42,24 @@ stan.extract_samples <- function( stan_result, pars, min.iteration = NA, permute
       attr(res, 'iter_info') <- iter_info
       res
     } else {
-      res[ seq(from=as.integer(ceiling(min.iteration/n_thin)), dim(res)[[1]] ), , ]    
+      res[seq(from=as.integer(ceiling(min.iteration/n_thin)), dim(res)[[1]] ), , ]
     }
   } else {
     res
   }
 }
 
-extract_index <- function( var_names ) {
-  res <- apply( do.call( cbind, strsplit( gsub( ']$', '', gsub( '^[^[]+\\[', '', var_names ) ), ',' ) ),
+extract_index <- function(var_names) {
+  res <- apply(do.call(cbind, strsplit(gsub(']$', '', gsub('^[^[]+\\[', '', var_names)), ',')),
          1, as.integer )
-  if ( is.vector( res ) ) res <- matrix( res, nrow = length(var_names) )
-  return ( res )
+  if (is.vector(res)) res <- matrix(res, nrow = length(var_names))
+  return (res)
 }
-extract_var <- function( var_names ) {
-  gsub( '\\[(\\d+\\,?)+]$', '', var_names )
+extract_var <- function(var_names) {
+  gsub('\\[(\\d+\\,?)+]$', '', var_names)
 }
 
-pvalue_not_zero <- function( samples, tail = c("both", "negative", "positive") )
+pvalue_not_zero <- function(samples, tail = c("both", "negative", "positive"))
 {
   tail = match.arg(tail)
   if (tail == "negative") {

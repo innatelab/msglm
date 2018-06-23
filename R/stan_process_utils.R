@@ -3,7 +3,16 @@
 # Author: astukalov
 ###############################################################################
 
-stan.iterations_frame <- function( stan_result )
+append_sparse <- function(stan_data, mtx_name, mtx) {
+    mtx_sparse <- extract_sparse_parts(mtx)
+    stan_data[[paste0(mtx_name, "_Nw")]] <- length(mtx_sparse$w)
+    stan_data[[paste0(mtx_name, "_w")]] <- mtx_sparse$w
+    stan_data[[paste0(mtx_name, "_u")]] <- mtx_sparse$u
+    stan_data[[paste0(mtx_name, "_v")]] <- mtx_sparse$v
+    return(stan_data)
+}
+
+stan.iterations_frame <- function(stan_result)
 {
   n_iterations <- dim( stan_result )[[1]]
   n_chains <- dim( stan_result )[[2]]

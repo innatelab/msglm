@@ -16,9 +16,9 @@ msglm.vars_info <- list(
   subcomponents = list(names = c('sub_labu_shift_unscaled'), dims = c('subcomponent')),
   subcomponentXmsprotocol = list(names = c('sub_labu_msproto_shift_unscaled'), dims=c('subcomponent', 'msprotocol')),
   objects = list(names = c('obj_base_labu', 'obj_base_labu_replCI', "obj_base_repl_shift_sigma"), dims = c('object')),
-  object_effects = list(names = c('obj_effect_lambda', 'obj_effect_repl_shift_sigma', 'obj_effect', 'obj_effect_replCI'),
+  object_effects = list(names = c('obj_effect_sigma', 'obj_effect_repl_shift_sigma', 'obj_effect', 'obj_effect_replCI'),
                         dims = c('object_effect')),
-  object_batch_effects = list(names = c('obj_batch_effect'), #'obj_batch_effect_unscaled', 'obj_batch_effect_lambda',
+  object_batch_effects = list(names = c('obj_batch_effect'), #'obj_batch_effect_unscaled', 'obj_batch_effect_sigma',
                               dims = c('object_batch_effect'))
 )
 

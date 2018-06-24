@@ -274,7 +274,7 @@ parameters {
 transformed parameters {
   vector[Nobjects] obj_base_labu;
   vector[NobjEffects] obj_effect;
-  vector<lower=0>[NobjEffects] obj_effect_lambda;
+  vector<lower=0>[NobjEffects] obj_effect_sigma;
   vector[NobjBatchEffects] obj_batch_effect;
 
   vector[Niactions] iaction_labu;
@@ -291,8 +291,8 @@ transformed parameters {
   }
 
   // calculate effects lambdas and scale effects
-  obj_effect_lambda = obj_effect_lambda_a ./ sqrt(obj_effect_lambda_t);
-  obj_effect = append_row(obj_effect_unscaled_pos, obj_effect_unscaled_other)[obj_effect_reshuffle] .* obj_effect_lambda .* obj_effect_tau;
+  obj_effect_sigma = obj_effect_lambda_a ./ sqrt(obj_effect_lambda_t) .* obj_effect_tau;
+  obj_effect = append_row(obj_effect_unscaled_pos, obj_effect_unscaled_other)[obj_effect_reshuffle] .* obj_effect_sigma;
 
   // calculate iaction_labu
   iaction_labu = csr_matrix_times_vector(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u, obj_base_labu) +
@@ -311,10 +311,10 @@ transformed parameters {
   }
   // calculate objXexp_batch_shift (doesn't make sense to add to obs_labu)
   if (NbatchEffects > 0) {
-    vector[NobjBatchEffects] obj_batch_effect_lambda;
+    vector[NobjBatchEffects] obj_batch_effect_sigma;
 
-    obj_batch_effect_lambda = obj_batch_effect_lambda_a ./ sqrt(obj_batch_effect_lambda_t);
-    obj_batch_effect = append_row(obj_batch_effect_unscaled_pos, obj_batch_effect_unscaled_other)[obj_batch_effect_reshuffle] .* obj_batch_effect_lambda * obj_batch_effect_tau;
+    obj_batch_effect_sigma = obj_batch_effect_lambda_a ./ sqrt(obj_batch_effect_lambda_t) * obj_batch_effect_tau;
+    obj_batch_effect = append_row(obj_batch_effect_unscaled_pos, obj_batch_effect_unscaled_other)[obj_batch_effect_reshuffle] .* obj_batch_effect_sigma;
     obs_batch_shift = csr_matrix_times_vector(Nobservations, NobjBatchEffects, obsXobjbatcheff_w, obsXobjbatcheff_v, obsXobjbatcheff_u, obj_batch_effect);
   }
 }

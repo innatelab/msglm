@@ -365,10 +365,10 @@ model {
         vector[Nquanted] q_labu;
         vector[Nmissed] m_labu;
 
-        q_labu = obs_labu[quant2observation] + experiment_shift[observation2experiment[quant2observation]];
-        m_labu = obs_labu[miss2observation] + experiment_shift[observation2experiment[miss2observation]];
-        //qLogAbu = iaction_shift[quant2iaction] + experiment_shift[observation2experiment[quant2observation]];
-        //mLogAbu = iaction_shift[miss2iaction] + experiment_shift[observation2experiment[miss2observation]];
+        q_labu = obs_labu[quant2observation] + experiment_shift[quant2experiment];
+        m_labu = obs_labu[miss2observation] + experiment_shift[miss2experiment];
+        //qLogAbu = iaction_shift[quant2iaction] + experiment_shift[quant2experiment];
+        //mLogAbu = iaction_shift[miss2iaction] + experiment_shift[miss2experiment];
         if (NbatchEffects > 0) {
           q_labu = q_labu + obs_batch_shift[quant2observation];
           m_labu = m_labu + obs_batch_shift[miss2observation];

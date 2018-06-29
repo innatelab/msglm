@@ -9,11 +9,6 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
     objs_df <- dplyr::select_(objs_df, .dots=unique(c("glm_object_ix", object_cols)))
   }
   res <- list(iteration = NULL,
-    effect = data.frame(effect = colnames(conditionXeffect.mtx), stringsAsFactors = FALSE),
-    repl_effect = data.frame(repl_effect = colnames(msrunXreplEffect.mtx), stringsAsFactors = FALSE),
-    batch_effect = data.frame(batch_effect = colnames(msrunXbatchEffect.mtx), stringsAsFactors = FALSE),
-    condition = data.frame(condition = rownames(conditionXeffect.mtx), index_condition = 1:nrow(conditionXeffect.mtx),
-                           stringsAsFactors = FALSE),
     msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, condition),
     iaction = dplyr::select(model_data$interactions, glm_iaction_ix, glm_object_ix, iaction_id, condition_ix, condition) %>%
         dplyr::inner_join(objs_df),
@@ -23,9 +18,6 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
         dplyr::inner_join(objs_df),
     object = model_data$objects, # use full object information
     object_effect = model_data$object_effects %>%
-        dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
-        dplyr::inner_join(objs_df),
-    object_repl_effect = model_data$object_repl_effects %>%
         dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
         dplyr::inner_join(objs_df),
     object_batch_effect = model_data$object_batch_effects %>%

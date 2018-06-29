@@ -1,4 +1,5 @@
 require(rstan)
+require(Matrix)
 
 stan_models_path <- file.path(base_scripts_path, "R/msglm/inst/stan_models") # FIXME
 msglm.stan_model <- stan_model(file.path(stan_models_path, "msglm.stan"), "msglm", save_dso = TRUE, auto_write = TRUE)
@@ -9,20 +10,16 @@ msglm_normalize.stan_model <- stan_model(file.path(stan_models_path , "msglm_nor
 # variables description for msglm_local model
 msglm.vars_info <- list(
   global = list( names = c('sub_labu_shift_sigma', 'sub_labu_msproto_shift_sigma'), dims=c() ),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
-  effects = list( names = c('effect_shift_replCI_sigma'), dims = c('effect') ),
   #batch_effects = list(names = c('batch_effect_sigma'), dims = c('batch_effect')),
-  conditions = list(names = c('obj_repl_shift_sigma'), dims = c("condition")),
-  iactions = list(names = c('iaction_labu', 'iaction_labu_replCI'), dims = c('iaction')),
-  observations = list(names = c('obs_labu'), dims = c('observation')),
+  iactions = list(names = c('iact_repl_shift_sigma', 'iaction_labu', 'iaction_labu_replCI'), dims = c('iaction')),
+  observations = list(names = c('obs_labu', "obs_repl_shift"), dims = c('observation')),
   subcomponents = list(names = c('sub_labu_shift_unscaled'), dims = c('subcomponent')),
   subcomponentXmsprotocol = list(names = c('sub_labu_msproto_shift_unscaled'), dims=c('subcomponent', 'msprotocol')),
-  objects = list(names = c('obj_base_labu'), dims = c('object')),
-  object_effects = list(names = c('obj_effect_lambda', 'obj_effect', 'obj_effect_replCI'),
+  objects = list(names = c('obj_base_labu', 'obj_base_labu_replCI', "obj_base_repl_shift_sigma"), dims = c('object')),
+  object_effects = list(names = c('obj_effect_lambda', 'obj_effect_repl_shift_sigma', 'obj_effect', 'obj_effect_replCI'),
                         dims = c('object_effect')),
-  object_repl_shifts = list(names = c('objXexp_repl_shift_unscaled'), dims = c('object', 'msrun')),
   object_batch_effects = list(names = c('obj_batch_effect'), #'obj_batch_effect_unscaled', 'obj_batch_effect_lambda',
-                              dims = c('object_batch_effect')),
-  object_batch_shifts = list(names = c('objXexp_batch_shift'), dims = c('object', 'msrun'))
+                              dims = c('object_batch_effect'))
 )
 
 # get the indices of the first rows in a group
@@ -40,11 +37,8 @@ nrows_cumsum <- function(df, group_col) {
 
 stan.prepare_data <- function(base_input_data, model_data,
                               global_labu_shift = global_protgroup_labu_shift,
-                              repl_tau=0.25, batch_tau=0.3)
+                              base_repl_shift_tau=0.1, effect_repl_shift_tau=0.25, batch_tau=0.3)
 {
-  batchEffXmsrun.mtx <- t(msrunXbatchEffect.mtx[unique(model_data$mschannels$msrun),, drop=FALSE])
-  replEffXmsrun.mtx <- t(msrunXreplEffect.mtx[unique(model_data$mschannels$msrun),, drop=FALSE])
-  repl_eff_col <- names(dimnames(replEffXmsrun.mtx))[[1]]
   message('Converting MSGLM model data to Stan-readable format...')
   if (any(as.integer(model_data$effects$effect) != seq_len(nrow(model_data$effects)))) {
     stop("model_data$effects are not ordered")
@@ -64,12 +58,7 @@ stan.prepare_data <- function(base_input_data, model_data,
     Nexperiments = n_distinct(model_data$mschannels$msrun_ix),
     Nconditions = nrow(conditionXeffect.mtx),
     Nobjects = n_distinct(model_data$ms_data$glm_object_ix),
-    experiment2condition = as.array(model_data$mschannels$condition_ix),
-    effectXcondition = t(conditionXeffect.mtx),
-    inv_effectXcondition = t(inv_conditionXeffect.mtx),
     experiment_shift = as.array(model_data$mschannels$model_mschannel_shift),
-    batchEffectXexperiment = batchEffXmsrun.mtx,
-    replEffectXexperiment = replEffXmsrun.mtx,
     observation2experiment = as.array(obs_df$msrun_ix),
     observation2iaction = as.array(obs_df$glm_iaction_ix),
     iaction2obj = as.array(model_data$interactions$glm_object_ix),
@@ -77,17 +66,10 @@ stan.prepare_data <- function(base_input_data, model_data,
     Neffects = ncol(conditionXeffect.mtx),
     effect_is_positive = as.array(as.integer(model_data$effects$is_positive)),
     NobjEffects = nrow(model_data$object_effects),
-    NeffectsPerObjCumsum = as.array(nrows_cumsum(model_data$object_effects, 'glm_object_ix')),
-    obj_effect2obj = as.array(as.integer(model_data$object_effects$glm_object_ix)),
     obj_effect2effect = as.array(as.integer(model_data$object_effects$effect)),
-    NreplEffects = ncol(msrunXreplEffect.mtx),
-    NobjReplEffects = nrow(model_data$object_repl_effects),
-    NreplEffectsPerObjCumsum = as.array(nrows_cumsum(model_data$object_repl_effects, 'glm_object_ix')),
-    obj_repl_effect2repl_effect = as.array(as.integer(model_data$object_repl_effects[[repl_eff_col]])),
     NbatchEffects = ncol(msrunXbatchEffect.mtx),
     batch_effect_is_positive = as.array(as.integer(model_data$batch_effects$is_positive)),
     NobjBatchEffects = nrow(model_data$object_batch_effects),
-    NbatchEffectsPerObjCumsum = as.array(nrows_cumsum(model_data$object_batch_effects, 'glm_object_ix')),
     obj_batch_effect2batch_effect = as.array(as.integer(model_data$object_batch_effects$batch_effect)),
     NunderdefObjs = sum(model_data$objects$is_underdefined),
     underdef_objs = as.array(dplyr::filter(model_data$objects, is_underdefined) %>% .$glm_object_ix),
@@ -98,14 +80,18 @@ stan.prepare_data <- function(base_input_data, model_data,
     qData = as.array(model_data$ms_data$intensity[!is.na(model_data$ms_data$intensity)]),
     global_labu_shift = global_labu_shift,
     effect_tau = effects.df$tau,
-    obj_repl_shift_tau = repl_tau,
+    obj_base_repl_shift_tau = base_repl_shift_tau,
+    obj_effect_repl_shift_tau = effect_repl_shift_tau,
     obj_batch_effect_tau = batch_tau,
     obj_base_labu_sigma = 4.0,
     #obj_batch_effect_sigma = 0.25,
     underdef_obj_shift = -8.0#,
     #zShift = mean(log(ms_data$protgroup_intensities$intensity), na.rm = TRUE),
     #zScale = 1.0/sd(log(ms_data$protgroup_intensities$intensity), na.rm = TRUE)
-  ))
+  )) %>%
+    append_sparse("iactXobjeff", model_data$iactXobjeff) %>%
+    append_sparse("obsXobjbatcheff", model_data$obsXobjbatcheff)
+
   if ("subcomponents" %in% names(model_data)) {
     # data have subcomponents
     res$Nsubcomponents <- nrow(model_data$subcomponents)

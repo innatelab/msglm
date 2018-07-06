@@ -53,8 +53,9 @@ frame2matrix <- function(df, row_col, col_col, val_col, cols=NULL, rows=NULL) {
   nz_mtx <- as.matrix(dplyr::select(df_wide, -one_of(row_col)))
   rownames(nz_mtx) <- df_wide[[row_col]]
   colnames(nz_mtx) <- str_replace(colnames(nz_mtx), fixed(paste0(val_col, ".")), "")
-  mtx_dims <- list(rows %||% rownames(nz_mtx),
-                   cols %||% colnames(nz_mtx))
+
+  mtx_dims <- list(if (!is.null(rows) && length(rows) > 0) rows else rownames(nz_mtx),
+                   if (!is.null(cols) && length(cols) > 0) cols else colnames(nz_mtx))
   names(mtx_dims) <- c(row_col, col_col)
   mtx <- do.call(zero_matrix, mtx_dims)
   mtx[mtx_dims[[1]] %in% rownames(nz_mtx), mtx_dims[[2]] %in% colnames(nz_mtx)] <- nz_mtx

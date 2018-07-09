@@ -9,12 +9,12 @@ msglm_normalize.stan_model <- stan_model(file.path(stan_models_path , "msglm_nor
 
 # variables description for msglm_local model
 msglm.vars_info <- list(
-  global = list( names = c('sub_labu_shift_sigma', 'sub_labu_msproto_shift_sigma'), dims=c() ),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
+  global = list( names = c('suo_shift_sigma', 'suo_msproto_shift_sigma'), dims=c() ),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
   #batch_effects = list(names = c('batch_effect_sigma'), dims = c('batch_effect')),
   iactions = list(names = c('iact_repl_shift_sigma', 'iaction_labu', 'iaction_labu_replCI'), dims = c('iaction')),
   observations = list(names = c('obs_labu', "obs_repl_shift"), dims = c('observation')),
-  subcomponents = list(names = c('sub_labu_shift_unscaled'), dims = c('subcomponent')),
-  subcomponentXmsprotocol = list(names = c('sub_labu_msproto_shift_unscaled'), dims=c('subcomponent', 'msprotocol')),
+  subobjects = list(names = c('suo_shift_unscaled'), dims = c('subobject')),
+  subobjectXmsprotocol = list(names = c('suo_msproto_shift_unscaled'), dims=c('subobject', 'msprotocol1')),
   objects = list(names = c('obj_base_labu', 'obj_base_labu_replCI', "obj_base_repl_shift_sigma"), dims = c('object')),
   object_effects = list(names = c('obj_effect_sigma', 'obj_effect_repl_shift_sigma', 'obj_effect', 'obj_effect_replCI'),
                         dims = c('object_effect')),
@@ -92,12 +92,12 @@ stan.prepare_data <- function(base_input_data, model_data,
     append_sparse("iactXobjeff", model_data$iactXobjeff) %>%
     append_sparse("obsXobjbatcheff", model_data$obsXobjbatcheff)
 
-  if ("subcomponents" %in% names(model_data)) {
-    # data have subcomponents
-    res$Nsubcomponents <- nrow(model_data$subcomponents)
-    res$sub2obj <- as.array(as.integer(model_data$subcomponents$glm_object_ix))
-    res$quant2sub <- as.array(as.integer(model_data$ms_data$glm_subcomponent_ix[!is.na(model_data$ms_data$qdata_ix)]))
-    res$miss2sub <- as.array(as.integer(model_data$ms_data$glm_subcomponent_ix[!is.na(model_data$ms_data$mdata_ix)]))
+  if ("subobjects" %in% names(model_data)) {
+    # data have subobjects
+    res$Nsubobjects <- nrow(model_data$subobjects)
+    res$suo2obj <- as.array(as.integer(model_data$subobjects$glm_object_ix))
+    res$quant2suo <- as.array(as.integer(model_data$ms_data$glm_subobject_ix[!is.na(model_data$ms_data$qdata_ix)]))
+    res$miss2suo <- as.array(as.integer(model_data$ms_data$glm_subobject_ix[!is.na(model_data$ms_data$mdata_ix)]))
     res$Nmsprotocols <- 0L
     res$experiment2msproto <- integer(0)
   }
@@ -105,9 +105,9 @@ stan.prepare_data <- function(base_input_data, model_data,
     res$Nmsprotocols <- n_distinct(model_data$mschannels$msproto_ix)
     res$experiment2msproto <- as.array(model_data$mschannels$msproto_ix)
   }
-  if ("Nsubcomponents" %in% names(res)) {
+  if ("Nsubobjects" %in% names(res)) {
     message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s) with ",
-            res$Nsubcomponents, " subcomponent(s), ",
+            res$Nsubobjects, " subobject(s), ",
             res$Nquanted, " quantitation(s), ",
             res$Nmissed, " missed")
   } else {
@@ -123,15 +123,15 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
 {
     message("Running Stan MCMC...")
     vars_info <- msglm.vars_info
-    if ("Nsubcomponents" %in% names(stan_input_data)) {
+    if ("Nsubobjects" %in% names(stan_input_data)) {
       stanmodel <- msglm_local_multicomponent.stan_model
     } else {
       stanmodel <- msglm_local.stan_model
-      # exclude subcomponent-related
-      vars_info$subcomponents <- NULL
-      vars_info$subcomponentXmsprotocol <- NULL
+      # exclude subobject-related
+      vars_info$subobjects <- NULL
+      vars_info$subobjectXmsprotocol <- NULL
       vars_info$global$names <- setdiff(vars_info$global$names,
-                                        c('sub_labu_shift_sigma', 'sub_labu_msproto_shift_sigma'))
+                                        c('suo_shift_sigma', 'suo_msproto_shift_sigma'))
     }
     res <- sampling(stanmodel,
              pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,

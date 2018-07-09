@@ -24,8 +24,8 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
         dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
         dplyr::inner_join(objs_df)
   )
-  if ("subcomponents" %in% names(model_data)) {
-    res$subcomponent <- dplyr::select(model_data$subcomponents, glm_object_ix, glm_subcomponent_ix, superprotgroup_id, pepmod_id)
+  if ("subobjects" %in% names(model_data)) {
+    res$subobject <- dplyr::select(model_data$subobjects, glm_object_ix, glm_subobject_ix, superprotgroup_id, pepmod_id)
   }
   if ("msproto_ix" %in% colnames(model_data$mschannels)) {
     res$msprotocol <- dplyr::select(model_data$mschannels, msproto_ix, one_of("instrument")) %>%

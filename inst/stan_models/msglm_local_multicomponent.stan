@@ -8,7 +8,7 @@ data {
   int<lower=1> Nexperiments;    // number of experiments
   int<lower=1> Nconditions;     // number of experimental conditions
   int<lower=0> Nobjects;        // number of objects (proteins/peptides/sites etc)
-  int<lower=0> Nsubcomponents;  // number of objects subcomponents (peptides of proteins etc), 0 if not supported
+  int<lower=0> Nsubobjects;     // number of objects subcomponents (peptides of proteins etc), 0 if not supported
   int<lower=0> Nmsprotocols;    // number of MS protocols used
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
   int<lower=0> Nobservations;   // number of observations of interactions (objectXexperiment pairs for all iactions and experiments of its condition)
@@ -16,7 +16,7 @@ data {
   int<lower=0> NreplEffects;    // number of repl effects (that define biological experimental variation, iaction_repl_shift)
   int<lower=0> NbatchEffects;   // number of batch effects (that define assay experimental variation, but not biology)
   int<lower=0> NunderdefObjs;   // number of virtual interactions (the ones not detected but required for comparison)
-  int<lower=1,upper=Nobjects> sub2obj[Nsubcomponents];
+  int<lower=1,upper=Nobjects> suo2obj[Nsubobjects];
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
   int<lower=1,upper=Nconditions> iaction2condition[Niactions];
   int<lower=1,upper=Nobjects> underdef_objs[NunderdefObjs];
@@ -33,12 +33,12 @@ data {
   int<lower=1,upper=Nmsprotocols> experiment2msproto[Nmsprotocols > 0 ? Nexperiments : 0];
 
   // map from labelXreplicateXobject to observed/missed data
-  int<lower=0> Nquanted;        // total number of quantified subcomponentsXexperiments
+  int<lower=0> Nquanted;        // total number of quantified subobjectsXexperiments
   int<lower=1,upper=Nobservations>  quant2observation[Nquanted];
-  int<lower=1,upper=Nsubcomponents> quant2sub[Nsubcomponents > 0 ? Nquanted : 0];
-  int<lower=0> Nmissed;         // total number of missed subcomponentsXexperiments
+  int<lower=1,upper=Nsubobjects> quant2suo[Nsubobjects > 0 ? Nquanted : 0];
+  int<lower=0> Nmissed;         // total number of missed subobjectsXexperiments
   int<lower=1,upper=Nobservations> miss2observation[Nmissed];
-  int<lower=1,upper=Nsubcomponents> miss2sub[Nsubcomponents > 0 ? Nmissed : 0];
+  int<lower=1,upper=Nsubobjects> miss2suo[Nsubobjects > 0 ? Nmissed : 0];
 
   int<lower=0> NobjEffects;
   int<lower=1,upper=Neffects> obj_effect2effect[NobjEffects];
@@ -91,15 +91,15 @@ transformed data {
   matrix[Nexperiments, Nexperiments-Nconditions] experimentXrepl_effect;
 
   int<lower=0> NobjectSubs[Nobjects];
-  matrix[Nsubcomponents, Nsubcomponents > 0 ? Nsubcomponents - Nobjects : 0] subXsub_effect;
-  vector[Nsubcomponents] zero_sub_shifts;
+  matrix[Nsubobjects, Nsubobjects > 0 ? Nsubobjects - Nobjects : 0] suoXsuo_effect;
+  vector[Nsubobjects] zero_suo_shifts;
 
   int<lower=1,upper=Niactions> quant2iaction[Nquanted];
   int<lower=1,upper=Nexperiments> quant2experiment[Nquanted];
-  int<lower=1,upper=Nmsprotocols*Nsubcomponents> quant2msprotoXsub[((Nmsprotocols > 1) && (Nsubcomponents > 0)) ? Nquanted : 0];
+  int<lower=1,upper=Nmsprotocols*Nsubobjects> quant2msprotoXsuo[((Nmsprotocols > 1) && (Nsubobjects > 0)) ? Nquanted : 0];
   int<lower=1,upper=Niactions> miss2iaction[Nmissed];
   int<lower=1,upper=Nexperiments> miss2experiment[Nmissed];
-  int<lower=1,upper=Nmsprotocols*Nsubcomponents> miss2msprotoXsub[((Nmsprotocols > 1) && (Nsubcomponents > 0)) ? Nmissed : 0];
+  int<lower=1,upper=Nmsprotocols*Nsubobjects> miss2msprotoXsuo[((Nmsprotocols > 1) && (Nsubobjects > 0)) ? Nmissed : 0];
   int<lower=0,upper=NobjEffects> NobjEffectsPos;
   int<lower=0,upper=NobjEffects> NobjEffectsOther;
   int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects];
@@ -208,16 +208,16 @@ transformed data {
     }
   }
 
-  if (Nsubcomponents > 0) {
-    int sub_index[Nsubcomponents];
+  if (Nsubobjects > 0) {
+    int suo_index[Nsubobjects];
     int object_shift0_offset[Nobjects+1];
 
     NobjectSubs = rep_array(0, Nobjects);
-    for (i in 1:Nsubcomponents) {
+    for (i in 1:Nsubobjects) {
       int obj_ix;
       obj_ix = sub2obj[i];
       NobjectSubs[obj_ix] = NobjectSubs[obj_ix] + 1;
-      sub_index[i] = NobjectSubs[obj_ix];
+      suo_index[i] = NobjectSubs[obj_ix];
     }
 
     object_shift0_offset[1] = 0;
@@ -225,9 +225,9 @@ transformed data {
       object_shift0_offset[i+1] = object_shift0_offset[i] + NobjectSubs[i]-1;
     }
 
-    subXsub_effect = rep_matrix(0.0, Nsubcomponents, Nsubcomponents-Nobjects);
-    for (i in 1:Nsubcomponents-Nobjects) {
-      for (j in 1:Nsubcomponents) {
+    suoXsuo_effect = rep_matrix(0.0, Nsubobjects, Nsubobjects-Nobjects);
+    for (i in 1:Nsubobjects-Nobjects) {
+      for (j in 1:Nsubobjects) {
         int obj_ix;
         obj_ix = sub2obj[j];
         if (object_shift0_offset[obj_ix]<i && i<=object_shift0_offset[obj_ix+1]) {
@@ -235,24 +235,24 @@ transformed data {
           int n_obj_subs;
           param_ix = i - object_shift0_offset[obj_ix];
           n_obj_subs = NobjectSubs[obj_ix];
-          if (sub_index[j] == param_ix) {
-            subXsub_effect[j, i] = (n_obj_subs-1.0)/n_obj_subs;
+          if (suo_index[j] == param_ix) {
+            suoXsuo_effect[j, i] = (n_obj_subs-1.0)/n_obj_subs;
           } else {
-            subXsub_effect[j, i] = -1.0/n_obj_subs;
+            suoXsuo_effect[j, i] = -1.0/n_obj_subs;
           }
         } else {
-          subXsub_effect[j, i] = 0.0;
+          suoXsuo_effect[j, i] = 0.0;
         }
       }
     }
     if (Nmsprotocols > 1) {
       for (i in 1:Nquanted) {
-        quant2msprotoXsub[i] = (experiment2msproto[quant2experiment[i]]-1)*Nsubcomponents + quant2sub[i];
+        quant2msprotoXsub[i] = (experiment2msproto[quant2experiment[i]]-1)*Nsubobjects + quant2sub[i];
       }
       for (i in 1:Nmissed) {
-        miss2msprotoXsub[i] = (experiment2msproto[miss2experiment[i]]-1)*Nsubcomponents + miss2sub[i];
+        miss2msprotoXsub[i] = (experiment2msproto[miss2experiment[i]]-1)*Nsubobjects + miss2sub[i];
       }
-      zero_sub_shifts = rep_vector(0.0, Nsubcomponents);
+      zero_suo_shifts = rep_vector(0.0, Nsubobjects);
     }
   }
 }
@@ -264,10 +264,10 @@ parameters {
   //vector<lower=0>[Nconditions] condition_repl_effect_sigma;
 
   row_vector[Nobjects] obj_base_labu0; // baseline object abundance without underdefinedness adjustment
-  real<lower=0.0> sub_labu_shift_sigma;
-  vector[Nsubcomponents > 0 ? Nsubcomponents-Nobjects : 0] sub_labu0_shift_unscaled; // subcomponent shift within object
-  real<lower=0.0> sub_labu_msproto_shift_sigma;
-  matrix[Nsubcomponents > 0 ? Nsubcomponents : 0, Nmsprotocols > 1 ? Nmsprotocols-1 : 0] sub_labu_msproto_shift_unscaled;
+  real<lower=0.0> suo_shift_sigma;
+  vector[Nsubobjects > 0 ? Nsubobjects-Nobjects : 0] suo_labu0_shift_unscaled; // subcomponent shift within object
+  real<lower=0.0> suo_msproto_shift_sigma;
+  matrix[Nsubobjects > 0 ? Nsubobjects : 0, Nmsprotocols > 1 ? Nmsprotocols-1 : 0] suo_msproto_shift_unscaled;
 
   //real<lower=0.0> obj_effect_tau;
   vector<lower=0.0>[NobjEffects] obj_effect_lambda_t;
@@ -290,7 +290,7 @@ parameters {
 
 transformed parameters {
   row_vector[Nobjects] obj_base_labu;
-  vector[Nsubcomponents] sub_labu_shift_unscaled; // subcomponent shift within object
+  vector[Nsubobjects] suo_shift_unscaled; // subcomponent shift within object
   vector[NobjEffects] obj_effect;
   vector<lower=0>[NobjEffects] obj_effect_lambda;
   vector[NobjBatchEffects] obj_batch_effect;
@@ -355,11 +355,11 @@ transformed parameters {
   } else {
     objXexp_batch_shift = rep_matrix(0.0, Nobjects, Nexperiments);
   }
-  // calculate sub_labu_shift
-  if (Nsubcomponents > 1) {
-    sub_labu_shift_unscaled = subXsub_effect * sub_labu0_shift_unscaled;
-  } else if (Nsubcomponents == 1) {
-    sub_labu_shift_unscaled = rep_vector(0.0, Nsubcomponents);
+  // calculate suo_shift
+  if (Nsubobjects > 1) {
+    suo_shift_unscaled = suoXsuo_effect * suo_labu0_shift_unscaled;
+  } else if (Nsubobjects == 1) {
+    suo_shift_unscaled = rep_vector(0.0, Nsubobjects);
   }
 }
 
@@ -397,12 +397,12 @@ model {
       obj_batch_effect_unscaled_pos ~ normal(0.0, 1.0);
       obj_batch_effect_unscaled_other ~ normal(0.0, 1.0);
     }
-    if (Nsubcomponents > 0) {
-      sub_labu_shift_sigma ~ cauchy(0.0, 1.0);
-      sub_labu_shift_unscaled ~ normal(0.0, 1.0);
+    if (Nsubobjects > 0) {
+      suo_shift_sigma ~ cauchy(0.0, 1.0);
+      suo_shift_unscaled ~ normal(0.0, 1.0);
       if (Nmsprotocols > 1) {
-        sub_labu_msproto_shift_sigma ~ cauchy(0.0, 1.0);
-        to_vector(sub_labu_msproto_shift_unscaled) ~ normal(0.0, 1.0);
+        suo_msproto_shift_sigma ~ cauchy(0.0, 1.0);
+        to_vector(suo_msproto_shift_unscaled) ~ normal(0.0, 1.0);
       }
     }
 
@@ -415,19 +415,19 @@ model {
         m_labu = obs_labu[miss2observation] + experiment_shift[miss2experiment];
         //qLogAbu = iaction_shift[quant2iaction] + experiment_shift[observation2experiment[quant2observation]];
         //mLogAbu = iaction_shift[miss2iaction] + experiment_shift[observation2experiment[miss2observation]];
-        if (Nsubcomponents > 0) {
+        if (Nsubobjects > 0) {
           // adjust by subcomponent shift
           if (Nmsprotocols > 1) {
-            vector[Nmsprotocols*Nsubcomponents] sub_labu_shift;
-            sub_labu_shift = to_vector(rep_matrix(sub_labu_shift_unscaled * sub_labu_shift_sigma, Nmsprotocols) +
-              append_col(zero_sub_shifts, sub_labu_msproto_shift_unscaled * sub_labu_msproto_shift_sigma));
-            q_labu = q_labu + sub_labu_shift[quant2msprotoXsub];
-            m_labu = m_labu + sub_labu_shift[miss2msprotoXsub];
+            vector[Nmsprotocols*Nsubobjects] suo_shift;
+            suo_shift = to_vector(rep_matrix(suo_shift_unscaled * suo_shift_sigma, Nmsprotocols) +
+              append_col(zero_suo_shifts, suo_msproto_shift_unscaled * suo_msproto_shift_sigma));
+            q_labu = q_labu + suo_shift[quant2msprotoXsub];
+            m_labu = m_labu + suo_shift[miss2msprotoXsub];
           } else {
-            vector[Nsubcomponents] sub_labu_shift;
-            sub_labu_shift = sub_labu_shift_unscaled * sub_labu_shift_sigma;
-            q_labu = q_labu + sub_labu_shift[quant2sub];
-            m_labu = m_labu + sub_labu_shift[miss2sub];
+            vector[Nsubobjects] suo_shift;
+            suo_shift = suo_shift_unscaled * suo_shift_sigma;
+            q_labu = q_labu + suo_shift[quant2sub];
+            m_labu = m_labu + suo_shift[miss2sub];
           }
         }
         if (NbatchEffects > 0) {

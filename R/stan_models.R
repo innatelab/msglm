@@ -4,7 +4,7 @@ require(Matrix)
 stan_models_path <- file.path(base_scripts_path, "R/msglm/inst/stan_models") # FIXME
 msglm.stan_model <- stan_model(file.path(stan_models_path, "msglm.stan"), "msglm", save_dso = TRUE, auto_write = TRUE)
 msglm_local.stan_model <- stan_model(file.path(stan_models_path, "msglm_local.stan"), "msglm_local", save_dso = TRUE, auto_write = TRUE)
-msglm_local_multicomponent.stan_model <- stan_model(file.path(stan_models_path, "msglm_local_multicomponent.stan"), "msglm_local_multicomponent", save_dso = TRUE, auto_write = TRUE)
+msglm_local_subobjects.stan_model <- stan_model(file.path(stan_models_path, "msglm_local_subobjects.stan"), "msglm_local_subobjects", save_dso = TRUE, auto_write = TRUE)
 msglm_normalize.stan_model <- stan_model(file.path(stan_models_path , "msglm_normalize.stan"), "msglm_normalize", save_dso = TRUE, auto_write = TRUE)
 
 # variables description for msglm_local model
@@ -124,7 +124,7 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
     message("Running Stan MCMC...")
     vars_info <- msglm.vars_info
     if ("Nsubobjects" %in% names(stan_input_data)) {
-      stanmodel <- msglm_local_multicomponent.stan_model
+      stanmodel <- msglm_local_subobjects.stan_model
     } else {
       stanmodel <- msglm_local.stan_model
       # exclude subobject-related

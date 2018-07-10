@@ -56,29 +56,13 @@ join_msglm_reports <- function(section, reports, type, results_tag="msglm_result
     res <- report[[results_tag]][[section]][[type]]
     # add object id columns
     # FIXME model_data$objects support?
-    if (!is.null(res) && !('protgroup_id' %in% colnames(res))
-        && "protgroup_id" %in% colnames(report$model_data$objects)) {
-      res$protgroup_id <- rep_len(report$model_data$objects$protgroup_id[1], nrow(res))
-    }
-    if (!is.null(res) && !('superprotgroup_id' %in% colnames(res))
-        && "superprotgroup_id" %in% colnames(report$model_data$objects)) {
-      res$superprotgroup_id <- rep_len(report$model_data$objects$superprotgroup_id[1], nrow(res))
-    }
-    if (!is.null(res) && !('majority_protein_acs' %in% colnames(res))
-        && "majority_protein_acs" %in% colnames(report$model_data$objects)) {
-      res$majority_protein_acs <- rep_len(report$model_data$objects$majority_protein_acs[1], nrow(res))
-    }
-    if (!is.null(res) && !('pepmod_id' %in% colnames(res))
-        && "pepmod_id" %in% colnames(report$model_data$objects)) {
-      res$pepmod_id <- rep_len(report$model_data$objects$pepmod_id[1], nrow(res))
-    }
-    if (!is.null(res) && !('site_id' %in% colnames(res))
-        && "site_id" %in% colnames(report$model_data$objects)) {
-      res$site_id <- rep_len(report$model_data$objects$site_id[1], nrow(res))
-    }
-    if (!is.null(res) && !('multiplicity' %in% colnames(res))
-        && "site_id" %in% colnames(report$model_data$objects)) {
-      res$multiplicity <- rep_len(report$model_data$objects$multiplicity[1], nrow(res))
+    if (!is.null(res)) {
+      obj_id_cols <- setdiff(intersect(c('protregroup_id', 'superprotgroup_id', 'protgroup_id',
+                                         'majority_protein_acs', 'pepmod_id', 'site_id', 'multiplicity'),
+                                       colnames(report$model_data$objects)), colnames(res))
+      for (obj_id_col in obj_id_cols) {
+        res[[obj_id_col]] <- rep_len(report$model_data$objects[[obj_id_col]][[1]], nrow(res))
+      }
     }
     res
   },

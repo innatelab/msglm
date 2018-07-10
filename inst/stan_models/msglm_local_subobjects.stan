@@ -149,8 +149,8 @@ transformed data {
 
   int<lower=0> suoXsuo0_Nw;
   vector[effXeff0_Nw(Nobjects, suo2obj)] suoXsuo_shift0_w;
-  int<lower=1, upper=effXeff0_Nw(Nobjects, suo2obj) + 1> suoXsuo_shift0_u[Nsubobjects + 1];
-  int<lower=1, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[effXeff0_Nw(Nobjects, suo2obj)];
+  int<lower=0, upper=effXeff0_Nw(Nobjects, suo2obj) + 1> suoXsuo_shift0_u[Nsubobjects + 1];
+  int<lower=0, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[effXeff0_Nw(Nobjects, suo2obj)];
 
   // prepare reshuffling of positive/other obj effects
   NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
@@ -270,6 +270,7 @@ transformed data {
   for (i in 1:(Nobservations+1)) obsXiact_u[i] = i;
 
   suoXsuo0_Nw = effXeff0_Nw(Nobjects, suo2obj);
+  suoXsuo_shift0_u = rep_array(0, Nsubobjects+1);
   if (Nsubobjects > 0) {
     int obj2nsuo[Nobjects];
 

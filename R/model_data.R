@@ -72,8 +72,8 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
       dplyr::arrange(effect)
 
   obsXobjbatcheff <- iactXeffect(msrunXbatchEffect.mtx[model_data$mschannels$msrun, , drop=FALSE],
-                                                 model_data$ms_data$glm_object_ix,
-                                                 model_data$ms_data$msrun_ix)
+                                 model_data$observations$glm_object_ix,
+                                 model_data$observations$msrun_ix)
   model_data$object_batch_effects <- obsXobjbatcheff$objeff_df %>%
     dplyr::rename(glm_object_ix = obj,
                   batch_effect = eff, object_batch_effect = objeff) %>%

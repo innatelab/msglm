@@ -463,10 +463,10 @@ model {
       obj_batch_effect_unscaled_other ~ normal(0.0, 1.0);
     }
     if (Nsubobjects > 0) {
-      suo_shift_sigma ~ cauchy(0.0, 1.0);
+      suo_shift_sigma ~ inv_gamma(1.0, 1.0);
       suo_shift_unscaled ~ normal(0.0, 1.0);
+      suo_msproto_shift_sigma ~ inv_gamma(2.0, 1.0); // if Nmsprotocols==1, fake something far from 0 and +Inf
       if (Nmsprotocols > 1) {
-        suo_msproto_shift_sigma ~ cauchy(0.0, 1.0);
         to_vector(suo_msproto_shift_unscaled) ~ normal(0.0, 1.0);
       }
     }

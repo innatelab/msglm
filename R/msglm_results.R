@@ -30,7 +30,12 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
   }
   if ("msproto_ix" %in% colnames(model_data$mschannels)) {
     res$msprotocol <- dplyr::select(model_data$mschannels, msproto_ix, one_of("instrument")) %>%
-      dplyr::distinct() %>% dplyr::filter(msproto_ix > 1L) # remove the 1st (the default) MS protocol
+      dplyr::distinct()
+    if ("subobjectXmsprotocol" %in% names(model_data)) {
+      # remove the 1st (the default) MS protocol
+      res$subobjectXmsprotocol1 <- bind_cols(rep(res$subobject, times=nrow(res$msprotocol)-1L),
+                                             rep(res$msprotocol[-1], each=nrow(res$subobject)))
+    }
   }
   return(res)
 }

@@ -14,7 +14,7 @@ msglm.vars_info <- list(
   iactions = list(names = c('iact_repl_shift_sigma', 'iaction_labu', 'iaction_labu_replCI'), dims = c('iaction')),
   observations = list(names = c('obs_labu', "obs_repl_shift"), dims = c('observation')),
   subobjects = list(names = c('suo_shift_unscaled'), dims = c('subobject')),
-  subobjectXmsprotocol = list(names = c('suo_msproto_shift_unscaled'), dims=c('subobject', 'msprotocol1')),
+  subobjectXmsprotocol = list(names = c('suo_msproto_shift_unscaled'), dims=c('subobjectXmsprotocol1')),
   objects = list(names = c('obj_base_labu', 'obj_base_labu_replCI', "obj_base_repl_shift_sigma"), dims = c('object')),
   object_effects = list(names = c('obj_effect_sigma', 'obj_effect_repl_shift_sigma', 'obj_effect', 'obj_effect_replCI'),
                         dims = c('object_effect')),

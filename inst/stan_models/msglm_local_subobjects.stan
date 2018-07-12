@@ -502,8 +502,8 @@ model {
           m_labu = m_labu + obs_batch_shift[miss2observation];
         }
 
-        qDataNorm ~ double_exponential(exp(q_labu - qLogStd), 1);
         // model quantitations and missing data
+        qDataNorm ~ double_exponential(exp(q_labu - qLogStd), 1);
         1 ~ bernoulli_logit(q_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         0 ~ bernoulli_logit(m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
     }
@@ -513,6 +513,7 @@ generated quantities {
     vector[Nobjects] obj_base_labu_replCI;
     vector[NobjEffects] obj_effect_replCI;
     vector[Niactions] iaction_labu_replCI;
+    vector[Nsubobjects] suo_llh;
 
     for (i in 1:Nobjects) {
         obj_base_labu_replCI[i] = normal_rng(obj_base_labu[i], obj_base_repl_shift_sigma[i]);
@@ -522,4 +523,38 @@ generated quantities {
     }
     iaction_labu_replCI = csr_matrix_times_vector(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u, obj_base_labu_replCI) +
                           csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect_replCI);
+    // per-subobject loglikelihood (the code copied from "model" section)
+    if (Nsubobjects > 0) {
+        vector[Nquanted] q_labu;
+        vector[Nmissed] m_labu;
+        vector[Nsubobjects] suo_shift;
+
+        suo_shift = suo_shift_unscaled * suo_shift_sigma;
+        // prepare predicted abundances
+        q_labu = obs_labu[quant2observation] + experiment_shift[quant2experiment] + suo_shift[quant2suo];
+        m_labu = obs_labu[miss2observation] + experiment_shift[miss2experiment] + suo_shift[miss2suo];
+
+        if (Nmsprotocols > 1) {
+            vector[(Nmsprotocols-1)*Nsubobjects+1] suo_msproto_shift;
+            suo_msproto_shift[1] = 0.0; // the 1st protocol has no shift (taken care by suo_shift)
+            suo_msproto_shift[2:((Nmsprotocols-1)*Nsubobjects+1)] = suo_msproto_shift_unscaled * suo_msproto_shift_sigma;
+
+            q_labu += suo_msproto_shift[quant2msprotoXsuo];
+            m_labu += suo_msproto_shift[miss2msprotoXsuo];
+        }
+        if (NbatchEffects > 0) {
+          q_labu = q_labu + obs_batch_shift[quant2observation];
+          m_labu = m_labu + obs_batch_shift[miss2observation];
+        }
+
+        // calculate log-likelihood per subobject
+        suo_llh = rep_vector(0.0, Nsubobjects);
+        for (i in 1:Nquanted) {
+          suo_llh[quant2suo[i]] += double_exponential_lpdf(qDataNorm[i] | exp(q_labu[i] - qLogStd[i]), 1) +
+              bernoulli_logit_lpmf(1 | q_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
+        }
+        for (i in 1:Nmissed) {
+          suo_llh[miss2suo[i]] += bernoulli_logit_lpmf(0 | m_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
+        }
+    }
 }

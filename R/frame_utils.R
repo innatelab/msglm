@@ -53,8 +53,10 @@ frame2matrix <- function(df, row_col, col_col, val_col="w", cols=NULL, rows=NULL
   row_vals <- df[[row_col]]
   col_vals <- df[[col_col]]
   w_vals <- df[[val_col]]
-  for (i in 1:nrow(df)) {
-    mtx[row_vals[[i]], col_vals[[i]]] <- w_vals[[i]]
+  if (nrow(df) > 0L) {
+    for (i in 1:nrow(df)) {
+      mtx[row_vals[[i]], col_vals[[i]]] <- w_vals[[i]]
+    }
   }
   return(mtx)
 }

@@ -87,6 +87,8 @@ selectUniprotACs <- function(acs, valid_acs)
     } else {return (NA_character_)}
 }
 
+MaxQuant_NAs <- c("", "NA", "NaN", "n. def.", "n.def.")
+
 read.MaxQuant <- function(filename, layout = c("wide", "long"),
                           row_id_cols = c('protein_ac_noiso'),
                           protein_ac_cols, protein_info = NULL,
@@ -189,7 +191,7 @@ read.MaxQuant.ProteinGroups <- function(folder_path, file_name = 'proteinGroups.
 {
     proteinGroups.df <- read_tsv(file.path(folder_path, file_name), n_max = nrows,
                                  col_types = cols(`Fasta headers` = "c"),
-                                 na = c("", "NA", "n. def.", "n.def."), guess_max = guess_max)
+                                 na = MaxQuant_NAs, guess_max = guess_max)
     col_renames <- c("protgroup_id" = "id", "protein_acs" = "Protein IDs",
                      "majority_protein_acs" = "Majority protein IDs",
                      "gene_names" = "Gene names", "protein_names" = "Protein names",
@@ -253,8 +255,7 @@ read.MaxQuant.Peptides <- function(folder_path, file_name = 'peptides.txt',
                                              `Mod. peptide IDs` = "c",
                                              `Leading razor protein` = "c",
                                              `Charges` = "c"),
-                            na = c("", "NA", "n. def.", "n.def."),
-                            guess_max = 20000L) %>%
+                            na = MaxQuant_NAs, guess_max = 20000L) %>%
         dplyr::mutate(peptide_id = row_number()-1L,
                       is_reverse = !is.na(`Reverse`) & `Reverse` == '+',
                       is_contaminant = !is.na(`Potential contaminant`) & `Potential contaminant` == '+',
@@ -308,8 +309,7 @@ read.MaxQuant.AllPeptides <- function( folder_path, file_name = 'allPeptides.txt
                                                 `Raw file` = "c",
                                                 `Resolution` = "n"
                                ),
-                               na = c("", "NA", "n. def.", "n.def."),
-                               guess_max = 20000L)
+                               na = MaxQuant_NAs, guess_max = 20000L)
     allPeptides.df <- dplyr::rename(allPeptides.df,
                                     pep_type = Type,
                                     raw_file = `Raw file`,
@@ -338,7 +338,7 @@ read.MaxQuant.Sites <- function(folder_path, file_name, nrows = Inf, modif = "Ph
     data.df <- read_tsv(file.path(folder_path, file_name),
                         col_names = TRUE, n_max = nrows,
                         col_types = cols(`Protein group IDs` = col_character(), .default = col_guess()),
-                        na = c("", "NA", "n. def.", "n.def."), guess_max = 20000L)
+                        na = MaxQuant_NAs, guess_max = 20000L)
     sites.df <- data.df %>%
         dplyr::mutate(is_contaminant = !is.na(`Potential contaminant`) & `Potential contaminant` == '+',
                       is_reverse = !is.na(`Reverse`) & `Reverse` == '+') %>%
@@ -415,7 +415,7 @@ read.MaxQuant.Evidence_internal <- function(folder_path, file_name = 'evidence.t
                                              Type = 'c', `Raw file` = 'c', Experiment = 'c',
                                              Modifications = 'c', `Labeling State` = 'c',
                                              .default = col_guess()),
-                            na = c("", "NA", "n. def.", "n.def."), guess_max = guess_max)
+                            na = MaxQuant_NAs, guess_max = guess_max)
 
     message( 'Renaming and converting evidence table columns...' )
     # fix column names from different MQ versions

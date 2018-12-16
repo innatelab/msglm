@@ -16,10 +16,11 @@ conditionXeffect_frame <- function(conditionXeffect_mtx, effects_df) {
 }
 
 # compose replicate effects design matrix
-replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", cond_col="condition", replicate_col="msrun") {
+replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", condition_col="condition", replicate_col="msrun",
+                                     replicate_contrast = "contr.poly") {
   # compose replicate effects
   # ~ (replicate %in% condition) doesn't work because of assymetrical design (diff. N of replicates)
-  mschannels_df <- dplyr::select_at(mschannels_df, c("msrun"=msrun_col, "condition"=cond_col, "replicate"=replicate_col))
+  mschannels_df <- dplyr::select_at(mschannels_df, c("msrun"=msrun_col, "condition"=condition_col, "replicate"=replicate_col))
   msrunXreplEffect_pre.df <- dplyr::group_by(mschannels_df, condition) %>%
     dplyr::do({
       if (n_distinct(.$replicate) <= 1) {
@@ -33,10 +34,10 @@ replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", cond_col=
         cond_msruns.df <- dplyr::mutate(., replicate=factor(replicate))
         mtx <- model.matrix(~ replicate,
                           cond_msruns.df,
-                          contrasts.arg = list("replicate" = "contr.sum"))
+                          contrasts.arg = list("replicate" = replicate_contrast))
         mtx <- mtx[, colnames(mtx) != "(Intercept)", drop=FALSE]
         dimnames(mtx) <- list(msrun = cond_msruns.df$msrun,
-                              repl_effect = paste0(cond_col, cond_msruns.df$condition[1], ':', colnames(mtx)))
+                              repl_effect = paste0(condition_col, cond_msruns.df$condition[1], ':', colnames(mtx)))
         as.data.frame(as.table(mtx)) %>% dplyr::filter(Freq != 0.0) %>%
           dplyr::mutate(msrun = as.character(msrun),
                         repl_effect = as.character(repl_effect))
@@ -44,9 +45,9 @@ replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", cond_col=
     }) %>% dplyr::ungroup()
   repl_col <- paste0(replicate_col, "_effect")
   res <- frame2matrix(msrunXreplEffect_pre.df %>%
-                      dplyr::rename_at("repl_effect", funs(function(x) repl_col)) %>%
-                      dplyr::rename_at("msrun", funs(function(x) msrun_col)),
-                      msrun_col, repl_col, "Freq")
+                      dplyr::rename_at("repl_effect", function(x) replicate_col) %>%
+                      dplyr::rename_at("msrun", function(x) msrun_col),
+                      msrun_col, replicate_col, "Freq")
   res[, !str_detect(colnames(res), "__ignore_replicate__"), drop=FALSE]
 }
 

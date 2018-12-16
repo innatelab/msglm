@@ -452,6 +452,7 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
 }
 
 process.stan_fit <- function(msglm.stan_fit, dims_info,
+                             vars_info = attr(msglm.stan_fit, "msglm_vars_info"),
                              mschannel_col = "msrun_ix",
                              effect_vars = unlist(lapply(vars_info, function(vi) str_subset(vi$names, "_effect(?:_replCI)?$"))),
                              contrast_vars = unlist(lapply(vars_info, function(vi) {
@@ -461,7 +462,6 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                              condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
                              keep.samples=FALSE, verbose=FALSE)
 {
-  vars_info <- attr(msglm.stan_fit, "msglm_vars_info")
   message( 'Extracting MCMC samples...' )
   msglm.stan_samples <- stan.extract_samples(msglm.stan_fit,
                                              pars = unlist(sapply(vars_info, function(vi) vi$names)),

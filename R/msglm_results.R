@@ -313,13 +313,18 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
                            contrastXmetacondition, conditionXmetacondition.df, contrasts.df,
                            mschannel_col = "mschannel_ix",
                            condition_agg_col = "condition", var_names = c('iaction_labu', 'iaction_labu_replCI', 'obs_labu'),
-                           obj_dims = 'glm_object_ix', var_info_cols = 'glm_object_ix', val_trans = NULL,
+                           obj_dim = "object",
+                           obj_id_cols = 'glm_object_ix', var_info_cols = obj_id_cols, val_trans = NULL,
                            condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1)) {
-  contrastXcondition.df <- as.data.frame(as.table(contrastXmetacondition)) %>% dplyr::filter(Freq != 0) %>%
-    dplyr::rename(weight=Freq) %>%
+  contrast_col <- names(dimnames(contrastXmetacondition))[[1]]
+  condition_col <- condition_agg_col
+  metacondition_col <- names(dimnames(contrastXmetacondition))[[2]]
+  contrastXmetacondition.df <- as.data.frame(as.table(contrastXmetacondition)) %>%
+    dplyr::filter(Freq != 0) %>% dplyr::rename(weight=Freq) %>%
+    dplyr::inner_join(contrasts.df)
+  contrastXcondition.df <- contrastXmetacondition.df %>%
     dplyr::inner_join(conditionXmetacondition.df) %>%
-    dplyr::inner_join(contrasts.df) %>%
-    dplyr::arrange(contrast, contrast_type, metacondition, condition)
+    dplyr::arrange_(.dots=c(contrast_col, "contrast_type", metacondition_col, condition_col))
 
   for (vars_category in names(vars_results)) {
     vars_cat_subset_info <- vars_info[[vars_category]]
@@ -328,22 +333,21 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
       message('Filtering ', vars_category, ' to use for contrasts...')
       cond_stats.df <- dplyr::inner_join(vars_results[[vars_category]]$stats,
                                          dplyr::mutate(contrastXcondition.df, is_lhs = weight > 0)) %>%
-        dplyr::group_by_(.dots=c(obj_dims, "contrast", "metacondition", condition_agg_col, "is_lhs")) %>%
+        dplyr::group_by_(.dots=c(obj_id_cols, contrast_col, metacondition_col, condition_agg_col, "is_lhs")) %>%
         dplyr::group_by_(.dots = condition_agg_col, add=TRUE) %>%
         dplyr::summarize(cond_mean = mean(mean)) %>% dplyr::ungroup()
-
-      cond_agg_stats.df <- dplyr::group_by_(cond_stats.df, .dots=c(obj_dims, "contrast", "metacondition", "is_lhs")) %>%
+      cond_agg_stats.df <- dplyr::group_by_(cond_stats.df, .dots=c(obj_id_cols, contrast_col, metacondition_col, "is_lhs")) %>%
         dplyr::group_by_(.dots = condition_agg_col, add=TRUE) %>%
         dplyr::summarize(cond_max_mean = max(cond_mean),
                          cond_min_mean = min(cond_mean)) %>%
-        dplyr::group_by_(.dots=c(obj_dims, "contrast", "metacondition", "is_lhs")) %>%
+        dplyr::group_by_(.dots=c(obj_id_cols, contrast_col, metacondition_col, "is_lhs")) %>%
         dplyr::mutate(cond_max_qtile = cume_dist(cond_max_mean) - 1/n(),
                       cond_min_qtile = cume_dist(cond_min_mean) - 1/n()) %>% dplyr::ungroup() %>%
-        dplyr::select_(.dots = c(obj_dims, "contrast", "metacondition", condition_agg_col,
+        dplyr::select_(.dots = c(obj_id_cols, contrast_col, metacondition_col, condition_agg_col,
                                  "is_lhs", "cond_min_qtile", "cond_max_qtile", "cond_max_mean", "cond_min_mean"))
       # compose threshold dataframe
       contrast_quantile_thresholds <- function(cond_qtls, is_lhs) {
-        res <- data.frame(contrast = unique(cond_agg_stats.df$contrast),
+        res <- data.frame(contrast = unique(cond_agg_stats.df[[contrast_col]]),
                           cond_qtile.min_thresh = 0, cond_qtile.max_thresh = 1,
                           is_lhs = is_lhs,
                           stringsAsFactors = FALSE)
@@ -367,11 +371,11 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
       message( 'Calculating contrasts for ', vars_category, ' variables...' )
       samples.df <- dplyr::semi_join(vars_results[[vars_category]]$samples, cond_stats.df) # exclude unused conditions
       experiment_col <- if (mschannel_col %in% colnames(samples.df)) mschannel_col
-                        else if ('condition' %in% colnames(samples.df)) 'condition'
-                        else 'condition'
+                        else if (condition_col %in% colnames(samples.df)) condition_col
+                        else condition_col
       metacondition2experiments.df <- dplyr::inner_join(dplyr::semi_join(conditionXmetacondition.df, cond_stats.df),
                                                         dplyr::distinct(dplyr::select_(samples.df,
-                                                                                       .dots=unique(c("condition", experiment_col)))))
+                                                                                       .dots=unique(c(condition_col, experiment_col)))))
       if (nrow(samples.df) == 0) {
         # no samples
         vars_results[[vars_category]]$contrast_stats <- NULL
@@ -381,8 +385,8 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
           stop("Unsupported contrast types: ", paste0(unique(contrastXmetacondition.df$contrast_type[invalid_contrast_types]), collapse=" "))
         }
         # include only the object columns that are included in the processed vars_category
-        objs_df <- dplyr::select_(dims_info$object, .dots=intersect(colnames(vars_results[[vars_category]]$stats),
-                                                                    colnames(dims_info$object)))
+        objs_df <- dplyr::select_(dims_info[[obj_dim]], .dots=intersect(colnames(vars_results[[vars_category]]$stats),
+                                                                    colnames(dims_info[[obj_dim]])))
         # adjust samples w.r.t. condition shift
         if ('condition_shift' %in% colnames(samples.df)) {
           for (shift_name in vars_cat_subset_info$names) {
@@ -390,13 +394,13 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
           }
         }
         contrast_stats.df <- vars_contrast_stats(samples.df, vars_cat_subset_info$names,
-                                                 group_cols = obj_dims, condition_col = 'metacondition',
+                                                 group_cols = obj_id_cols, condition_col = metacondition_col,
                                                  experiment_col = experiment_col,
                                                  condition2experiments.df = metacondition2experiments.df,
                                                  contrastXcondition = contrastXmetacondition, val_trans = val_trans)
         var_info.df <- vars_results[[vars_category]]$stats %>%
           dplyr::inner_join(conditionXmetacondition.df) %>%
-          dplyr::select_(.dots = setdiff(var_info_cols, c('index_observation', 'iaction_id', 'condition', condition_agg_col, experiment_col))) %>%
+          dplyr::select_(.dots = setdiff(var_info_cols, c('index_observation', 'iaction_id', condition_col, condition_agg_col, experiment_col))) %>%
           dplyr::distinct()
         # inject contrast statistics into vars_results
         vars_results[[vars_category]]$contrast_stats <- left_join(var_info.df, contrast_stats.df) %>%

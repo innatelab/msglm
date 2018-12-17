@@ -46,7 +46,12 @@ stan.prepare_data <- function(base_input_data, model_data,
   if (any(as.integer(model_data$batch_effects$batch_effect) != seq_len(nrow(model_data$batch_effects)))) {
     stop("model_data$batch_effects are not ordered")
   }
-  obs_df <- dplyr::select(model_data$ms_data, glm_observation_ix, msrun_ix, glm_object_ix, glm_iaction_ix) %>%
+  if (!("mschannel_ix" %in% names(model_data$mschannels))) {
+    warn("No mschannel_ix column found, using msrun_ix")
+    model_data$mschannels$mschannel_ix <- model_data$mschannels$msrun_ix
+    model_data$ms_data$mschannel_ix <- model_data$ms_data$msrun_ix
+  }
+  obs_df <- dplyr::select(model_data$ms_data, glm_observation_ix, mschannel_ix, msrun_ix, glm_object_ix, glm_iaction_ix) %>%
     dplyr::distinct()
   if (any(obs_df$glm_observation_ix != seq_len(nrow(obs_df)))) {
     stop("model_data$ms_data not ordered by observations / have missing observations")
@@ -55,11 +60,11 @@ stan.prepare_data <- function(base_input_data, model_data,
   res <- c(res, list(
     Niactions = nrow(model_data$interactions),
     Nobservations = nrow(obs_df),
-    Nexperiments = n_distinct(model_data$mschannels$msrun_ix),
+    Nexperiments = n_distinct(model_data$mschannels$mschannel_ix),
     Nconditions = nrow(conditionXeffect.mtx),
     Nobjects = n_distinct(model_data$ms_data$glm_object_ix),
     experiment_shift = as.array(model_data$mschannels$model_mschannel_shift),
-    observation2experiment = as.array(obs_df$msrun_ix),
+    observation2experiment = as.array(obs_df$mschannel_ix),
     observation2iaction = as.array(obs_df$glm_iaction_ix),
     iaction2obj = as.array(model_data$interactions$glm_object_ix),
     iaction2condition = as.array(model_data$interactions$condition_ix),

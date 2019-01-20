@@ -46,12 +46,11 @@ vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info, tail = c("bo
    group_cols <- paste0( 'index_', vars_cat_info$dims )
    #print( str(samples.df) )
    #print( str(group_cols ) )
-   p_value_all_samples <- function( samples ) {
-       do.call( rbind, lapply( vars_cat_info$names, function(col) {
-           data.frame( var = col,
-                       p_value = pvalue_not_zero( samples[[col]], tail = tail ),
-                       stringsAsFactors = FALSE )
-           } ) )
+   p_value_all_samples <- function(samples) {
+       bind_rows(lapply(vars_cat_info$names, function(col) {
+           data_frame(var = col,
+                      p_value = pvalue_not_zero(samples[[col]], tail = tail))
+           }))
    }
    p_value.df <- samples.df %>%
         group_by_( .dots = group_cols ) %>%
@@ -196,9 +195,8 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
 {
     res.df <- data.df
     res_index <- extract_index( res.df$var_name )
-    dims.df <- data.frame( ix = seq_along(dim_info),
-                           name = names(dim_info),
-                           stringsAsFactors = FALSE ) %>%
+    dims.df <- data_frame(ix = seq_along(dim_info),
+                          name = names(dim_info)) %>%
       group_by( name ) %>%
       mutate( local_ix = row_number(), suffix = if ( n() > 1 ) paste0( '.', local_ix ) else '' ) %>%
       ungroup()
@@ -239,7 +237,7 @@ stan_samples_frame <- function(stan_samples, var_names, var_dims) {
       warning("Variable(s) samples not found: ", paste0(setdiff(var_names, names(stan_samples)), collapse=", "))
     }
     avail_var_names <- intersect(var_names, names(stan_samples))
-    samples.df <- do.call(data.frame, lapply(avail_var_names, function(var_name) {
+    samples.df <- do.call(data_frame, lapply(avail_var_names, function(var_name) {
       as.vector(stan_samples[[var_name]])
     }))
     if (ncol(samples.df) > 0) {
@@ -291,11 +289,10 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
           return ( data.frame() )
         }
     }
-    res.df <- data.frame(
+    res.df <- data_frame(
             var_name = names(opt_results$par)[res_mask],
-            mean = opt_results$par[ res_mask ],
-            stringsAsFactors = FALSE ) %>%
-      mutate( var = extract_var( var_name ) )
+            mean = opt_results$par[res_mask]) %>%
+      mutate(var = extract_var(var_name))
 
     # add additional dimension information
     if ( length(vars_cat_info$dims) > 0 ) {
@@ -347,10 +344,9 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
                                  "is_lhs", "cond_min_qtile", "cond_max_qtile", "cond_max_mean", "cond_min_mean"))
       # compose threshold dataframe
       contrast_quantile_thresholds <- function(cond_qtls, is_lhs) {
-        res <- data.frame(contrast = unique(cond_agg_stats.df[[contrast_col]]),
+        res <- data_frame(contrast = unique(cond_agg_stats.df[[contrast_col]]),
                           cond_qtile.min_thresh = 0, cond_qtile.max_thresh = 1,
-                          is_lhs = is_lhs,
-                          stringsAsFactors = FALSE)
+                          is_lhs = is_lhs)
         if (is.list(cond_qtls)) {
           rownames(res) <- res$contrast
           res[names(cond_qtls), 'cond_qtile.min_thresh'] <- sapply(cond_qtls, function(qtl) qtl[[1]])

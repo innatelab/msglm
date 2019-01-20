@@ -59,9 +59,8 @@ ms_data.wide <- read.table(file.path(data_path, "proteinGroups.txt"), sep='\t',
   dplyr::rename(majority_protein_ids = `Majority protein IDs`)
 
 ms_data.mtx <- as.matrix(ms_data.wide %>% dplyr::select(starts_with("Intensity ")))
-msruns.df <- data.frame(msrun_id = 1:ncol(ms_data.mtx),
-                        msrun = gsub("Intensity ", "", colnames(ms_data.mtx)[grepl("Intensity", colnames(ms_data.mtx))]),
-                        stringsAsFactors=FALSE) %>%
+msruns.df <- data_frame(msrun_id = 1:ncol(ms_data.mtx),
+                        msrun = gsub("Intensity ", "", colnames(ms_data.mtx)[grepl("Intensity", colnames(ms_data.mtx))])) %>%
   dplyr::mutate(bait_orf = gsub( "-4", "", gsub("_.+$", "", msrun) ),
                 replicate = as.integer(gsub("^.+_", "", msrun)))
 baits.df <- msruns.df %>% dplyr::select(bait_orf) %>% dplyr::distinct() %>%
@@ -352,12 +351,12 @@ apms_glm.stan_samples <- stan.extract_samples( apms_glm.stan_fit,
                                                permuted = TRUE )
 
 dim_info <- list( iteration = NULL,
-                  effect = data.frame( param = all_effects,
-                                       param_type = 'effect', stringsAsFactors = FALSE ),
-                  batch_effect = data.frame( param = all_batch_effects,
-                                             param_type = 'effect', stringsAsFactors = FALSE ),
-                  condition = data.frame( param = all_conditions, index_condition = seq_along(all_conditions),
-                                          param_type = 'condition', stringsAsFactors = FALSE ),
+                  effect = data_frame(param = all_effects,
+                                      param_type = 'effect'),
+                  batch_effect = data_frame(param = all_batch_effects,
+                                            param_type = 'effect'),
+                  condition = data_frame(param = all_conditions, index_condition = seq_along(all_conditions),
+                                         param_type = 'condition'),
                   experiment = model_data$msruns,
                   iaction = dplyr::select(model_data$interactions, iaction_ix, protgroup_ix, condition_ix, bait_ix, condition, bait_orf) %>%
                             dplyr::inner_join(model_data$proteins),

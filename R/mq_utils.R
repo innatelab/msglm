@@ -16,24 +16,24 @@ recombine_dlms <- function(dlms, sep=";") {
     paste0(dlms_expanded[!is.na(dlms_expanded)], collapse=sep)
 }
 
-expand_protgroups <- function(protgroup_ids, sep=";") {
-    protgroups2protgroup.list <- strsplit(protgroup_ids, sep, fixed=TRUE)
+expand_protgroups <- function(protgroup_ids, sep=fixed(";")) {
+    protgroups2protgroup.list <- str_split(protgroup_ids, sep)
     data.frame( protgroup_ids = rep.int(protgroup_ids, sapply(protgroups2protgroup.list, length)),
                 protgroup_id = as.integer(unlist(protgroups2protgroup.list)),
                 stringsAsFactors = FALSE )
 }
 
 expand_sites <- function(sites_df, by=c("protgroup_id", "protein_ac"),
-                         keep_cols=c("site_id"), sep=";")
+                         keep_cols=c("site_id"), sep=fixed(";"))
 {
   exp_by <- match.arg(by)
   collapsed_by <- paste0(exp_by, "s")
-  exp_list <- strsplit(sites_df[[collapsed_by]], sep, fixed=TRUE)
+  exp_list <- str_split(sites_df[[collapsed_by]], sep)
   exp_lengths <- sapply(exp_list, length)
   res <- sites_df[rep.int(1:nrow(sites_df), exp_lengths), c(collapsed_by, keep_cols)]
   res[[exp_by]] <- unlist(exp_list)
   if ("site_ids" %in% colnames(sites_df)) {
-    site_list <- strsplit(sites_df$site_ids, sep, fixed=TRUE)
+    site_list <- str_split(sites_df$site_ids, sep)
     site_lengths <- sapply(site_list, length)
     if (any(site_lengths != exp_lengths)) stop("site lengths mismatch")
     res$site_id <- unlist(site_list)
@@ -43,7 +43,7 @@ expand_sites <- function(sites_df, by=c("protgroup_id", "protein_ac"),
     protein_ac = "positions_in_proteins"
   )
   if (poses_col %in% colnames(sites_df)) {
-    pos_list <- strsplit(sites_df[[poses_col]], sep, fixed=TRUE)
+    pos_list <- str_split(sites_df[[poses_col]], sep)
     pos_lengths <- sapply(pos_list, length)
     if (any(pos_lengths != exp_lengths)) stop("pos lengths mismatch")
     res$position <- as.integer(unlist(pos_list))

@@ -35,8 +35,9 @@ rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NU
 
 # Expands a frame by the column that contains sep-separated list of entities.
 # In the new frame there is a row for each entity.
-expand_collapsed <- function(df, collapsed_col, separated_col, extra_cols=NULL, sep=";") {
-  exp_list <- strsplit(df[[collapsed_col]], sep, fixed=TRUE)
+expand_collapsed <- function(df, collapsed_col, separated_col,
+                             extra_cols=NULL, sep=fixed(";")) {
+  exp_list <- str_split(df[[collapsed_col]], sep)
   exp_lengths <- sapply(exp_list, length)
   res <- df[rep.int(1:nrow(df), exp_lengths), c(collapsed_col, extra_cols)]
   res[[separated_col]] <- unlist(exp_list)

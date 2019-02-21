@@ -68,6 +68,7 @@ data {
   int<lower=0> NobjEffects;
   int<lower=1,upper=Neffects> obj_effect2effect[NobjEffects];
   int<lower=0,upper=1> effect_is_positive[Neffects];
+  vector[Neffects] effect_mean;
 
   int<lower=0> NobjBatchEffects;
   int<lower=1,upper=NbatchEffects> obj_batch_effect2batch_effect[NobjBatchEffects];
@@ -127,6 +128,7 @@ transformed data {
   int<lower=0,upper=NobjEffects> NobjEffectsOther;
   int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects];
   vector<lower=0>[NobjEffects] obj_effect_tau;
+  vector[NobjEffects] obj_effect_mean;
 
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsPos;
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsOther;
@@ -171,6 +173,7 @@ transformed data {
     }
   }
   obj_effect_tau = effect_tau[obj_effect2effect];
+  obj_effect_mean = effect_mean[obj_effect2effect];
 
   // prepare reshuffling of positive/other batch effects
   NobjBatchEffectsPos = sum(batch_effect_is_positive[obj_batch_effect2batch_effect]);
@@ -390,7 +393,7 @@ transformed parameters {
 
   // calculate effects lambdas and scale effects
   obj_effect_sigma = obj_effect_lambda_a ./ sqrt(obj_effect_lambda_t) .* obj_effect_tau;
-  obj_effect = append_row(obj_effect_unscaled_pos, obj_effect_unscaled_other)[obj_effect_reshuffle] .* obj_effect_sigma;
+  obj_effect = obj_effect_mean + append_row(obj_effect_unscaled_pos, obj_effect_unscaled_other)[obj_effect_reshuffle] .* obj_effect_sigma;
 
   // calculate iaction_labu
   iaction_labu = csr_matrix_times_vector(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u, obj_base_labu) +

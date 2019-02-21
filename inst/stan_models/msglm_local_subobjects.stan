@@ -164,10 +164,10 @@ transformed data {
     cur_other_eff = NobjEffectsPos;
     for (i in 1:NobjEffects) {
       if (effect_is_positive[obj_effect2effect[i]]) {
-        cur_pos_eff = cur_pos_eff + 1;
+        cur_pos_eff += 1;
         obj_effect_reshuffle[i] = cur_pos_eff;
       } else {
-        cur_other_eff = cur_other_eff + 1;
+        cur_other_eff += 1;
         obj_effect_reshuffle[i] = cur_other_eff;
       }
     }
@@ -185,10 +185,10 @@ transformed data {
     cur_other_eff = NobjBatchEffectsPos;
     for (i in 1:NobjBatchEffects) {
       if (batch_effect_is_positive[obj_batch_effect2batch_effect[i]]) {
-        cur_pos_eff = cur_pos_eff + 1;
+        cur_pos_eff += 1;
         obj_batch_effect_reshuffle[i] = cur_pos_eff;
       } else {
-        cur_other_eff = cur_other_eff + 1;
+        cur_other_eff += 1;
         obj_batch_effect_reshuffle[i] = cur_other_eff;
       }
     }
@@ -205,7 +205,7 @@ transformed data {
     for (i in 1:Nquanted) {
       qLogStd[i] = intensity_log_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
       qDataNorm[i] = exp(qLogData[i] - qLogStd[i]);
-      qLogStd[i] = qLogStd[i] - global_labu_shift; // obs_labu is modeled without obj_base
+      qLogStd[i] -= global_labu_shift; // obs_labu is modeled without obj_base
     }
   }
   quant2experiment = observation2experiment[quant2observation];

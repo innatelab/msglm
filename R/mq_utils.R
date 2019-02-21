@@ -12,8 +12,8 @@ require(stringr)
 require(CeMMmisc)
 require(quantreg)
 
-recombine_dlms <- function(dlms, sep=";") {
-    dlms_expanded <- unique(unlist(lapply(dlms, strsplit, sep, fixed=TRUE)))
+recombine_dlms <- function(dlms, sep=fixed(";")) {
+    dlms_expanded <- unique(unlist(str_split(dlms, sep)))
     paste0(dlms_expanded[!is.na(dlms_expanded)], collapse=sep)
 }
 

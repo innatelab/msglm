@@ -413,9 +413,11 @@ read.MaxQuant.Evidence_internal <- function(folder_path, file_name = 'evidence.t
                             col_types = cols(Resolution = 'n',
                                             `Protein group IDs` = 'c',
                                             `Oxidation (M) site IDs` = 'c',
+                                            `Met->AHA site IDs` = 'c',
                                             `Peptide ID` = 'i', `Mod. peptide ID` = 'i', `Charge` = 'i',
                                              Type = 'c', `Raw file` = 'c', Experiment = 'c',
                                              Modifications = 'c', `Labeling State` = 'c',
+                                            `Reverse` = "c",
                                              .default = col_guess()),
                             na = MaxQuant_NAs, guess_max = guess_max)
 

@@ -19,8 +19,8 @@ recombine_dlms <- function(dlms, sep=fixed(";")) {
 
 expand_protgroups <- function(protgroup_ids, sep=fixed(";")) {
     protgroups2protgroup.list <- str_split(protgroup_ids, sep)
-    data_frame(protgroup_ids = rep.int(protgroup_ids, sapply(protgroups2protgroup.list, length)),
-               protgroup_id = as.integer(unlist(protgroups2protgroup.list)))
+    tibble(protgroup_ids = rep.int(protgroup_ids, sapply(protgroups2protgroup.list, length)),
+           protgroup_id = as.integer(unlist(protgroups2protgroup.list)))
 }
 
 expand_sites <- function(sites_df, by=c("protgroup_id", "protein_ac"),
@@ -55,6 +55,8 @@ expand_sites <- function(sites_df, by=c("protgroup_id", "protein_ac"),
   }
   return(res)
 }
+
+zero2na <- function(x) if_else(x == 0.0, NA_real_, x)
 
 expand_peptides <- function(peptides_df, by=c("protgroup_id", "protein_ac"),
                             keep_cols=c("start_pos", "end_pos"), sep=";")
@@ -144,17 +146,17 @@ read.MaxQuant <- function(filename, layout = c("wide", "long"),
 
     #print(str(res))
     #print( quant.columns.df )
-    res <- res %>% mutate_at(quant.columns, funs(as.numeric)) %>%
-        group_by_(.dots = paste0('`', row_id_cols, '`')) %>%
-        summarise_at(quant.columns, funs(max)) %>%
+    res <- res %>% mutate_at(quant.columns, as.numeric) %>%
+        group_by(!!row_id_cols) %>%
+        summarise_at(quant.columns, max) %>%
         dplyr::ungroup()
 
     if ( match.arg( layout ) == 'long' ) {
         quant.columns.df$exists <- quant.columns.df$colname %in% colnames(res)
         res[, subset(quant.columns.df,!exists)$colname ] <- NA # add missing column names to make it reshapeable
-        rename_cols <- paste0('`', quant.columns.df$colname, '`')
+        rename_cols <- quant.columns.df$colname
         names(rename_cols) <- quant.columns.df$colname_fixed
-        res <- rename_(res, .dots = rename_cols)
+        res <- rename(res, !!rename_cols)
         quant.columns.full_list <- lapply(measures.fixed, function(mes) subset(quant.columns.df,measure_fixed==mes)$colname_fixed)
         names(quant.columns.full_list) <- measures.fixed
         res <- reshape(res, direction = 'long',
@@ -162,7 +164,7 @@ read.MaxQuant <- function(filename, layout = c("wide", "long"),
                        varying = quant.columns.full_list,
                        v.names = names(quant.columns.full_list),
                        timevar = 'mschannel',
-                       times = sort( unique( quant.columns.df$mschannel )),
+                       times = sort(unique(quant.columns.df$mschannel)),
                        sep = '.')
         res <- inner_join(res, channels.df) %>% mutate(mschannel = NULL) # add mstags and msrun info
         # fix NA
@@ -174,8 +176,8 @@ read.MaxQuant <- function(filename, layout = c("wide", "long"),
         prot_info_cols <- c('protein_label','genename','molweight','contaminant_family')
         join_by <- c(protein_ac_noiso = 'protein_ac_noiso')
         names(join_by) <- names(protein_ac_cols)[[1]]
-        res <- res %>% left_join(dplyr::select_(protein_info, .dots = c('protein_ac_noiso', prot_info_cols)),
-                                 by = join_by)
+        res <- left_join(res, dplyr::select(protein_info, !!c('protein_ac_noiso', prot_info_cols)),
+                         by = join_by)
     }
     return ( res )
 }
@@ -201,7 +203,7 @@ read.MaxQuant.ProteinGroups <- function(folder_path, file_name = 'proteinGroups.
                      "mol_weight_kDa" = "Mol. weight [kDa]", "seqcov" = "Sequence coverage [%]",
                      "unique_razor_seqcov" = "Unique + razor sequence coverage [%]",
                      "is_contaminant" = "Potential contaminant", "is_reverse" = "Reverse")
-    res.df <- dplyr::select_(proteinGroups.df, .dots = backquote(col_renames)[col_renames %in% colnames(proteinGroups.df)]) %>%
+    res.df <- dplyr::select(proteinGroups.df, !!col_renames[col_renames %in% colnames(proteinGroups.df)]) %>%
         dplyr::mutate(is_contaminant = !is.na(is_contaminant) & is_contaminant == '+',
                       is_reverse = !is.na(is_reverse) & is_reverse == '+')
     col_info <- list(protgroup = colnames(res.df))
@@ -209,7 +211,7 @@ read.MaxQuant.ProteinGroups <- function(folder_path, file_name = 'proteinGroups.
         intensities.df <- proteinGroups.df %>% dplyr::select(starts_with("Intensity")) %>%
             gsub_columns("^Intensity\\s([LMH](\\s|$))", "Intensity.\\1") %>%
             gsub_columns("^Intensity(\\s|$)", "Intensity.Sum\\1") %>%
-            mutate_all(., funs(ifelse(.==0.0, NA, .)))
+            mutate_all(zero2na)
         res.df <- bind_cols(res.df, intensities.df)
         col_info$intensity <- colnames(intensities.df)
     }
@@ -217,7 +219,7 @@ read.MaxQuant.ProteinGroups <- function(folder_path, file_name = 'proteinGroups.
         lfq.df <- proteinGroups.df %>% dplyr::select(starts_with("LFQ intensity")) %>%
             gsub_columns("^LFQ intensity\\s([LMH](\\s|$))", "LFQ_Intensity.\\1") %>%
             gsub_columns("^LFQ intensity(\\s|$)", "LFQ_Intensity.Sum\\1") %>%
-            mutate_all(., funs(ifelse(.==0.0, NA, .)))
+            mutate_all(zero2na)
         res.df <- bind_cols(res.df, lfq.df)
         col_info$LFQ <- colnames(lfq.df)
     }
@@ -225,7 +227,7 @@ read.MaxQuant.ProteinGroups <- function(folder_path, file_name = 'proteinGroups.
         ibaq.df <- proteinGroups.df %>% dplyr::select(starts_with("iBAQ")) %>%
             gsub_columns("^iBAQ\\s([LMH](\\s|$))", "iBAQ.\\1") %>%
             gsub_columns("^iBAQ(\\s|$)", "iBAQ.Sum\\1") %>%
-            mutate_all(., funs(ifelse(.==0.0, NA, .)))
+            mutate_all(zero2na)
         res.df <- bind_cols(res.df, ibaq.df)
         col_info$iBAQ <- colnames(ibaq.df)
     }
@@ -238,7 +240,7 @@ read.MaxQuant.ProteinGroups <- function(folder_path, file_name = 'proteinGroups.
     if ('ident_type' %in% import_data) {
         ident_types.df <- proteinGroups.df %>% dplyr::select(starts_with("Identification type")) %>%
           gsub_columns("^Identification\\stype\\s", "ident_type.") %>%
-          mutate_all(., funs(factor(., levels=c("By matching", "By MS/MS"))))
+          mutate_all(~factor(.x, levels=c("By matching", "By MS/MS")))
         res.df <- bind_cols(res.df, ident_types.df)
         col_info$ident_type <- colnames(ident_types.df)
     }
@@ -281,7 +283,7 @@ read.MaxQuant.Peptides <- function(folder_path, file_name = 'peptides.txt',
         intensities.df <- dplyr::select(peptides.df, starts_with("Intensity")) %>%
             gsub_columns("^Intensity\\s([LMH](\\s|$))", "Intensity.\\1") %>%
             gsub_columns("^Intensity(\\s|$)", "Intensity.Sum\\1") %>%
-            mutate_all(., funs(ifelse(.==0.0, NA, .)))
+            mutate_all(zero2na)
         res.df <- bind_cols(res.df, intensities.df)
         col_info$intensity <- colnames(intensities.df)
     }
@@ -295,7 +297,7 @@ read.MaxQuant.Peptides <- function(folder_path, file_name = 'peptides.txt',
     if ('ident_type' %in% import_data) {
         ident_types.df <- dplyr::select(peptides.df, starts_with("Identification type")) %>%
           gsub_columns("^Identification\\stype\\s", "ident_type.") %>%
-          mutate_all(., funs(factor(., levels=c("By matching", "By MS/MS"))))
+          mutate_all(~factor(.x, levels=c("By matching", "By MS/MS")))
         res.df <- bind_cols(res.df, ident_types.df)
         col_info$ident_type <- colnames(ident_types.df)
     }
@@ -375,8 +377,7 @@ read.MaxQuant.Sites <- function(folder_path, file_name, nrows = Inf, modif = "Ph
             gsub_columns("^Intensity\\s([LMH](\\s|_|$))", "Intensity.\\1") %>%
             gsub_columns("^Intensity(\\s|_|$)", "Intensity.Sum\\1") %>%
             gsub_columns("^Intensity.Sum(.+)(___\\d+)$", "Intensity.Sum\\2\\1") %>%
-            mutate_all(., funs(as.numeric)) %>%
-            mutate_all(., funs(ifelse(.==0.0, NA_real_, .)))
+            mutate_all(~zero2na(as.numeric(.x)))
         res.df <- bind_cols(res.df, intensities.df)
         col_info$intensity <- colnames(intensities.df)
     }
@@ -385,14 +386,14 @@ read.MaxQuant.Sites <- function(folder_path, file_name, nrows = Inf, modif = "Ph
             gsub_columns("^(Occupancy\\s|Occupancy ratio|Occupancy error scale\\s)([LMH](\\s|$))", "\\1.\\2") %>%
             gsub_columns("^Occupancy ratio", "occupancy_ratio") %>%
             gsub_columns("^Occupancy error scale", "occupancy_error_scale") %>%
-            mutate_all(funs(as.numeric))
+            mutate_all(as.numeric)
         res.df <- bind_cols(res.df, occupancies.df)
         col_info$occupancy <- colnames(occupancies.df)
     }
     if ('ratio' %in% import_data) {
         ratios.df <- data.df %>% dplyr::select(starts_with("Ratio mode/base")) %>%
             gsub_columns("^Ratio mod/base\\s", "ratio_mod2base.") %>%
-            mutate_all(funs(as.numeric))
+            mutate_all(as.numeric)
         res.df <- bind_cols(res.df, ratios.df)
         col_info$ratio <- colnames(ratios.df)
     }
@@ -454,7 +455,7 @@ read.MaxQuant.Evidence_internal <- function(folder_path, file_name = 'evidence.t
     }
     col_renames <- col_renames[ col_renames %in% colnames(evidence.df) ]
     if (length(col_renames) > 0) {
-        evidence.df <- dplyr::rename_( evidence.df, .dots = backquote(col_renames) )
+        evidence.df <- dplyr::rename(evidence.df, !!col_renames)
     }
     evidence.df <- dplyr::mutate(evidence.df,
                                  msrun = factor(msrun),
@@ -645,10 +646,12 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
     intensity_columns.df <- expand.grid(measure = 'intensity', mstag = ilabels) %>%
         mutate(old_name = paste0('Intensity ', mstag),
                new_name = paste0(measure, '.', mstag),
-               type = if_else(mstag == 'Sum', 'aggregate', if_else(old_name %in% colnames(evidence.df), 'measured', 'missing'))) %>%
-        dplyr::filter( type != 'missing' ) %>%
-        dplyr::mutate( type = factor(type)) %>%
-        dplyr::arrange( mstag )
+               type = case_when(mstag == 'Sum' ~ 'aggregate',
+                                old_name %in% colnames(evidence.df) ~ 'measured',
+                                TRUE ~ 'missing')) %>%
+        dplyr::filter(type != 'missing') %>%
+        dplyr::mutate(type = factor(type)) %>%
+        dplyr::arrange(mstag)
     ilabels <- intensity_columns.df$mstag # restrict to the labels actually used
     msruns.df <- evidence.df %>% dplyr::select(msrun, raw_file) %>% dplyr::distinct()
     mschannels.df <- expand.grid(raw_file = msruns.df$raw_file,
@@ -698,14 +701,14 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
     # NOTE?: the same mod. peptide Id can have multiple mod. sequences (mod at different poses)
     message('Enumerating pepmod states and summarizing channel intensities...')
     intensities.mtx <- as.matrix(evidence.df[,dplyr::filter(intensity_columns.df, mstag != 'Sum')$old_name])
-    intens_cols <- backquote(intensity_columns.df$old_name)
+    intens_cols <- intensity_columns.df$old_name
     names(intens_cols) <- intensity_columns.df$new_name
     evidence.df <- mutate(evidence.df,
                           pepmodstate_id = as.integer(interaction(pepmod_id, charge, drop = TRUE, lex.order = TRUE, sep = '_')),
                           `Intensity Sum` = rowSums(intensities.mtx, na.rm = TRUE),
                           n_quants = rowSums(!is.na(intensities.mtx) & intensities.mtx > 0.0),
                           is_full_quant = !is.na(rowSums(intensities.mtx > 0.0))) %>%
-        dplyr::rename_(.dots=intens_cols)
+        dplyr::rename(!!intens_cols)
 
     message( 'Extracting pepmod states...' )
     pepmodstates.df <- dplyr::select(evidence.df, protgroup_ids, pepmodstate_id, pepmod_id, charge) %>% dplyr::distinct() %>%
@@ -770,14 +773,13 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
         message("Collecting GLM results")
         dplyr::collect(distr.df)
     } else {
-        dplyr::group_by_(pms_full_intensities_long.df, c(glm_group_col, "msprotocol")) %>%
+        dplyr::group_by(pms_full_intensities_long.df, !!c(glm_group_col, "msprotocol")) %>%
             dplyr::do({glm_corrected_intensities(., glm_max_factor = glm.max_factor, glm_reldelta_range = glm.reldelta_range,
                                                  max_npepmods = glm.max_npepmods, min_intensity=min_intensity)})
     }
     pms_full_intensities_long_glm.df <- dplyr::ungroup( pms_full_intensities_long_glm.df ) %>%
         dplyr::select(-intensity_fixed) %>% # remove temporary non-NA column
         bind_rows(dplyr::filter(pms_full_intensities_long.df, mstag == 'Sum'))
-    print(str(pms_full_intensities_long_glm.df))
 
     if (evidence_pepobj == "pepmod") {
       message('Summing intensities of different charges...')
@@ -833,9 +835,9 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
         dplyr::ungroup() %>%
         dplyr::select(-charge) %>%
         left_join(pepmod_stats.df) %>%
-        dplyr::mutate(is_shared_by_groups = grepl( ';', protgroup_ids, fixed = TRUE ),
+        dplyr::mutate(is_shared_by_groups = str_detect(protgroup_ids, fixed(';')),
                       is_shared = is_shared_by_groups,
-                      is_shared_by_proteins = grepl( ';', protein_acs, fixed = TRUE ))
+                      is_shared_by_proteins = str_detect(protein_acs, fixed(';')))
 
     message( 'Extracting peaks information...' )
     peak_columns <- c('pepmodstate_id', 'pepmod_id', 'charge', 'msrun', 'evidence_id', 'n_quants', 'is_full_quant',
@@ -850,15 +852,15 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
                       'Base peak fraction', 'PEP', 'MS/MS Count', 'MS/MS Scan Number', 'Score', 'Delta score', 'Combinatorics',
                       'MS/MS IDs', 'Best MS/MS', 'AIF MS/MS IDs' ) %>%
       .[ . %in% colnames(evidence.df) ]
-    peaks.df <- evidence.df %>% dplyr::select_( .dots = backquote( peak_columns ) ) %>% dplyr::distinct()
+    peaks.df <- evidence.df %>% dplyr::select(!!peak_columns) %>% dplyr::distinct()
 
     ratio_columns.df <- expand.grid(measure = 'ratio',
                                     mstag_nom = unique(dplyr::filter(intensity_columns.df, type == 'measured')$mstag),
                                     mstag_denom = unique(dplyr::filter(intensity_columns.df, type == 'measured')$mstag),
                                     type = c('', 'normalized', 'shift')) %>%
         dplyr::filter(("ratio" %in% import_data) & mstag_nom != mstag_denom) %>%
-        mutate(old_name = gsub('\\s$', '', paste0('Ratio ', mstag_nom, '/', mstag_denom, ' ', type)),
-               inverted_old_name = gsub('\\s$', '', paste0('Ratio ', mstag_denom, '/', mstag_nom, ' ', type)),
+        mutate(old_name = str_replace(paste0('Ratio ', mstag_nom, '/', mstag_denom, ' ', type), '\\s$', ''),
+               inverted_old_name = str_replace(paste0('Ratio ', mstag_denom, '/', mstag_nom, ' ', type), '\\s$', ''),
                suffix = paste0(type, if_else(type != "", '_', ""), mstag_nom, mstag_denom),
                new_name = paste0( measure, '.', suffix ),
                exists = old_name %in% colnames(evidence.df),
@@ -897,17 +899,17 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
                                   trf_old_name = gsub('\\s$', '', paste0(measure, ' ', mstag_nom, '/', mstag_denom, ' ', type)))
                     ) %>%
                     dplyr::filter(type == "")
-                inverted_cols <- backquote(ref_ratio_cols.df$old_name[ref_ratio_cols.df$is_inverted])
+                inverted_cols <- ref_ratio_cols.df$old_name[ref_ratio_cols.df$is_inverted]
                 names(inverted_cols) <- ref_ratio_cols.df$trf_old_name[ref_ratio_cols.df$is_inverted]
                 pre_intensities.df$ref_intensity <- pre_intensities.df[[paste0("Intensity ", correct_by_ratio.ref_label)]]
 
                 agg_ratios.df <- pre_intensities.df %>% dplyr::select(pepmod_id, msrun, ref_intensity, starts_with("Ratio"), mass_error_ppm) %>%
                     dplyr::mutate(ratio_weight = abs(1/mass_error_ppm)/sum(abs(1/mass_error_ppm), na.rm=TRUE)) %>%
-                    dplyr::mutate_at(inverted_cols, funs(1/.)) %>%
-                    dplyr::summarise_each_(funs(if_else(all(is.na(ratio_weight)), NA_real_,
-                                                        weighted.mean(.[!is.na(ratio_weight)],
-                                                                      ratio_weight[!is.na(ratio_weight)], na.rm=TRUE))),
-                                           backquote(ref_ratio_cols.df$trf_old_name))
+                    dplyr::mutate_at(inverted_cols, ~ 1/.) %>%
+                    dplyr::summarise_at(ref_ratio_cols.df$trf_old_name,
+                                        ~ if_else(all(is.na(ratio_weight)), NA_real_,
+                                                 weighted.mean(.[!is.na(ratio_weight)],
+                                                               ratio_weight[!is.na(ratio_weight)], na.rm=TRUE)))
                 ilabels_ordered <- c(as.character(ref_ratio_cols.df$mstag_nom), correct_by_ratio.ref_label)
                 intens_mtx <- as.matrix(intensities.df[paste0("intensity.", ilabels_ordered)])
                 ratios_mtx <- cbind(as.matrix(agg_ratios.df[ref_ratio_cols.df$trf_old_name]),
@@ -948,7 +950,7 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
         dplyr::mutate(has_ident = TRUE) %>%
         tidyr::spread(ident_type, has_ident, sep=".")
     intensities.df <- dplyr::left_join(intensities.df, ident_types.df) %>%
-        mutate_at(vars(starts_with("ident_type")), funs(!is.na(.)))
+        mutate_at(vars(starts_with("ident_type")), ~!is.na(.x))
 
     ratio_columns_sel.df <- dplyr::filter(ratio_columns.df,
                                           mstag_nom < mstag_denom & mstag_denom != 'Sum')
@@ -958,15 +960,14 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
             missing_cols <- dplyr::filter(ratio_columns_sel.df, !exists) %>% .$old_name
             warning(nrow(missing_cols), " ratio column(s) are missing: ", paste(missing_cols, collapse=' '))
         }
-        sel_cols <- backquote(ratio_columns_sel.df$old_name)
+        sel_cols <- ratio_columns_sel.df$old_name
         names(sel_cols) <- ratio_columns_sel.df$new_name
         ratios.df <- intensities.df %>%
-            dplyr::summarise_at(sel_cols, funs(mean(., na.rm=TRUE))) %>%
+            dplyr::summarise_at(sel_cols, ~mean(.x, na.rm=TRUE)) %>%
             dplyr::ungroup()
         ratios.df[,dplyr::filter(ratio_columns_sel.df,!exists)$new_name] <- NA_real_ # add missing column names to make it evidence.df hapeable
         # fix NA
-        ratios.df <- ratios.df %>% mutate_at(ratio_columns_sel.df$new_name,
-                                         funs(if_else(!is.na(.) & .==0, NA_real_, .)))
+        ratios.df <- ratios.df %>% mutate_at(ratio_columns_sel.df$new_name, zero2na)
         if (evidence_msobj == 'mschannel') {
             message( 'Converting ratios to long format...' )
             ratios.df <- reshape(ratios.df, direction = 'long',
@@ -985,8 +986,8 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
     }
     protgroup_ids <- pepmods.df$protgroup_ids %>% unique()
     protgroups2protgroup.list <- strsplit(protgroup_ids, ';', fixed=TRUE)
-    protgroups2protgroup.df <- data_frame(protgroup_ids = rep.int(protgroup_ids, sapply(protgroups2protgroup.list, length)),
-                                          protgroup_id = as.integer(unlist(protgroups2protgroup.list)))
+    protgroups2protgroup.df <- tibble(protgroup_ids = rep.int(protgroup_ids, sapply(protgroups2protgroup.list, length)),
+                                      protgroup_id = as.integer(unlist(protgroups2protgroup.list)))
     res <- list(pepmods = pepmods.df,
                  protgroups2protgroup = protgroups2protgroup.df,
                  raw_files = msruns.df,
@@ -1023,22 +1024,22 @@ read.MaxQuant.Evidence <- function(folder_path, file_name = 'evidence.txt',
 }
 
 msrun_code_parser.f = function(msruns, chunk_names = c('dataset', 'batch', 'frac_protocol', 'fraction', 'tech_replicate')) {
-    msrun_chunks <- strsplit( as.character( msruns ), '_' )
-    n_missing_chunks <- length( chunk_names ) - sapply( msrun_chunks, length )
-    msrun_chunks <- lapply( seq_along(msrun_chunks), function(i) c(msrun_chunks[[i]],rep.int(NA,n_missing_chunks[[i]])) )
-    res <- cbind( msrun = msruns, as.data.frame( do.call( rbind, msrun_chunks ), stringsAsFactors = FALSE ) )
-    colnames(res) <- c( 'msrun', chunk_names )
-    canonical_order <- c('msrun','dataset','experiment','batch','frac_protocol','replicate','fraction','tech_replicate')
-    res[,setdiff(canonical_order,colnames(res))] <- NA
-    res[,canonical_order]
+    msrun_chunks <- str_split(as.character(msruns), fixed('_'))
+    n_missing_chunks <- length(chunk_names) - sapply(msrun_chunks, length)
+    msrun_chunks <- lapply(seq_along(msrun_chunks), function(i) c(msrun_chunks[[i]], rep.int(NA, n_missing_chunks[[i]])))
+    res <- cbind(msrun = msruns, as_tibble(do.call(rbind, msrun_chunks)))
+    colnames(res) <- c('msrun', chunk_names)
+    canonical_order <- c('msrun', 'dataset', 'experiment', 'batch', 'frac_protocol', 'replicate', 'fraction', 'tech_replicate')
+    res[, setdiff(canonical_order, colnames(res))] <- NA
+    res[, canonical_order]
 }
 
 expand_protgroup_acs <- function(protgroups, acs_col,
                                  ac_col = str_replace(acs_col, "_(ac|id)s", "_\\1"),
                                  id_col="protgroup_id", sep=";") {
   acs <- str_split(protgroups[[acs_col]], sep, simplify = FALSE)
-  res <- data_frame(row_ix = rep.int(seq_along(acs), sapply(acs, length)),
-                    prot_ix = unlist(lapply(acs, function(acs) seq_along(acs))))
+  res <- tibble(row_ix = rep.int(seq_along(acs), sapply(acs, length)),
+                prot_ix = unlist(lapply(acs, function(acs) seq_along(acs))))
   res[[id_col]] <- protgroups[[id_col]][res$row_ix]
   res[[ac_col]] <- unlist(acs)
   return (res)

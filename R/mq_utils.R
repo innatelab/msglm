@@ -777,7 +777,7 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
             dplyr::do({glm_corrected_intensities(., glm_max_factor = glm.max_factor, glm_reldelta_range = glm.reldelta_range,
                                                  max_npepmods = glm.max_npepmods, min_intensity=min_intensity)})
     }
-    pms_full_intensities_long_glm.df <- dplyr::ungroup( pms_full_intensities_long_glm.df ) %>%
+    pms_full_intensities_long_glm.df <- dplyr::ungroup(pms_full_intensities_long_glm.df) %>%
         dplyr::select(-intensity_fixed) %>% # remove temporary non-NA column
         bind_rows(dplyr::filter(pms_full_intensities_long.df, mstag == 'Sum'))
 
@@ -862,7 +862,7 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
         mutate(old_name = str_replace(paste0('Ratio ', mstag_nom, '/', mstag_denom, ' ', type), '\\s$', ''),
                inverted_old_name = str_replace(paste0('Ratio ', mstag_denom, '/', mstag_nom, ' ', type), '\\s$', ''),
                suffix = paste0(type, if_else(type != "", '_', ""), mstag_nom, mstag_denom),
-               new_name = paste0( measure, '.', suffix ),
+               new_name = paste0(measure, '.', suffix),
                exists = old_name %in% colnames(evidence.df),
                inverted_exists = inverted_old_name %in% colnames(evidence.df))
 
@@ -871,7 +871,7 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
     # labeled mode favours features that have most quantitations per label
 
     if ("ratio" %in% import_data) {
-        if ( correct_ratios ) {
+        if (correct_ratios) {
             # channel/msrun ratios are more precisely measured than intensities even within the features of same pepmod
             # so calculate average ratios per pepmod and use these ratios to correct the absolute intensities:
             # the ratios of the corrected intensities should match

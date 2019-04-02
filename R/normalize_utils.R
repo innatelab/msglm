@@ -47,16 +47,14 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
     if (nrow(msdata_df) == 0L) {
         # degenerated case, no data
         warning("No valid observations in group ", condgroup_id)
-        res <- data.frame(condition = as.character(msdata_df$condition[1]),
-                          shift = 0.0,
-                          stringsAsFactors = FALSE)
+        res <- tibble(condition = as.character(msdata_df$condition[1]),
+                      shift = 0.0)
         colnames(res) <- c(cond_col, "shift")
         return (res)
     } else if (n_distinct(msdata_df$condition) == 1L) {
         # another degenerated case, single condition
-        res <- data.frame(condition = as.character(msdata_df$condition[1]),
-                          shift = 0.0,
-                          stringsAsFactors = FALSE)
+        res <- tibble(condition = as.character(msdata_df$condition[1]),
+                      shift = 0.0)
         colnames(res) <- c(cond_col, "shift")
         return (res)
     }
@@ -100,9 +98,8 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
                                history_size=10L)
         shift_pars <- norm_fit$par[str_detect(names(norm_fit$par), "^shift\\[\\d+\\]$")]
         shift_ixs <- as.integer(str_match(names(shift_pars), "\\[(\\d+)\\]$")[,2])
-        res <- data.frame(condition = levels(mschan_df$condition)[shift_ixs],
-                          shift = as.numeric(shift_pars),
-                          stringsAsFactors=FALSE)
+        res <- tibble(condition = levels(mschan_df$condition)[shift_ixs],
+                      shift = as.numeric(shift_pars))
     } else if (stan_method == 'mcmc') {
         norm_fit <- sampling(stan_norm_model, stan_input, chains=mcmc.chains, iter=mcmc.iter, thin=mcmc.thin,
                              pars=out_params, include=TRUE,
@@ -122,13 +119,12 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
         shift_pars <- norm_fit_stat[shift_mask, 'mean']
         shift_sd_pars <- norm_fit_stat[shift_mask, 'sd']
         shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[shift_mask], "\\[(\\d+)\\]$")[,2])
-        res <- data.frame(condition = levels(mschan_df$condition)[shift_ixs],
-                          shift = as.numeric(shift_pars),
-                          shift_sd = as.numeric(shift_sd_pars),
-                          Rhat = norm_fit_stat[shift_mask, 'Rhat'],
-                          n_eff = norm_fit_stat[shift_mask, 'n_eff'],
-                          converged = !nonconv_mask.Rhat & !nonconv_mask.neff,
-                          stringsAsFactors=FALSE)
+        res <- tibble(condition = levels(mschan_df$condition)[shift_ixs],
+                      shift = as.numeric(shift_pars),
+                      shift_sd = as.numeric(shift_sd_pars),
+                      Rhat = norm_fit_stat[shift_mask, 'Rhat'],
+                      n_eff = norm_fit_stat[shift_mask, 'n_eff'],
+                      converged = !nonconv_mask.Rhat & !nonconv_mask.neff)
     } else if (stan_method == 'vb') {
         norm_fit <- vb(stan_norm_model, stan_input, iter=vb.iter,
                        pars=out_params, include=TRUE,
@@ -137,9 +133,8 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
         shift_mask <- str_detect(rownames(norm_fit_stat), "^shift\\[\\d+\\]$")
         shift_pars <- norm_fit_stat[shift_mask, 'mean']
         shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[shift_mask], "\\[(\\d+)\\]$")[,2])
-        res <- data.frame(condition = levels(mschan_df$condition)[shift_ixs],
-                          shift = as.numeric(shift_pars),
-                          stringsAsFactors=FALSE)
+        res <- tibble(condition = levels(mschan_df$condition)[shift_ixs],
+                      shift = as.numeric(shift_pars))
     } else {
         stop('Unknown method ', stan_method)
     }
@@ -183,9 +178,8 @@ normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
     names(msdata_df_std) <-c("obj", "mschannel", "condition", "condgroup", "quant")
     if (is.null(mschan_preshifts)) {
       # no shifts by default
-      mschan_preshifts <- data.frame(mschannel = sort(unique(msdata_df_std$mschannel)),
-                                     preshift = rep.int(0.0, n_distinct(msdata_df_std$mschannel)),
-                                     stringsAsFactors = TRUE)
+      mschan_preshifts <- tibble(mschannel = sort(unique(msdata_df_std$mschannel)),
+                                 preshift = rep.int(0.0, n_distinct(msdata_df_std$mschannel)))
     } else {
       mschan_preshifts <- mschan_preshifts[,c(mschan_col, preshift_col)]
       colnames(mschan_preshifts) <- c("mschannel", "preshift")

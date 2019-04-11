@@ -176,7 +176,7 @@ read.MaxQuant <- function(filename, layout = c("wide", "long"),
         prot_info_cols <- c('protein_label','genename','molweight','contaminant_family')
         join_by <- c(protein_ac_noiso = 'protein_ac_noiso')
         names(join_by) <- names(protein_ac_cols)[[1]]
-        res <- left_join(res, dplyr::select(protein_info, !!c('protein_ac_noiso', prot_info_cols)),
+        res <- left_join(res, dplyr::select(protein_info, protein_ac_noiso, !!prot_info_cols),
                          by = join_by)
     }
     return ( res )
@@ -775,7 +775,7 @@ process.MaxQuant.Evidence <- function( evidence.df, evidence.pepobj = c("pepmod"
         message("Collecting GLM results")
         dplyr::collect(distr.df)
     } else {
-        dplyr::group_by(pms_full_intensities_long.df, !!c(glm_group_col, "msprotocol")) %>%
+        dplyr::group_by(pms_full_intensities_long.df, !!glm_group_col, msprotocol) %>%
             dplyr::do({glm_corrected_intensities(., glm_max_factor = glm.max_factor, glm_reldelta_range = glm.reldelta_range,
                                                  max_npepmods = glm.max_npepmods, min_intensity=min_intensity)})
     }
@@ -1074,7 +1074,7 @@ match_protgroups <- function(pgs1, pgs2, suffix = c(".x", ".y")) {
     dplyr::group_by(protgroup_id.y) %>%
     dplyr::filter(is.na(protgroup_id.y) | (is.na(min_ac_match_rank) == all(is.na(min_ac_match_rank)))) %>%
     dplyr::ungroup() %>%
-    dplyr::rename_(.dots=protgroup_vars)
+    dplyr::rename(!!protgroup_vars)
 }
 
 split_protgroups <- function(protgroups.df) {

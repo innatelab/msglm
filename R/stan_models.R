@@ -57,12 +57,12 @@ stan.prepare_data <- function(base_input_data, model_data,
   if (!("mschannel_ix" %in% names(model_data$mschannels))) {
     warn("No mschannel_ix column found, using msrun_ix")
     model_data$mschannels$mschannel_ix <- model_data$mschannels$msrun_ix
-    model_data$ms_data$mschannel_ix <- model_data$ms_data$msrun_ix
+    model_data$msdata$mschannel_ix <- model_data$msdata$msrun_ix
   }
-  obs_df <- dplyr::select(model_data$ms_data, glm_observation_ix, mschannel_ix, msrun_ix, glm_object_ix, glm_iaction_ix) %>%
+  obs_df <- dplyr::select(model_data$msdata, glm_observation_ix, mschannel_ix, msrun_ix, glm_object_ix, glm_iaction_ix) %>%
     dplyr::distinct()
   if (any(obs_df$glm_observation_ix != seq_len(nrow(obs_df)))) {
-    stop("model_data$ms_data not ordered by observations / have missing observations")
+    stop("model_data$msdata not ordered by observations / have missing observations")
   }
   res <- base_input_data
   res <- c(res, list(
@@ -70,7 +70,7 @@ stan.prepare_data <- function(base_input_data, model_data,
     Nobservations = nrow(obs_df),
     Nexperiments = n_distinct(model_data$mschannels$mschannel_ix),
     Nconditions = nrow(conditionXeffect.mtx),
-    Nobjects = n_distinct(model_data$ms_data$glm_object_ix),
+    Nobjects = n_distinct(model_data$msdata$glm_object_ix),
     experiment_shift = as.array(model_data$mschannels$model_mschannel_shift),
     observation2experiment = as.array(obs_df$mschannel_ix),
     observation2iaction = as.array(obs_df$glm_iaction_ix),
@@ -86,11 +86,11 @@ stan.prepare_data <- function(base_input_data, model_data,
     obj_batch_effect2batch_effect = as.array(as.integer(model_data$object_batch_effects$batch_effect)),
     NunderdefObjs = sum(model_data$objects$is_underdefined),
     underdef_objs = as.array(dplyr::filter(model_data$objects, is_underdefined) %>% .$glm_object_ix),
-    Nquanted = sum(!is.na(model_data$ms_data$intensity)),
-    Nmissed = sum(is.na(model_data$ms_data$intensity)),
-    quant2observation = as.array(model_data$ms_data$glm_observation_ix[!is.na(model_data$ms_data$qdata_ix)]),
-    miss2observation = as.array(model_data$ms_data$glm_observation_ix[!is.na(model_data$ms_data$mdata_ix)]),
-    qData = as.array(model_data$ms_data$intensity[!is.na(model_data$ms_data$intensity)]),
+    Nquanted = sum(!is.na(model_data$msdata$intensity)),
+    Nmissed = sum(is.na(model_data$msdata$intensity)),
+    quant2observation = as.array(model_data$msdata$glm_observation_ix[!is.na(model_data$msdata$qdata_ix)]),
+    miss2observation = as.array(model_data$msdata$glm_observation_ix[!is.na(model_data$msdata$mdata_ix)]),
+    qData = as.array(model_data$msdata$intensity[!is.na(model_data$msdata$intensity)]),
     global_labu_shift = global_labu_shift,
     effect_tau = effects.df$tau,
     effect_mean = effects.df$mean,
@@ -100,8 +100,8 @@ stan.prepare_data <- function(base_input_data, model_data,
     obj_base_labu_sigma = 4.0,
     #obj_batch_effect_sigma = 0.25,
     underdef_obj_shift = -8.0#,
-    #zShift = mean(log(ms_data$protgroup_intensities$intensity), na.rm = TRUE),
-    #zScale = 1.0/sd(log(ms_data$protgroup_intensities$intensity), na.rm = TRUE)
+    #zShift = mean(log(msdata$protgroup_intensities$intensity), na.rm = TRUE),
+    #zScale = 1.0/sd(log(msdata$protgroup_intensities$intensity), na.rm = TRUE)
   )) %>%
     modifyList(matrix2csr("iactXobjeff", model_data$iactXobjeff)) %>%
     modifyList(matrix2csr("obsXobjbatcheff", model_data$obsXobjbatcheff))
@@ -110,8 +110,8 @@ stan.prepare_data <- function(base_input_data, model_data,
     # data have subobjects
     res$Nsubobjects <- nrow(model_data$subobjects)
     res$suo2obj <- as.array(as.integer(model_data$subobjects$glm_object_ix))
-    res$quant2suo <- as.array(as.integer(model_data$ms_data$glm_subobject_ix[!is.na(model_data$ms_data$qdata_ix)]))
-    res$miss2suo <- as.array(as.integer(model_data$ms_data$glm_subobject_ix[!is.na(model_data$ms_data$mdata_ix)]))
+    res$quant2suo <- as.array(as.integer(model_data$msdata$glm_subobject_ix[!is.na(model_data$msdata$qdata_ix)]))
+    res$miss2suo <- as.array(as.integer(model_data$msdata$glm_subobject_ix[!is.na(model_data$msdata$mdata_ix)]))
     res$Nmsprotocols <- 0L
     res$experiment2msproto <- integer(0)
   }

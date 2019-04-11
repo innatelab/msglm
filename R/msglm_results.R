@@ -13,7 +13,7 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
     msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, condition),
     iaction = dplyr::select(model_data$interactions, glm_iaction_ix, glm_object_ix, iaction_id, condition_ix, condition) %>%
         dplyr::inner_join(objs_df),
-    observation = dplyr::select(model_data$ms_data, glm_observation_ix, glm_iaction_ix, glm_object_ix,
+    observation = dplyr::select(model_data$msdata, glm_observation_ix, glm_iaction_ix, glm_object_ix,
                                 condition_ix, condition, msrun, msrun_ix) %>%
         dplyr::distinct() %>%
         dplyr::inner_join(objs_df),

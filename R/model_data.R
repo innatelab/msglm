@@ -21,9 +21,8 @@ iactXeffect <- function(expXeff, iact2obj, iact2exp) {
     eff_mask <- colSums(abs(iactXeff)) != 0.0
     if (!any(eff_mask)) return (NULL)
     list(mtx = iactXeff[, eff_mask, drop=FALSE],
-         df = data.frame(eff = colnames(expXeff)[eff_mask],
-                         iact_ix = iact_ix,
-                         stringsAsFactors = FALSE))
+         df = tibble(eff = colnames(expXeff)[eff_mask],
+                     iact_ix = iact_ix))
   })
   objeffs <- unique(unlist(lapply(seq_along(iact_infos),
                            function(iact_ix) if (!is.null(iact_infos[[iact_ix]])) paste0(colnames(iact_infos[[iact_ix]]$mtx), "@", iact2obj[[iact_ix]]) else c())))
@@ -32,9 +31,8 @@ iactXeffect <- function(expXeff, iact2obj, iact2exp) {
   df <- if (any(iact_mask)) {
       bind_rows(lapply(iact_infos_masked, function(iact_info) iact_info$df))
   } else {
-      data.frame(eff = character(),
-                 iact_ix = integer(),
-                 stringsAsFactors = FALSE)
+      tibble(eff = character(),
+             iact_ix = integer())
   }
   df <- df %>%
     dplyr::mutate(obj = iact2obj[iact_ix],

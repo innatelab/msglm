@@ -18,7 +18,7 @@ prepare_observations <- function(data.mtx)
 iactXeffect <- function(expXeff, iact2obj, iact2exp) {
   iact_infos <- lapply(seq_along(iact2obj), function(iact_ix){
     iactXeff <- expXeff[iact2exp[[iact_ix]], , drop=FALSE]
-    eff_mask <- colSums(abs(iactXeff)) != 0.0
+    eff_mask <- colSums(abs(iactXeff), na.rm=TRUE) != 0.0
     if (!any(eff_mask)) return (NULL)
     list(mtx = iactXeff[, eff_mask, drop=FALSE],
          df = tibble(eff = colnames(expXeff)[eff_mask],

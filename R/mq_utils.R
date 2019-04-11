@@ -14,7 +14,7 @@ require(quantreg)
 
 recombine_dlms <- function(dlms, sep=fixed(";")) {
     dlms_expanded <- unique(unlist(str_split(dlms, sep)))
-    paste0(dlms_expanded[!is.na(dlms_expanded)], collapse=sep)
+    na_if(paste0(dlms_expanded[!is.na(dlms_expanded)], collapse=sep), "")
 }
 
 expand_protgroups <- function(protgroup_ids, sep=fixed(";")) {

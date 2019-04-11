@@ -69,7 +69,7 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
       dplyr::mutate(effect = factor(effect, levels=levels(model_data$object_effects$effect))) %>%
       dplyr::arrange(effect)
 
-  obsXobjbatcheff <- iactXeffect(msrunXbatchEffect.mtx[model_data$mschannels$msrun, , drop=FALSE],
+  obsXobjbatcheff <- iactXeffect(msrunXbatchEffect.mtx[unique(model_data$mschannels$msrun), , drop=FALSE],
                                  model_data$observations$glm_object_ix,
                                  model_data$observations$msrun_ix)
   model_data$object_batch_effects <- obsXobjbatcheff$objeff_df %>%

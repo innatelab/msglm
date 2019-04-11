@@ -2,13 +2,13 @@
 prepare_observations <- function(data.mtx)
 {
   data.vec <- as.vector(data.mtx)
-  data.vec[ data.vec == 0 ] <- NA
-  data.obs.mask <- !is.na( data.vec )
-  data.idx <- ifelse( data.obs.mask, cumsum( data.obs.mask ), -cumsum( !data.obs.mask ) )
-  data.idx.arr <- matrix( data.idx, ncol = ncol( data.mtx ) )
-  list( Nobserved = sum(data.obs.mask), # total non-NA  datapoints
-        oData = array( data.vec[ data.obs.mask ] ), # only non-NA values
-        dataIndex = as.array(data.idx.arr) # either index in oData if observed, or -index of non-observed
+  data.vec[data.vec == 0] <- NA
+  data.obs.mask <- !is.na(data.vec)
+  data.idx <- ifelse(data.obs.mask, cumsum(data.obs.mask), -cumsum(!data.obs.mask))
+  data.idx.arr <- matrix(data.idx, ncol = ncol(data.mtx))
+  list(Nobserved = sum(data.obs.mask), # total non-NA  datapoints
+       oData = array(data.vec[data.obs.mask]), # only non-NA values
+       dataIndex = as.array(data.idx.arr) # either index in oData if observed, or -index of non-observed
   )
 }
 
@@ -76,7 +76,8 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
                                  model_data$observations$msrun_ix)
   model_data$object_batch_effects <- obsXobjbatcheff$objeff_df %>%
     dplyr::rename(glm_object_ix = obj,
-                  batch_effect = eff, object_batch_effect = objeff) %>%
+                  batch_effect = eff,
+                  object_batch_effect = objeff) %>%
     dplyr::arrange(object_batch_effect)
   model_data$batch_effects <- dplyr::select(batch_effects.df, batch_effect, is_positive) %>%
       dplyr::mutate(batch_effect = factor(batch_effect, levels=levels(model_data$object_batch_effects$batch_effect))) %>%
@@ -99,5 +100,6 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
     model_data$objects <- dplyr::mutate(model_data$objects,
                                         is_underdefined = FALSE)
   }
+
   return(model_data)
 }

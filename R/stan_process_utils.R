@@ -18,10 +18,10 @@ stan.iterations_frame <- function(stan_result)
   n_chains <- dim( stan_result )[[2]]
   n_thin <- stan_result@sim$thin
 
-  expand.grid( sample_ix = seq_len(n_iterations),
-               chain = seq_len(n_chains) ) %>%
-    mutate( iteration = sample_ix * n_thin,
-            unpermuted_ix = row_number() )
+  expand.grid(sample_ix = seq_len(n_iterations),
+              chain = seq_len(n_chains)) %>%
+    mutate(iteration = sample_ix * n_thin,
+           unpermuted_ix = row_number())
 }
 
 stan.extract_samples <- function(stan_result, pars, min.iteration = NA, permuted = FALSE)

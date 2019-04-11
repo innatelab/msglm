@@ -3,13 +3,13 @@
 # Author: astukalov
 ###############################################################################
 
-append_sparse <- function(stan_data, mtx_name, mtx) {
+# converts matrix to compressed row storage (CSR)
+# wrapper for extract_sparse_parts that uses the specified matrix name
+matrix2csr <- function(mtx_name, mtx) {
     mtx_sparse <- extract_sparse_parts(mtx)
-    stan_data[[paste0(mtx_name, "_Nw")]] <- length(mtx_sparse$w)
-    stan_data[[paste0(mtx_name, "_w")]] <- mtx_sparse$w
-    stan_data[[paste0(mtx_name, "_u")]] <- mtx_sparse$u
-    stan_data[[paste0(mtx_name, "_v")]] <- mtx_sparse$v
-    return(stan_data)
+    mtx_sparse$Nw <- length(mtx_sparse$w)
+    names(mtx_sparse) <- paste0(mtx_name, "_", names(mtx_sparse))
+    return(mtx_sparse)
 }
 
 stan.iterations_frame <- function(stan_result)

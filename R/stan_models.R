@@ -103,8 +103,8 @@ stan.prepare_data <- function(base_input_data, model_data,
     #zShift = mean(log(ms_data$protgroup_intensities$intensity), na.rm = TRUE),
     #zScale = 1.0/sd(log(ms_data$protgroup_intensities$intensity), na.rm = TRUE)
   )) %>%
-    append_sparse("iactXobjeff", model_data$iactXobjeff) %>%
-    append_sparse("obsXobjbatcheff", model_data$obsXobjbatcheff)
+    modifyList(matrix2csr("iactXobjeff", model_data$iactXobjeff)) %>%
+    modifyList(matrix2csr("obsXobjbatcheff", model_data$obsXobjbatcheff))
 
   if ("subobjects" %in% names(model_data)) {
     # data have subobjects

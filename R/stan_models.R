@@ -9,17 +9,24 @@ msglm_normalize.stan_model <- stan_model(file.path(stan_models_path , "msglm_nor
 
 # variables description for msglm_local model
 msglm.vars_info <- list(
-  global = list( names = c('suo_shift_sigma', 'suo_msproto_shift_sigma'), dims=c() ),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
-  #batch_effects = list(names = c('batch_effect_sigma'), dims = c('batch_effect')),
-  iactions = list(names = c('iact_repl_shift_sigma', 'iaction_labu', 'iaction_labu_replCI'), dims = c('iaction')),
-  observations = list(names = c('obs_labu', "obs_repl_shift"), dims = c('observation')),
-  subobjects = list(names = c('suo_shift_unscaled', 'suo_llh'), dims = c('subobject')),
-  subobjectXmsprotocol = list(names = c('suo_msproto_shift_unscaled'), dims=c('subobjectXmsprotocol1')),
-  objects = list(names = c('obj_base_labu', 'obj_base_labu_replCI', "obj_base_repl_shift_sigma"), dims = c('object')),
-  object_effects = list(names = c('obj_effect_sigma', 'obj_effect_repl_shift_sigma', 'obj_effect', 'obj_effect_replCI'),
-                        dims = c('object_effect')),
-  object_batch_effects = list(names = c('obj_batch_effect'), #'obj_batch_effect_unscaled', 'obj_batch_effect_sigma',
-                              dims = c('object_batch_effect'))
+  global = list(names=c('suo_shift_sigma', 'suo_msproto_shift_sigma'),
+                dims=c()),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
+  #batch_effects = list(names = c('batch_effect_sigma'),
+  #                     dims = c('batch_effect')),
+  iactions = list(names=c('iact_repl_shift_sigma', 'iaction_labu', 'iaction_labu_replCI'),
+                  dims=c('iaction')),
+  observations = list(names=c('obs_labu', "obs_repl_shift"),
+                      dims=c('observation')),
+  subobjects = list(names=c('suo_shift_unscaled', 'suo_llh'),
+                    dims=c('subobject')),
+  subobjectXmsprotocol = list(names=c('suo_msproto_shift_unscaled'),
+                              dims=c('subobjectXmsprotocol1')),
+  objects = list(names=c('obj_base_labu', 'obj_base_labu_replCI', "obj_base_repl_shift_sigma"),
+                 dims=c('object')),
+  object_effects = list(names=c('obj_effect_sigma', 'obj_effect_repl_shift_sigma', 'obj_effect', 'obj_effect_replCI'),
+                        dims=c('object_effect')),
+  object_batch_effects = list(names=c('obj_batch_effect'), #'obj_batch_effect_unscaled', 'obj_batch_effect_sigma',
+                              dims=c('object_batch_effect'))
 )
 
 # get the indices of the first rows in a group
@@ -37,7 +44,8 @@ nrows_cumsum <- function(df, group_col) {
 
 stan.prepare_data <- function(base_input_data, model_data,
                               global_labu_shift = global_protgroup_labu_shift,
-                              base_repl_shift_tau=0.1, effect_repl_shift_tau=0.25, batch_tau=0.3)
+                              base_repl_shift_tau=0.1, effect_repl_shift_tau=0.25,
+                              batch_tau=0.3)
 {
   message('Converting MSGLM model data to Stan-readable format...')
   if (any(as.integer(model_data$effects$effect) != seq_len(nrow(model_data$effects)))) {

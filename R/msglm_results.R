@@ -42,23 +42,23 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
 
 vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info, tail = c("both", "negative", "positive"))
 {
-   tail = match.arg(tail)
-   group_cols <- paste0( 'index_', vars_cat_info$dims )
-   #print( str(samples.df) )
-   #print( str(group_cols ) )
-   p_value_all_samples <- function(samples) {
-       bind_rows(lapply(vars_cat_info$names, function(col) {
-           data_frame(var = col,
-                      p_value = pvalue_not_zero(samples[[col]], tail = tail))
-           }))
-   }
-   p_value.df <- samples.df %>%
-        group_by_( .dots = group_cols ) %>%
-        do( p_value_all_samples(.) )
-   if ('fraction' %in% group_cols) {
-     p_value.df$fraction <- as.integer( p_value.df$fraction )
-   }
-   return ( p_value.df )
+  tail = match.arg(tail)
+  group_cols <- paste0('index_', vars_cat_info$dims)
+  #print(str(samples.df))
+  #print(str(group_cols))
+  p_value_all_samples <- function(samples) {
+      bind_rows(lapply(vars_cat_info$names, function(col) {
+          tibble(var = col,
+                 p_value = pvalue_not_zero(samples[[col]], tail = tail))
+          }))
+  }
+  p_value.df <- samples.df %>%
+       group_by_(.dots = group_cols) %>%
+       do(p_value_all_samples(.))
+  if ('fraction' %in% group_cols) {
+    p_value.df$fraction <- as.integer(p_value.df$fraction)
+  }
+  return (p_value.df)
 }
 
 vars_contrast_stats <- function(samples.df, var_names, group_cols,
@@ -71,7 +71,7 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
   n_max_samples <- n_distinct(samples.df$unpermuted_ix)
   if (n_max_samples == 0L) {
     warning("No samples for ", paste0(var_names, collapse=" "), " ", condition_col)
-    return(data.frame())
+    return (data.frame())
   }
   if (is.na(condition_col)) {
     # no conditions specified, assume the same condition for all experiments
@@ -105,7 +105,7 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
     condition2experiments.df <- dplyr::distinct(dplyr::select_(samples.df, condition_col))
   }
 
-  contrast_stats_all_samples <- function( samples ) {
+  contrast_stats_all_samples <- function(samples) {
     #print(str(samples))
     # recode experiment indices to match what is in the samples
     samples_grouped <- dplyr::group_by_(samples, .dots=c(experiment_col))
@@ -142,91 +142,93 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
 
       #print(str(samples.arr))
       res <- insilicoMop:::ContrastStatistics(
-        samples.arr, as.integer(cur_cond2expr.df[[experiment_col]]), as.integer(cur_cond2expr.df[[condition_col]]),
+        samples.arr, as.integer(cur_cond2expr.df[[experiment_col]]),
+        as.integer(cur_cond2expr.df[[condition_col]]),
         cur_contrastXcondition,
         nsteps = nsteps, maxBandwidth = maxBandwidth,
-        quant_probs = quant.probs ) %>%
+        quant_probs = quant.probs) %>%
         as.data.frame(stringsAsFactors = FALSE, optional = TRUE) %>%
         mutate(var = var_col)
       # TODO se_mean, n_eff, Rhat
-      return(res)
+      return (res)
     } ) )
   }
   contrast_stats.df <- dplyr::arrange_(samples.df,
-                                       .dots = c(group_cols, experiment_col, 'iteration', 'chain') ) %>%
-    group_by_( .dots = group_cols ) %>%
-    do( contrast_stats_all_samples(.) ) %>%
+                                       .dots = c(group_cols, experiment_col, 'iteration', 'chain')) %>%
+    group_by_(.dots = group_cols) %>%
+    do(contrast_stats_all_samples(.)) %>%
     dplyr::mutate(mean_log2 = mean/log(2),
                   median_log2 = `50%`/log(2),
                   sd_log2 = sd/log(2))
-  if ( 'fraction' %in% group_cols ) {
-    contrast_stats.df$fraction <- as.integer( contrast_stats.df$fraction )
+  if ('fraction' %in% group_cols) {
+    contrast_stats.df$fraction <- as.integer(contrast_stats.df$fraction)
   }
-  if ( !is.null(dimnames(contrastXcondition)[[1]]) ) {
+  if (!is.null(dimnames(contrastXcondition)[[1]])) {
     contrast_col <- names(dimnames(contrastXcondition))[[1]]
     if (is.null(contrast_col)) {
       contrast_col <- "contrast"
     }
     contrast_stats.df[[contrast_col]] <- dimnames(contrastXcondition)[[1]][contrast_stats.df$index_contrast]
   }
-  return ( contrast_stats.df )
+  return (contrast_stats.df)
 }
 
-.attach_dim_info.by_array_index <- function( samples.df, stan_samples, dim_info )
+.attach_dim_info.by_array_index <- function(samples.df, stan_samples, dim_info)
 {
-    indexes.df <- do.call( cbind, lapply( seq_along(dim_info), function(dim_ix) {
-      slice.index( stan_samples[[ colnames(samples.df)[[ncol(samples.df)]] ]], dim_ix+1 ) %>% as.vector()
-    } ) ) %>% as.data.frame()
-    colnames(indexes.df) <- paste0( 'index_', names(dim_info) )
-    samples.df <- cbind( samples.df, indexes.df )
-    for ( dim_ix in seq_along(dim_info) ) {
+    indexes.df <- do.call(cbind, lapply(seq_along(dim_info), function(dim_ix) {
+      slice.index(stan_samples[[ colnames(samples.df)[[ncol(samples.df)]] ]], dim_ix+1) %>% as.vector()
+    })) %>% as.data.frame()
+    colnames(indexes.df) <- paste0('index_', names(dim_info))
+    samples.df <- cbind(samples.df, indexes.df)
+    for (dim_ix in seq_along(dim_info)) {
       dim_name <- names(dim_info)[[dim_ix]]
-      if ( !is.null(dim_info[[dim_ix]]) ) {
-        message( "Adding ", dim_name, " information" )
-        samples.df <- cbind( samples.df, dim_info[[dim_ix]][ indexes.df[[dim_ix]], , drop=FALSE ] )
+      if (!is.null(dim_info[[dim_ix]])) {
+        message("Adding ", dim_name, " information")
+        samples.df <- cbind(samples.df, dim_info[[dim_ix]][indexes.df[[dim_ix]], , drop=FALSE])
       } else {
-        warning( "No ", dim_name, " information provided" )
+        warning("No ", dim_name, " information provided")
       }
     }
-    return ( samples.df )
+    return (samples.df)
 }
 
-.attach_dim_info.by_var_name <- function( data.df, dim_info )
+.attach_dim_info.by_var_name <- function(data.df, dim_info)
 {
     res.df <- data.df
-    res_index <- extract_index( res.df$var_name )
+    res_index <- extract_index(res.df$var_name)
     dims.df <- data_frame(ix = seq_along(dim_info),
                           name = names(dim_info)) %>%
-      group_by( name ) %>%
-      mutate( local_ix = row_number(), suffix = if ( n() > 1 ) paste0( '.', local_ix ) else '' ) %>%
+      group_by(name) %>%
+      mutate(local_ix = row_number(),
+             suffix = if (n() > 1) paste0('.', local_ix) else '') %>%
       ungroup()
-    indexes.df <- do.call( cbind, lapply( seq_along(dim_info), function(dim_ix) {
-      res_index[,dim_ix]
-    } ) )
-    colnames(indexes.df) <- paste0( 'index_', names(dim_info) )
+    indexes.df <- do.call(cbind, lapply(seq_along(dim_info), function(dim_ix) {
+      res_index[, dim_ix]
+    }))
+    colnames(indexes.df) <- paste0('index_', names(dim_info))
 
-    for ( dim_ix in seq_len(nrow(dims.df)) ) {
-        if ( dim_ix > ncol(res_index) ) {
-            stop( 'Data contain less dimensions than the dim_info' )
+    for (dim_ix in seq_len(nrow(dims.df))) {
+        if (dim_ix > ncol(res_index)) {
+            stop('Data contain less dimensions than the dim_info')
         }
         dim_name <- dims.df$name[[dim_ix]]
-        if ( dims.df$local_ix[[dim_ix]] > 1 ) {
-          warning( 'Dimension ', dim_name, ' is not unique, using suffixes' )
+        if (dims.df$local_ix[[dim_ix]] > 1) {
+          warning('Dimension ', dim_name, ' is not unique, using suffixes')
         }
-        if ( !is.null(dim_info[[dim_ix]]) ) {
+        if (!is.null(dim_info[[dim_ix]])) {
             res.df[[dim_name]] <- NULL
-            if ( nrow(dim_info[[dim_ix]]) != max(res_index[,dim_ix]) ) {
-                stop( 'Dimension #', dim_ix, '(', dim_name,') info contains ', nrow(dim_info[[dim_ix]]),
-                      ' elements, the data contain ', max(res_index[,dim_ix]) )
+            if (nrow(dim_info[[dim_ix]]) != max(res_index[,dim_ix])) {
+                stop('Dimension #', dim_ix, '(', dim_name,') info contains ', nrow(dim_info[[dim_ix]]),
+                     ' elements, the data contain ', max(res_index[,dim_ix]))
             }
-            res_dim_info.df <- dim_info[[dim_ix]][ res_index[,dim_ix], , drop=FALSE ]
-            if ( dims.df$suffix[[dim_ix]] != '' ) {
-              colnames(res_dim_info.df) <- paste0( colnames(res_dim_info.df), dims.df$suffix[dim_ix] )
+            res_dim_info.df <- dim_info[[dim_ix]][res_index[,dim_ix], , drop=FALSE]
+            if (dims.df$suffix[[dim_ix]] != '') {
+              colnames(res_dim_info.df) <- paste0(colnames(res_dim_info.df), dims.df$suffix[dim_ix])
             }
-            res.df <- cbind( res.df, res_dim_info.df )
+            res.df <- cbind(res.df, res_dim_info.df)
         }
     }
-    return ( cbind( indexes.df, res.df ) )
+    return (cbind(indexes.df, res.df))
 }
 
 stan_samples_frame <- function(stan_samples, var_names, var_dims) {
@@ -256,37 +258,38 @@ stan_samples_frame <- function(stan_samples, var_names, var_dims) {
 }
 
 vars_statistics <- function(vars_category, stan_stats, stan_samples, vars_info, dim_info) {
-    message( 'Extracting ', vars_category, ' variables...' )
+    message('Extracting ', vars_category, ' variables...')
     vars_cat_info <- vars_info[[vars_category]]
     samples.df <- stan_samples_frame(stan_samples, vars_cat_info$names, dim_info[vars_cat_info$dims])
     # process convergence information
-    stats.df <- subset( stan_stats, grepl( paste0( '^(', paste0( vars_cat_info$names, collapse='|' ), ')(\\[|$)' ), var_name ) )
-    stats.df$var <- extract_var( stats.df$var_name )
+    stats.df <- subset(stan_stats, grepl( paste0('^(', paste0(vars_cat_info$names, collapse='|'), ')(\\[|$)'), var_name))
+    stats.df$var <- extract_var(stats.df$var_name)
     stats.df <- dplyr::mutate(stats.df,
                               mean_log2 = mean/log(2),
                               median_log2 = `50%`/log(2),
                               sd_log2 = sd/log(2))
-    if ( nrow(stats.df) > 0 && length(vars_cat_info$dims) > 0 ) {
-        stats.df <- .attach_dim_info.by_var_name( stats.df, dim_info[vars_cat_info$dims] )
+    if (nrow(stats.df) > 0 && length(vars_cat_info$dims) > 0) {
+        stats.df <- .attach_dim_info.by_var_name(stats.df, dim_info[vars_cat_info$dims])
     }
-    return ( list( samples=samples.df, stats=stats.df ) )
+    return (list(samples=samples.df, stats=stats.df))
 }
 
 vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
-    message( 'Extracting ', vars_category, ' variables...' )
+    message('Extracting ', vars_category, ' variables...')
     vars_cat_info <- vars_info[[vars_category]]
 
     # extract only samples of selected variables
     # convert arrays of samples of selected variables into data frames,
     # add back single copy of dimensions and real iteration information
-    res_mask <- grepl( paste0( '^(', paste0( vars_cat_info$names, collapse='|' ), ')(\\[|$)' ), names(opt_results$par) )
-    if ( !any(res_mask) ) {
+    res_mask <- grepl(paste0('^(', paste0(vars_cat_info$names, collapse='|'), ')(\\[|$)'), names(opt_results$par))
+    if (!any(res_mask)) {
         # checkf if the variable is degenerated
-        if ( prod( sapply( dim_info[vars_cat_info$dims], nrow ) ) > 0 ) {
-          stop( 'Variables ', paste0( "'", vars_cat_info$names, "'", collapse = ", " ), ' not found in the opt. results' )
+        if (prod(sapply(dim_info[vars_cat_info$dims], nrow)) > 0) {
+          stop('Variables ', paste0("'", vars_cat_info$names, "'", collapse = ", "),
+               ' not found in the opt. results')
         } else {
           # skip the degenerated variable
-          return ( data.frame() )
+          return (data.frame())
         }
     }
     res.df <- data_frame(
@@ -295,15 +298,15 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
       mutate(var = extract_var(var_name))
 
     # add additional dimension information
-    if ( length(vars_cat_info$dims) > 0 ) {
+    if (length(vars_cat_info$dims) > 0) {
         miss_mask <- !(vars_cat_info$dims %in% names(dim_info))
-        if ( any(miss_mask) ) {
-            stop( sum(miss_mask), ' dimension info are missing: ',
-                  paste0( vars_cat_info$dims[miss_mask], collapse = ' ' ) )
+        if (any(miss_mask)) {
+            stop(sum(miss_mask), ' dimension info are missing: ',
+                 paste0(vars_cat_info$dims[miss_mask], collapse = ' '))
         }
-        res.df <- .attach_dim_info.by_var_name( res.df, dim_info[vars_cat_info$dims] )
+        res.df <- .attach_dim_info.by_var_name(res.df, dim_info[vars_cat_info$dims])
     }
-    return ( res.df )
+    return (res.df)
 }
 
 calc_contrasts <- function(vars_results, vars_info, dims_info,
@@ -458,7 +461,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                              condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
                              keep.samples=FALSE, verbose=FALSE)
 {
-  message( 'Extracting MCMC samples...' )
+  message('Extracting MCMC samples...')
   msglm.stan_samples <- stan.extract_samples(msglm.stan_fit,
                                              pars = unlist(sapply(vars_info, function(vi) vi$names)),
                                              min.iteration = min.iteration,
@@ -471,7 +474,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
     monitor(print = FALSE) %>% as.data.frame
   msglm.stan_stats$var_name <- rownames(msglm.stan_stats)
 
-  message( 'Composing results...' )
+  message('Composing results...')
   res <- lapply(names(vars_info), vars_statistics, msglm.stan_stats, msglm.stan_samples,
                 vars_info, dims_info)
   names(res) <- names(vars_info)
@@ -484,7 +487,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                                     dplyr::ungroup() %>%
                                     dplyr::select(-index_contrast, -contrast))
 
-  message( 'Calculating P-values..' )
+  message('Calculating P-values..')
   local({
     for (ctg in names(res)) {
       ctg_subset_info <- vars_info[[ctg]]

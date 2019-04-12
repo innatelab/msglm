@@ -453,8 +453,8 @@ transformed parameters {
     vector[Niactions] preiaction_labu;
     vector[Nmixtions] mixtion_abu;
     vector[Nsupactions] supaction_abu;
-    vector[Nsupactions] supaction_abu_trunc;
-  
+    //vector[Nsupactions] supaction_abu_trunc;
+
     // multiply effects by iactXobjeff, hold off adding obj_base_labu to avoid overflows with exp()
     preiaction_labu = csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect);
     //print("preiaction_labu=", preiaction_labu);

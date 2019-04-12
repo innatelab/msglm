@@ -3,6 +3,8 @@
 # Author: astukalov
 ###############################################################################
 
+require(stringr)
+
 # converts matrix to compressed row storage (CSR)
 # wrapper for extract_sparse_parts that uses the specified matrix name
 matrix2csr <- function(mtx_name, mtx) {
@@ -50,13 +52,14 @@ stan.extract_samples <- function(stan_result, pars, min.iteration = NA, permuted
 }
 
 extract_index <- function(var_names) {
-  res <- apply(do.call(cbind, strsplit(gsub(']$', '', gsub('^[^[]+\\[', '', var_names)), ',')),
-         1, as.integer )
-  if (is.vector(res)) res <- matrix(res, nrow = length(var_names))
-  return (res)
+  var_ndims <- str_count(var_names, fixed(",")) + 1L
+  res <- str_split_fixed(str_remove(str_remove(var_names, '\\]$'), '^[^\\[]+\\['),
+                         fixed(','), var_ndims) %>%
+         as.integer() %>% matrix(ncol=var_ndims)
+  return(res)
 }
 extract_var <- function(var_names) {
-  gsub('\\[(\\d+\\,?)+]$', '', var_names)
+  str_remove(var_names, '\\[(?:\\d+\\,)*\\d+\\]$')
 }
 
 pvalue_not_zero <- function(samples, tail = c("both", "negative", "positive"))

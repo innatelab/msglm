@@ -3,14 +3,14 @@ require(stringr)
 # convert conditionXeffect matrix to a frame and calculate
 # condition2effect weights
 conditionXeffect_frame <- function(conditionXeffect_mtx, effects_df) {
-  as.data.frame(as.table(conditionXeffect_mtx), stringsAsFactors = FALSE) %>%
-    dplyr::filter(Freq != 0) %>% dplyr::rename(mult = Freq) %>%
+  as_tibble(as.table(conditionXeffect_mtx)) %>%
+    dplyr::filter(n != 0) %>% dplyr::rename(mult = n) %>%
     # estimate the weight of a condition in an effect
     dplyr::inner_join(dplyr::select(effects_df, effect, tau)) %>%
     dplyr::mutate(w = tau * mult) %>%
-    dplyr::group_by_(.dots=names(dimnames(conditionXeffect_mtx))[[1]]) %>%
+    dplyr::group_by_at(names(dimnames(conditionXeffect_mtx))[[1]]) %>%
     dplyr::mutate(eff_w = w/sum(w)) %>%
-    dplyr::group_by_(.dots=names(dimnames(conditionXeffect_mtx))[[2]]) %>%
+    dplyr::group_by_at(names(dimnames(conditionXeffect_mtx))[[2]]) %>%
     dplyr::mutate(cond_w = eff_w/sum(eff_w)) %>%
     dplyr::ungroup()
 }
@@ -26,10 +26,9 @@ replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", condition
       if (n_distinct(.$replicate) <= 1) {
         # return stub to keep msrun
         warning(.$condition[[1]], ": single replicate (", .$msrun[[1]], "), no replicate effects")
-        data.frame(msrun = as.character(.$msrun),
-                   repl_effect = paste0("__ignore_replicate__", .$condition[[1]]),
-                   Freq = 0.0,
-                   stringsAsFactors = FALSE)
+        tibble(msrun = as.character(.$msrun),
+               repl_effect = paste0("__ignore_replicate__", .$condition[[1]]),
+               w = 0)
       } else {
         cond_msruns.df <- dplyr::mutate(., replicate=factor(replicate))
         mtx <- model.matrix(~ replicate,
@@ -38,7 +37,8 @@ replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", condition
         mtx <- mtx[, colnames(mtx) != "(Intercept)", drop=FALSE]
         dimnames(mtx) <- list(msrun = cond_msruns.df$msrun,
                               repl_effect = paste0(condition_col, cond_msruns.df$condition[1], ':', colnames(mtx)))
-        as.data.frame(as.table(mtx)) %>% dplyr::filter(Freq != 0.0) %>%
+        as_tibble(as.table(mtx)) %>% dplyr::filter(n != 0.0) %>%
+          dplyr::rename(w = n) %>%
           dplyr::mutate(msrun = as.character(msrun),
                         repl_effect = as.character(repl_effect))
       }
@@ -47,7 +47,7 @@ replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", condition
   res <- frame2matrix(msrunXreplEffect_pre.df %>%
                       dplyr::rename_at("repl_effect", function(x) replicate_col) %>%
                       dplyr::rename_at("msrun", function(x) msrun_col),
-                      msrun_col, replicate_col, "Freq")
+                      msrun_col, replicate_col, "w")
   res[, !str_detect(colnames(res), "__ignore_replicate__"), drop=FALSE]
 }
 

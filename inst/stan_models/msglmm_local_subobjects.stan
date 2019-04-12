@@ -594,8 +594,8 @@ model {
             }
         }
         if (NbatchEffects > 0) {
-          q_labu = q_labu + obs_batch_shift[quant2observation];
-          m_labu = m_labu + obs_batch_shift[miss2observation];
+          q_labu += obs_batch_shift[quant2observation];
+          m_labu += obs_batch_shift[miss2observation];
         }
 
         // model quantitations and missing data

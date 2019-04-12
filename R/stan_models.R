@@ -5,6 +5,7 @@ stan_models_path <- file.path(base_scripts_path, "R/msglm/inst/stan_models") # F
 msglm.stan_model <- stan_model(file.path(stan_models_path, "msglm.stan"), "msglm", save_dso = TRUE, auto_write = TRUE)
 msglm_local.stan_model <- stan_model(file.path(stan_models_path, "msglm_local.stan"), "msglm_local", save_dso = TRUE, auto_write = TRUE)
 msglm_local_subobjects.stan_model <- stan_model(file.path(stan_models_path, "msglm_local_subobjects.stan"), "msglm_local_subobjects", save_dso = TRUE, auto_write = TRUE)
+msglmm_local_subobjects.stan_model <- stan_model(file.path(stan_models_path, "msglmm_local_subobjects.stan"), "msglmm_local_subobjects", save_dso = TRUE, auto_write = TRUE)
 msglm_normalize.stan_model <- stan_model(file.path(stan_models_path , "msglm_normalize.stan"), "msglm_normalize", save_dso = TRUE, auto_write = TRUE)
 
 # variables description for msglm_local model
@@ -29,6 +30,12 @@ msglm.vars_info <- list(
                               dims=c('object_batch_effect'))
 )
 
+msglmm.vars_info <- msglm.vars_info
+msglmm.vars_info$object_mix_effects <- list(names = c("obj_mix_effect", "obj_mix_effect_sigma"),
+                                            dims = c("object_mix_effect"))
+msglmm.vars_info$supactions <- list(names = c("supaction_labu", "supact_repl_shift_sigma"),
+                                    dims = c("supaction"))
+
 # get the indices of the first rows in a group
 # also get the index+1 of the last row
 nrows_cumsum <- function(df, group_col) {
@@ -48,6 +55,7 @@ stan.prepare_data <- function(base_input_data, model_data,
                               batch_tau=0.3)
 {
   message('Converting MSGLM model data to Stan-readable format...')
+  is_glmm <- "mix_effects" %in% names(model_data)
   if (any(as.integer(model_data$effects$effect) != seq_len(nrow(model_data$effects)))) {
     stop("model_data$effects are not ordered")
   }
@@ -59,23 +67,24 @@ stan.prepare_data <- function(base_input_data, model_data,
     model_data$mschannels$mschannel_ix <- model_data$mschannels$msrun_ix
     model_data$msdata$mschannel_ix <- model_data$msdata$msrun_ix
   }
-  obs_df <- dplyr::select(model_data$msdata, glm_observation_ix, mschannel_ix, msrun_ix, glm_object_ix, glm_iaction_ix) %>%
+  xaction_ix_col <- if (is_glmm) "glm_supaction_ix" else "glm_iaction_ix"
+  obs_df <- dplyr::select(model_data$msdata, glm_observation_ix, mschannel_ix, msrun_ix, glm_object_ix, !!xaction_ix_col) %>%
     dplyr::distinct()
   if (any(obs_df$glm_observation_ix != seq_len(nrow(obs_df)))) {
     stop("model_data$msdata not ordered by observations / have missing observations")
   }
+  if (is_glmm && any(as.integer(model_data$mix_effects$mix_effect) !=
+                     seq_len(nrow(model_data$mix_effects)))) {
+    stop("model_data$mix_effects are not ordered")
+  }
   res <- base_input_data
   res <- c(res, list(
-    Niactions = nrow(model_data$interactions),
     Nobservations = nrow(obs_df),
     Nexperiments = n_distinct(model_data$mschannels$mschannel_ix),
     Nconditions = nrow(conditionXeffect.mtx),
     Nobjects = n_distinct(model_data$msdata$glm_object_ix),
     experiment_shift = as.array(model_data$mschannels$model_mschannel_shift),
     observation2experiment = as.array(obs_df$mschannel_ix),
-    observation2iaction = as.array(obs_df$glm_iaction_ix),
-    iaction2obj = as.array(model_data$interactions$glm_object_ix),
-    iaction2condition = as.array(model_data$interactions$condition_ix),
     Neffects = ncol(conditionXeffect.mtx),
     effect_is_positive = as.array(as.integer(model_data$effects$is_positive)),
     NobjEffects = nrow(model_data$object_effects),
@@ -103,9 +112,32 @@ stan.prepare_data <- function(base_input_data, model_data,
     #zShift = mean(log(msdata$protgroup_intensities$intensity), na.rm = TRUE),
     #zScale = 1.0/sd(log(msdata$protgroup_intensities$intensity), na.rm = TRUE)
   )) %>%
-    modifyList(matrix2csr("iactXobjeff", model_data$iactXobjeff)) %>%
     modifyList(matrix2csr("obsXobjbatcheff", model_data$obsXobjbatcheff))
 
+  if (is_glmm) {
+    message("Setting GLMM interaction data...")
+    res$Nmix <- nrow(model_data$mix_effects)
+    res$mix_effect_mean <- as.array(model_data$mix_effects$mean)
+    res$mix_effect_tau <- as.array(model_data$mix_effects$tau)
+
+    res <- modifyList(res, matrix2csr("iactXobjeff", model_data$iactXobjeff))
+    iact_data <- list(Nsupactions = nrow(model_data$superactions),
+                      observation2supaction = as.array(obs_df$glm_supaction_ix),
+                      supaction2obj = as.array(model_data$superactions$glm_object_ix),
+                      Niactions = nrow(model_data$interactions),
+                      iaction2obj = as.array(model_data$interactions$glm_object_ix),
+                      Nmixtions = nrow(model_data$mixtions),
+                      mixt2iact = as.array(model_data$mixtions$glm_iaction_ix),
+                      mixt2mix = as.array(model_data$mixtions$mix_effect_ix))
+    res <- modifyList(res, iact_data)
+    res <- modifyList(res, matrix2csr("supactXmixt", model_data$supactXmixt))
+  } else {
+    res <- modifyList(res, matrix2csr("iactXobjeff", model_data$iactXobjeff))
+    iact_data <- list(Niactions = nrow(model_data$interactions),
+                      observation2iaction = as.array(obs_df$glm_iaction_ix),
+                      iaction2obj = as.array(model_data$interactions$glm_object_ix))
+    res <- modifyList(res, iact_data)
+  }
   if ("subobjects" %in% names(model_data)) {
     # data have subobjects
     res$Nsubobjects <- nrow(model_data$subobjects)
@@ -136,11 +168,17 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
                           adapt_delta=0.9, max_treedepth=11)
 {
     message("Running Stan MCMC...")
-    vars_info <- msglm.vars_info
     if ("Nsubobjects" %in% names(stan_input_data)) {
-      stanmodel <- msglm_local_subobjects.stan_model
+      if ("Nsupactions" %in% names(stan_input_data)) {
+        vars_info <- msglmm.vars_info
+        stanmodel <- msglmm_local_subobjects.stan_model
+      } else {
+        vars_info <- msglm.vars_info
+        stanmodel <- msglm_local_subobjects.stan_model
+      }
     } else {
       stanmodel <- msglm_local.stan_model
+      vars_info <- msglm.vars_info
       # exclude subobject-related
       vars_info$subobjects <- NULL
       vars_info$subobjectXmsprotocol <- NULL

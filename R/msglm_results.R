@@ -5,15 +5,16 @@ require(purrr)
 
 msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
 {
+  is_glmm <- "mix_effects" %in% names(model_data)
+  xaction_ix_col <- if (is_glmm) "glm_supaction_ix" else "glm_iaction_ix"
+
   objs_df <- model_data$objects
   if (!is.null(object_cols)) {
     objs_df <- dplyr::select(objs_df, !!!unique(c("glm_object_ix", object_cols)))
   }
   res <- list(iteration = NULL,
     msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, condition),
-    iaction = dplyr::select(model_data$interactions, glm_iaction_ix, glm_object_ix, iaction_id, condition_ix, condition) %>%
-        dplyr::inner_join(objs_df),
-    observation = dplyr::select(model_data$msdata, glm_observation_ix, glm_iaction_ix, glm_object_ix,
+    observation = dplyr::select(model_data$msdata, glm_observation_ix, !!xaction_ix_col, glm_object_ix,
                                 condition_ix, condition, msrun, msrun_ix) %>%
         dplyr::distinct() %>%
         dplyr::inner_join(objs_df),
@@ -482,12 +483,17 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   names(res) <- names(vars_info)
 
   # add interaction CI with respect to observations variability
-  res$iactions_obsCI <- list(stats = vars_contrast_stats(res$observations$samples,
-                                                         c('obs_labu'),
-                                                         c('glm_iaction_ix', 'glm_iaction_ix', 'condition'),
-                                                         condition_col = NA, contrastXcondition = NULL, mschannel_col) %>%
-                                    dplyr::ungroup() %>%
-                                    dplyr::select(-index_contrast, -contrast))
+  is_glmm <- "supactions" %in% names(res)
+  if (is_glmm) {
+    # FIXME what to do for glmm? there's no interaction observations
+  } else {
+    res$iactions_obsCI <- list(stats = vars_contrast_stats(res$observations$samples,
+                                                           c('obs_labu'),
+                                                           c('glm_iaction_ix', 'glm_iaction_ix', 'condition'),
+                                                           condition_col = NA, contrastXcondition = NULL, mschannel_col) %>%
+                                      dplyr::ungroup() %>%
+                                      dplyr::select(-index_contrast, -contrast))
+  }
 
   message('Calculating P-values..')
   local({

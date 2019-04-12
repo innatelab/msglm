@@ -143,6 +143,7 @@ transformed data {
   int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects];
   vector<lower=0>[NobjEffects] obj_effect_tau;
   vector[NobjEffects] obj_effect_mean;
+  vector[NunderdefObjs > 0 ? Nobjects : 0] obj_base_shift;
 
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsPos;
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsOther;
@@ -174,6 +175,13 @@ transformed data {
   vector[effXeff0_Nw(Nobjects, suo2obj)] suoXsuo_shift0_w;
   int<lower=0, upper=effXeff0_Nw(Nobjects, suo2obj) + 1> suoXsuo_shift0_u[Nsubobjects + 1];
   int<lower=0, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[effXeff0_Nw(Nobjects, suo2obj)];
+
+  if (NunderdefObjs > 0) {
+    obj_base_shift = rep_vector(0.0, Nobjects);
+    for (i in 1:NunderdefObjs) {
+      obj_base_shift[underdef_objs[i]] = underdef_obj_shift;
+    }
+  }
 
   // prepare reshuffling of positive/other obj effects
   NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
@@ -425,10 +433,11 @@ transformed parameters {
 
   vector[Nsubobjects] suo_shift_unscaled; // subcomponent shift within object
 
-  // correct baseline abundances of underdefined objects
-  obj_base_labu = obj_base_labu0;
-  for (i in 1:NunderdefObjs) {
-    obj_base_labu[underdef_objs[i]] = obj_base_labu[underdef_objs[i]] + underdef_obj_shift;
+  if (NunderdefObjs > 0) {
+    // correct baseline abundances of underdefined objects
+    obj_base_labu = obj_base_labu0 + obj_base_shift;
+  } else {
+    obj_base_labu = obj_base_labu0;
   }
 
   // calculate obj_mix_effects

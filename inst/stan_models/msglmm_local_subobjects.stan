@@ -178,7 +178,7 @@ transformed data {
   int<lower=1, upper=effXeff0_Nw(Nsupactions, observation2supaction) + 1> obsXobs_shift0_u[Nobservations + 1];
   int<lower=1, upper=Nobservations - Nsupactions> obsXobs_shift0_v[effXeff0_Nw(Nsupactions, observation2supaction)];
 
-  int<lower=0> suoXsuo0_Nw;
+  int<lower=0> suoXsuo_shift0_Nw;
   vector[effXeff0_Nw(Nobjects, suo2obj)] suoXsuo_shift0_w;
   int<lower=0, upper=effXeff0_Nw(Nobjects, suo2obj) + 1> suoXsuo_shift0_u[Nsubobjects + 1];
   int<lower=0, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[effXeff0_Nw(Nobjects, suo2obj)];
@@ -318,7 +318,7 @@ transformed data {
   // prepare supactXmixt matrix
   for (i in 1:Nmixtions) mixt2mix_ext[i] = mixt2mix[i] + 1;
 
-  suoXsuo0_Nw = effXeff0_Nw(Nobjects, suo2obj);
+  suoXsuo_shift0_Nw = effXeff0_Nw(Nobjects, suo2obj);
   suoXsuo_shift0_u = rep_array(0, Nsubobjects+1);
   if (Nsubobjects > 0) {
     int obj2nsuo[Nobjects];

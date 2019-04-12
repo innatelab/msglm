@@ -448,17 +448,17 @@ transformed parameters {
   
     // multiply effects by iactXobjeff, hold off adding obj_base_labu to avoid overflows with exp()
     preiaction_labu = csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect);
-    #print("preiaction_labu=", preiaction_labu);
+    //print("preiaction_labu=", preiaction_labu);
     // distribute iaction_labu components to mixtures and convert to exponent
     mixtion_abu = exp(preiaction_labu[mixt2iact] + append_row(1.0, obj_mix_effect)[mixt2mix_ext]);
-    #print("mixtion_abu=", mixtion_abu);
+    //print("mixtion_abu=", mixtion_abu);
     // do mixing
     supaction_abu = csr_matrix_times_vector(Nsupactions, Nmixtions, supactXmixt_w, supactXmixt_v, supactXmixt_u, mixtion_abu);
-    #print("supaction_abu=", supaction_abu);
-    #for (i in 1:Nsupactions) {
-    #  supaction_abu_trunc[i] = fmax(supaction_abu[i], 1E-5);
-    #}
-    #print("supaction_abu_trunc=", supaction_abu_trunc);
+    //print("supaction_abu=", supaction_abu);
+    //for (i in 1:Nsupactions) {
+    //  supaction_abu_trunc[i] = fmax(supaction_abu[i], 1E-5);
+    //}
+    //print("supaction_abu_trunc=", supaction_abu_trunc);
     // convert to log back and add obj_base_labu shifts
     supaction_labu = log(supaction_abu) +
           csr_matrix_times_vector(Nsupactions, Nobjects, supactXobjbase_w, supaction2obj,

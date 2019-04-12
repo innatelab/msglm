@@ -8,8 +8,9 @@ functions {
         vector[n] scores;
         matrix[n, n] x;
         matrix[n, n] r;
+        row_vector[n] r_norm;
 
-        for (i in 1:n) scores[i] = i;
+        for (i in 1:n) scores[i] = i*inv(n);
         scores -= mean(scores);
 
         for (i in 1:n) {
@@ -18,7 +19,13 @@ functions {
             }
         }
         r = qr_Q(x) * diag_matrix(diagonal(qr_R(x)));
-        r ./= rep_matrix(sqrt(columns_dot_self(r)), n);
+        r_norm = sqrt(columns_dot_self(r));
+        for (i in 1:n) {
+          if (r_norm[i] == 0.0) {
+            r_norm[i] = 1.0;
+          }
+        }
+        r ./= rep_matrix(r_norm, n);
         return block(r, 1, 2, n, n-1);
     }
 

@@ -178,10 +178,9 @@ transformed data {
   int<lower=1, upper=effXeff0_Nw(Nsupactions, observation2supaction) + 1> obsXobs_shift0_u[Nobservations + 1];
   int<lower=1, upper=Nobservations - Nsupactions> obsXobs_shift0_v[effXeff0_Nw(Nsupactions, observation2supaction)];
 
-  int<lower=0> suoXsuo_shift0_Nw;
-  vector[effXeff0_Nw(Nobjects, suo2obj)] suoXsuo_shift0_w;
-  int<lower=0, upper=effXeff0_Nw(Nobjects, suo2obj) + 1> suoXsuo_shift0_u[Nsubobjects + 1];
-  int<lower=0, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[effXeff0_Nw(Nobjects, suo2obj)];
+  vector[Nsubobjects > 0 ? Nsubobjects - Nobjects : 0] suoXsuo_shift0_w;
+  int<lower=0, upper=(Nsubobjects > 0 ? Nsubobjects - Nobjects + 1 : 0)> suoXsuo_shift0_u[Nsubobjects + 1];
+  int<lower=0, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[Nsubobjects - Nobjects];
 
   if (NunderdefObjs > 0) {
     obj_base_shift = rep_vector(0.0, Nobjects);
@@ -318,55 +317,26 @@ transformed data {
   // prepare supactXmixt matrix
   for (i in 1:Nmixtions) mixt2mix_ext[i] = mixt2mix[i] + 1;
 
-  suoXsuo_shift0_Nw = effXeff0_Nw(Nobjects, suo2obj);
-  suoXsuo_shift0_u = rep_array(0, Nsubobjects+1);
   if (Nsubobjects > 0) {
-    int obj2nsuo[Nobjects];
+    # subXsuo_shift0 matrix fixes the shift of the first subobject of each
+    # object to 0
+    int last_obj_ix;
+    suoXsuo_shift0_w = rep_vector(1.0, Nsubobjects - Nobjects);
 
-    int obj2nsuo_2ndpass[Nobjects];
-    int obj2suo_shift0_offset[Nobjects];
+    for (i in 1:Nsubobjects-Nobjects) suoXsuo_shift0_v[i] = i;
 
-    int suoXsuo_shift0_offset;
-    int suo_shift0_offset;
-
-    obj2nsuo = rep_array(0, Nobjects);
+    last_obj_ix = 0;
     for (i in 1:Nsubobjects) {
-      int obj_ix;
-      obj_ix = suo2obj[i];
-      obj2nsuo[obj_ix] += 1;
+      suoXsuo_shift0_u[i] = i - last_obj_ix;
+      if (last_obj_ix != suo2obj[i]) {
+        last_obj_ix = suo2obj[i];
+      }
     }
-    //print("object2nsuo=", object2nsuo);
-    suo_shift0_offset = 0;
-    suoXsuo_shift0_offset = 0;
-    suoXsuo_shift0_u[1] = 1;
-    obj2nsuo_2ndpass = rep_array(0, Nobjects);
-    obj2suo_shift0_offset = rep_array(0, Nobjects);
-    for (i in 1:Nsubobjects) {
-        int obj_ix;
-        int obj_nsuo;
-        obj_ix = suo2obj[i];
-        //print("obj_ix[", i, "]=", obj_ix);
-        obj_nsuo = obj2nsuo[obj_ix];
-        if (obj_nsuo > 1) {
-            // (re)generate contr_poly for interaction FIXME pre-build contr_poly for 2..max_nsuo
-            matrix[obj_nsuo, obj_nsuo-1] obj_suoXsuo0 = contr_poly(obj_nsuo);
-
-            if (obj2nsuo_2ndpass[obj_ix] == 0) {
-                // reserve (nsuo-1) suo_shift0 variables
-                obj2suo_shift0_offset[obj_ix] = suo_shift0_offset;
-                suo_shift0_offset += obj_nsuo-1;
-                //print("suo_shift0_offset=", suo_shift0_offset);
-            }
-            obj2nsuo_2ndpass[obj_ix] += 1;
-            // add 2npass-th row of obj_suoXsuo0 to the suoXsuo0
-            for (j in 1:cols(obj_suoXsuo0)) {
-                suoXsuo_shift0_v[suoXsuo_shift0_offset + j] = obj2suo_shift0_offset[obj_ix] + j;
-                suoXsuo_shift0_w[suoXsuo_shift0_offset + j] = obj_suoXsuo0[obj2nsuo_2ndpass[obj_ix], j];
-            }
-            suoXsuo_shift0_u[i+1] = suoXsuo_shift0_u[i] + cols(obj_suoXsuo0);
-            suoXsuo_shift0_offset += cols(obj_suoXsuo0);
-        }
-    }
+    suoXsuo_shift0_u[Nsubobjects + 1] = Nsubobjects - Nobjects + 1;
+    #print("suoXsuo_shift0_u=", suoXsuo_shift0_u);
+    #print("suoXsuo_shift0_v=", suoXsuo_shift0_v);
+    #print("suoXsuo_shift0=", csr_to_dense_matrix(Nsubobjects, Nsubobjects - Nobjects,
+    #      suoXsuo_shift0_w, suoXsuo_shift0_v, suoXsuo_shift0_u));
 
     if (Nmsprotocols > 1) {
       // all references to the 1st protocol are redirected to index 1 (this shift is always 0)

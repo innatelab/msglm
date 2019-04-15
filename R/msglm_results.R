@@ -19,10 +19,10 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
         dplyr::distinct() %>%
         dplyr::inner_join(objs_df),
     object = model_data$objects, # use full object information
-    object_effect = model_data$object_effects %>%
+    object_effect = dplyr::select(model_data$object_effects, -one_of("mean")) %>%
         dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
         dplyr::inner_join(objs_df),
-    object_batch_effect = model_data$object_batch_effects %>%
+    object_batch_effect = dplyr::select(model_data$object_batch_effects, -one_of("mean")) %>%
         dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
         dplyr::inner_join(objs_df)
   )
@@ -41,7 +41,7 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
   }
   if (is_glmm) {
     res$object_mix_effect <- dplyr::mutate(model_data$mix_effects, tmp="a") %>%
-      left_join(mutate(objs_df, tmp="a")) %>% select(-tmp)
+      left_join(mutate(objs_df, tmp="a")) %>% select(-tmp, -one_of("mean"))
     res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,
                                  glm_object_ix, iaction_id, action_ix, action, is_virtual) %>%
         dplyr::inner_join(objs_df) %>%

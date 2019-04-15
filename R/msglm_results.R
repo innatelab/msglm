@@ -39,6 +39,21 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
                                              rep(res$msprotocol[-1], each=nrow(res$subobject)))
     }
   }
+  if (is_glmm) {
+    res$object_mix_effect <- dplyr::mutate(model_data$mix_effects, tmp="a") %>%
+      left_join(mutate(objs_df, tmp="a")) %>% select(-tmp)
+    res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,
+                                 glm_object_ix, iaction_id, action_ix, action, is_virtual) %>%
+        dplyr::inner_join(objs_df) %>%
+        dplyr::rename(condition = action) # FIXME: hack to make contrasts works
+    res$supaction <- dplyr::select(model_data$superactions, glm_supaction_ix,
+                                   glm_object_ix, supaction_id, condition_ix, condition, is_virtual) %>%
+        dplyr::inner_join(objs_df)
+  } else {
+    res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,
+                                 glm_object_ix, iaction_id, condition_ix, condition, is_virtual) %>%
+        dplyr::inner_join(objs_df)
+  }
   return(res)
 }
 
@@ -460,7 +475,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                              mschannel_col = "msrun_ix",
                              effect_vars = unlist(lapply(vars_info, function(vi) str_subset(vi$names, "_effect(?:_replCI)?$"))),
                              contrast_vars = unlist(lapply(vars_info, function(vi) {
-                               rel_dims <- names(dims_info)[sapply(names(dims_info), function(dname) any(str_detect(colnames(dims_info[[dname]]), "^(msrun|mschannel|condition)")))]
+                               rel_dims <- names(dims_info)[sapply(names(dims_info), function(dname) any(str_detect(colnames(dims_info[[dname]]), "^(msrun|mschannel|condition|action)")))]
                                if (any(vi$dims %in% rel_dims)) str_subset(vi$names, "(?:labu|shift)(?:_replCI)?$") else c()
                               })),
                              condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),

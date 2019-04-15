@@ -329,7 +329,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
   for (vars_category in names(vars_results)) {
     vars_cat_subset_info <- vars_info[[vars_category]]
     vars_cat_subset_info$names <- intersect(vars_cat_subset_info$names, var_names)
-    if ( length(vars_cat_subset_info$names) > 0 ) {
+    if (length(vars_cat_subset_info$names) > 0) {
       message('Filtering ', vars_category, ' to use for contrasts...')
       cond_stats.df <- dplyr::inner_join(vars_results[[vars_category]]$stats,
                                          dplyr::mutate(contrastXcondition.df, is_lhs = weight > 0)) %>%
@@ -367,7 +367,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
         dplyr::mutate(is_accepted = (cond_min_qtile >= cond_qtile.min_thresh) &
                                     (cond_max_qtile <= cond_qtile.max_thresh))
       cond_stats.df <- dplyr::filter(cond_stats.df, is_accepted)
-      message( 'Calculating contrasts for ', vars_category, ' variables...' )
+      message('Calculating contrasts for ', vars_category, ' variables...')
       samples.df <- dplyr::semi_join(vars_results[[vars_category]]$samples, cond_stats.df) # exclude unused conditions
       experiment_col <- if (mschannel_col %in% colnames(samples.df)) mschannel_col
                         else if (condition_col %in% colnames(samples.df)) condition_col
@@ -381,7 +381,9 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
       } else {
         invalid_contrast_types <- !(contrastXmetacondition.df$contrast_type %in% c("filter", "filtering", "comparison"))
         if (any(invalid_contrast_types)) {
-          stop("Unsupported contrast types: ", paste0(unique(contrastXmetacondition.df$contrast_type[invalid_contrast_types]), collapse=" "))
+          stop("Unsupported contrast types: ",
+               paste0(unique(contrastXmetacondition.df$contrast_type[invalid_contrast_types]),
+                      collapse=" "))
         }
         # include only the object columns that are included in the processed vars_category
         objs_df <- dplyr::select(dims_info[[obj_dim]], !!!intersect(colnames(vars_results[[vars_category]]$stats),
@@ -389,7 +391,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
         # adjust samples w.r.t. condition shift
         if ('condition_shift' %in% colnames(samples.df)) {
           for (shift_name in vars_cat_subset_info$names) {
-            samples.df[,shift_name] <- samples.df[,shift_name] - samples.df$condition_shift
+            samples.df[, shift_name] <- samples.df[, shift_name] - samples.df$condition_shift
           }
         }
         contrast_stats.df <- vars_contrast_stats(samples.df, vars_cat_subset_info$names,

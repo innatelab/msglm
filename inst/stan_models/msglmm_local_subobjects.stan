@@ -10,7 +10,7 @@ functions {
         matrix[n, n] r;
         row_vector[n] r_norm;
 
-        for (i in 1:n) scores[i] = i*inv(n);
+        for (i in 1:n) scores[i] = i; //*inv(n);
         scores -= mean(scores);
 
         for (i in 1:n) {
@@ -20,6 +20,7 @@ functions {
         }
         r = qr_Q(x) * diag_matrix(diagonal(qr_R(x)));
         r_norm = sqrt(columns_dot_self(r));
+        //print("r_norm=", r_norm);
         for (i in 1:n) {
           if (r_norm[i] == 0.0) {
             r_norm[i] = 1.0;

@@ -319,8 +319,8 @@ transformed data {
   for (i in 1:Nmixtions) mixt2mix_ext[i] = mixt2mix[i] + 1;
 
   if (Nsubobjects > 0) {
-    # subXsuo_shift0 matrix fixes the shift of the first subobject of each
-    # object to 0
+    // subXsuo_shift0 matrix fixes the shift of the first subobject of each
+    // object to 0
     int last_obj_ix;
     suoXsuo_shift0_w = rep_vector(1.0, Nsubobjects - Nobjects);
 
@@ -334,10 +334,10 @@ transformed data {
       }
     }
     suoXsuo_shift0_u[Nsubobjects + 1] = Nsubobjects - Nobjects + 1;
-    #print("suoXsuo_shift0_u=", suoXsuo_shift0_u);
-    #print("suoXsuo_shift0_v=", suoXsuo_shift0_v);
-    #print("suoXsuo_shift0=", csr_to_dense_matrix(Nsubobjects, Nsubobjects - Nobjects,
-    #      suoXsuo_shift0_w, suoXsuo_shift0_v, suoXsuo_shift0_u));
+    //print("suoXsuo_shift0_u=", suoXsuo_shift0_u);
+    //print("suoXsuo_shift0_v=", suoXsuo_shift0_v);
+    //print("suoXsuo_shift0=", csr_to_dense_matrix(Nsubobjects, Nsubobjects - Nobjects,
+    //      suoXsuo_shift0_w, suoXsuo_shift0_v, suoXsuo_shift0_u));
 
     if (Nmsprotocols > 1) {
       // all references to the 1st protocol are redirected to index 1 (this shift is always 0)

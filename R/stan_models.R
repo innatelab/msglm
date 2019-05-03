@@ -1,10 +1,3 @@
-stan_models_path <- file.path(base_scripts_path, "R/msglm/inst/stan_models") # FIXME
-msglm.stan_model <- stan_model(file.path(stan_models_path, "msglm.stan"), "msglm", save_dso = TRUE, auto_write = TRUE)
-msglm_local.stan_model <- stan_model(file.path(stan_models_path, "msglm_local.stan"), "msglm_local", save_dso = TRUE, auto_write = TRUE)
-msglm_local_subobjects.stan_model <- stan_model(file.path(stan_models_path, "msglm_local_subobjects.stan"), "msglm_local_subobjects", save_dso = TRUE, auto_write = TRUE)
-msglmm_local_subobjects.stan_model <- stan_model(file.path(stan_models_path, "msglmm_local_subobjects.stan"), "msglmm_local_subobjects", save_dso = TRUE, auto_write = TRUE)
-msglm_normalize.stan_model <- stan_model(file.path(stan_models_path , "msglm_normalize.stan"), "msglm_normalize", save_dso = TRUE, auto_write = TRUE)
-
 # variables description for msglm_local model
 msglm.vars_info <- list(
   global = list(names=c('suo_shift_sigma', 'suo_msproto_shift_sigma'),
@@ -162,6 +155,14 @@ stan.prepare_data <- function(base_input_data, model_data,
   return(res)
 }
 
+msglm_stan_model <- function(model_name) {
+  stan_models_path <- system.file('stan_models', package="msglm", mustWork=FALSE)
+  message("Loading ", model_name, " Stan model")
+  return (rstan::stan_model(file.path(stan_models_path, paste0(model_name, ".stan")),
+                            model_name, save_dso = TRUE, auto_write = TRUE))
+}
+
+#' @export
 stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
                           adapt_delta=0.9, max_treedepth=11)
 {
@@ -169,13 +170,13 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
     if ("Nsubobjects" %in% names(stan_input_data)) {
       if ("Nsupactions" %in% names(stan_input_data)) {
         vars_info <- msglmm.vars_info
-        stanmodel <- msglmm_local_subobjects.stan_model
+        stanmodel <- msglm_stan_model("msglmm_local_subobjects")
       } else {
         vars_info <- msglm.vars_info
-        stanmodel <- msglm_local_subobjects.stan_model
+        stanmodel <- msglm_stan_model("msglm_local_subobjects")
       }
     } else {
-      stanmodel <- msglm_local.stan_model
+      stanmodel <- msglm_stan_model("msglm_local")
       vars_info <- msglm.vars_info
       # exclude subobject-related
       vars_info$subobjects <- NULL

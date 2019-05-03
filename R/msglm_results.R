@@ -156,7 +156,7 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
       samples.arr <- matrix(sample_vals, nrow=n_min_samples, ncol=nrow(samples_stats))
 
       #print(str(samples.arr))
-      res <- insilicoMop:::ContrastStatistics(
+      res <- ContrastStatistics(
         samples.arr, as.integer(cur_cond2expr.df[[experiment_col]]),
         as.integer(cur_cond2expr.df[[condition_col]]),
         cur_contrastXcondition,

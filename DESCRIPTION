@@ -1,13 +1,13 @@
 Package: msglm
 Type: Package
-Title: What the Package Does (Title Case)
+Title: GLM models for Mass Spectrometry Data
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Author: Alexey Stukalov
+Maintainer: Alexey Stukalov <alexey.stukalov@tum.de>
+Description: Bayesian Generalized Linear Models for Protein- and
+    Peptide-Level Mass Spectrometry data
+License: BSD?
 Encoding: UTF-8
 LazyData: true
-Imports: Rcpp (>= 1.0), BH, rstan, dplyr
+Imports: Rcpp (>= 1.0), BH, rstan, dplyr, tidyr, stringr, purrr
 LinkingTo: Rcpp, BH

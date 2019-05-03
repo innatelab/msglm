@@ -1,0 +1,3 @@
+.PHONY: all
+
+PKG_CPPFLAGS += -I$(BOOST_ROOT)/include

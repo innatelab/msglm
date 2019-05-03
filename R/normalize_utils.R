@@ -157,7 +157,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
 }
 
 #' @export
-normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
+normalize_experiments <- function(stan_input_base, msdata_df,
                                   quant_col = "intensity", obj_col = "protgroup_id",
                                   mschan_col = "mschannel", cond_col="condition", condgroup_col = NULL,
                                   mschan_preshifts = NULL, preshift_col="shift",
@@ -173,6 +173,7 @@ normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
 {
     stan_method <- match.arg(stan_method)
     shifts_constraint <- match.arg(shifts_constraint)
+    stan_norm_model <- msglm_stan_model("msglm_normalize")
     if (is.null(condgroup_col)) {
       msdata_df$`__fake_condgroup__` <- TRUE
       condgroup_col <- "__fake_condgroup__"
@@ -243,7 +244,7 @@ normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
 }
 
 #' @export
-multilevel_normalize_experiments <- function(stan_norm_model, instr_calib,
+multilevel_normalize_experiments <- function(instr_calib,
                                              mschannels_df, msdata_df,
                                   quant_col = "intensity", obj_col = "protgroup_id",
                                   mschan_col = "mschannel",
@@ -290,7 +291,7 @@ multilevel_normalize_experiments <- function(stan_norm_model, instr_calib,
     if (verbose) {
       message("Normalizing ", lev_name, " (level #", i, ")...")
     }
-    lev_shifts_df <- normalize_experiments(stan_norm_model, stan_input_base, msdata_df,
+    lev_shifts_df <- normalize_experiments(stan_input_base, msdata_df,
                                            obj_col = obj_col, quant_col = quant_col,
                                            mschan_col = mschan_col,
                                            cond_col = lev_info$cond_col,

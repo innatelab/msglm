@@ -342,8 +342,6 @@ apms_glm.stan_stats <- apms_glm.stan_fit %>%
   monitor( print = FALSE ) %>% as.data.frame
 apms_glm.stan_stats$var_name <- rownames( apms_glm.stan_stats )
 
-require( insilicoMop )
-
 message( 'Extracting MCMC samples...' )
 apms_glm.stan_samples <- stan.extract_samples( apms_glm.stan_fit,
                                                pars = unlist( sapply( vars_info, function( vi ) vi$names ) ),

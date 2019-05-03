@@ -3,8 +3,6 @@
 # Author: astukalov
 ###############################################################################
 
-require(stringr)
-
 # converts matrix to compressed row storage (CSR)
 # wrapper for extract_sparse_parts that uses the specified matrix name
 matrix2csr <- function(mtx_name, mtx) {

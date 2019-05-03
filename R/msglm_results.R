@@ -1,8 +1,3 @@
-require(rstan)
-require(insilicoMop)
-require(stringr)
-require(purrr)
-
 #' @export
 msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
 {

@@ -1,5 +1,3 @@
-require(stringr)
-
 # convert conditionXeffect matrix to a frame and calculate
 # condition2effect weights
 #' @export

@@ -16,8 +16,8 @@ matrix2csr <- function(mtx_name, mtx) {
 
 stan.iterations_frame <- function(stan_result)
 {
-  n_iterations <- dim( stan_result )[[1]]
-  n_chains <- dim( stan_result )[[2]]
+  n_iterations <- dim(stan_result)[[1]]
+  n_chains <- dim(stan_result)[[2]]
   n_thin <- stan_result@sim$thin
 
   tidyr::crossing(chain = seq_len(n_chains),
@@ -37,14 +37,14 @@ stan.extract_samples <- function(stan_result, pars, min.iteration = NA, permuted
     if ( permuted ) {
       iter_info <- attr(res, 'iter_info') %>% dplyr::filter(iteration >= min.iteration - stan_result@sim$warmup)
       sample_ixs <- sort(iter_info$unpermuted_ix)
-      res <- lapply( res, function(var_samples) {
+      res <- lapply(res, function(var_samples) {
         new_dims <- dim(var_samples)
         new_dims[[1]] <- n_distinct(sample_ixs)
-        array( var_samples[slice.index(var_samples,1) %in% sample_ixs], dim = new_dims ) } )
+        array(var_samples[slice.index(var_samples, 1) %in% sample_ixs], dim = new_dims) })
       attr(res, 'iter_info') <- iter_info
       res
     } else {
-      res[seq(from=as.integer(ceiling(min.iteration/n_thin)), dim(res)[[1]] ), , ]
+      res[seq(from=as.integer(ceiling(min.iteration/n_thin)), dim(res)[[1]]), , ]
     }
   } else {
     res

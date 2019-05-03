@@ -25,7 +25,11 @@ rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NU
     if (verbose) message("Binding rows of ", fname)
     dplyr::bind_rows(lapply(seq_along(frames_coll_list), function(coll_ix) {
       res <- frames_coll_list[[coll_ix]][[fname]]
-      if (!is.null(link_col) && nrow(res)>0) res[[link_col]] <- if (!is.null(names(frames_coll_list))) names(frames_coll_list)[[coll_ix]] else coll_ix
+      if (!is.null(link_col) && nrow(res)>0) {
+        res[[link_col]] <- if (!is.null(names(frames_coll_list))) {
+          names(frames_coll_list)[[coll_ix]]
+        } else coll_ix
+      }
       return (res)
     }))
   })

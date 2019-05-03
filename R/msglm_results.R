@@ -422,7 +422,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
         var_info.df <- vars_results[[vars_category]]$stats %>%
           dplyr::inner_join(conditionXmetacondition.df) %>%
           dplyr::select(!!!setdiff(var_info_cols,
-                                   c("index_observation", "iaction_id", 
+                                   c("index_observation", "iaction_id",
                                      condition_col, condition_agg_col, experiment_col))) %>%
           dplyr::distinct()
         # inject contrast statistics into vars_results

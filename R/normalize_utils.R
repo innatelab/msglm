@@ -89,7 +89,9 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
       dplyr::arrange(as.integer(obj), as.integer(mschannel)) %>%
       dplyr::mutate(safe_quant = if_else(is.na(quant), 0.0, quant))
 
-    stan_input$qData <- matrix(msdata_df$safe_quant, ncol = nrow(mschan_df), byrow=TRUE) # nrow=nrow(valid_objs)
+    stan_input$qData <- matrix(msdata_df$safe_quant,
+                               ncol = nrow(mschan_df),
+                               byrow=TRUE) # nrow=nrow(valid_objs)
     message("Running Stan optimization...")
     out_params <- c("data_sigma", "shift_sigma", "shift")
     if (stan_method == 'optimizing') {
@@ -307,7 +309,8 @@ multilevel_normalize_experiments <- function(stan_norm_model, instr_calib,
                                           dplyr::select_at(lev_shifts_df, c(lev_info$cond_col, "shift")))
     colnames(mschan_shifts_df)[colnames(mschan_shifts_df)=="shift"] <- lev_shift_col
     mschan_shifts_df[[total_shift_col]] <- mschan_shifts_df[[total_shift_col]] +
-          if_else(is.na(mschan_shifts_df[[lev_shift_col]]), 0.0, mschan_shifts_df[[lev_shift_col]])
+          if_else(is.na(mschan_shifts_df[[lev_shift_col]]), 0.0,
+                  mschan_shifts_df[[lev_shift_col]])
     lev_norm_res[[lev_name]] <- list(level_shifts = lev_shifts_df,
                                      mschannel_shifts = mschan_shifts_df)
   }

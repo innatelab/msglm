@@ -39,7 +39,7 @@ msglmm.vars_info$supactions <- list(names = c("supaction_labu", "supact_repl_shi
 # get the indices of the first rows in a group
 # also get the index+1 of the last row
 nrows_cumsum <- function(df, group_col) {
-  n_rows <- df %>% dplyr::arrange_(group_col) %>% dplyr::group_by_(group_col) %>%
+  n_rows <- df %>% dplyr::arrange_at(group_col) %>% dplyr::group_by_at(group_col) %>%
     dplyr::summarize(n_rows = n()) %>% .$n_rows
   if (length(n_rows)>0) {
     res <- cumsum(as.integer(n_rows))
@@ -185,7 +185,7 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
       vars_info$global$names <- setdiff(vars_info$global$names,
                                         c('suo_shift_sigma', 'suo_msproto_shift_sigma'))
     }
-    res <- sampling(stanmodel,
+    res <- rstan::sampling(stanmodel,
              pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,
              data = stan_input_data,
              #init = function() { pcp_peaks_glm.generate_init_params(pcp_peaks_glm.model_data) },

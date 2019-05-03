@@ -29,7 +29,7 @@ join_report_frames <- function(reports, frame_extractor=function(report) stop('n
   } else {
     report_names <- names(reports)
   }
-  joined_res.df <- bind_rows(lapply(report_names, function(report_name) {
+  joined_res.df <- dplyr::bind_rows(lapply(report_names, function(report_name) {
     report <- reports[[report_name]]
     frame <- frame_extractor(report)
     if (is.null(frame)) return ( NULL )

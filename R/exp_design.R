@@ -3,7 +3,7 @@ require(stringr)
 # convert conditionXeffect matrix to a frame and calculate
 # condition2effect weights
 conditionXeffect_frame <- function(conditionXeffect_mtx, effects_df) {
-  as_tibble(as.table(conditionXeffect_mtx)) %>%
+  tibble::as_tibble(as.table(conditionXeffect_mtx)) %>%
     dplyr::filter(n != 0) %>% dplyr::rename(mult = n) %>%
     # estimate the weight of a condition in an effect
     dplyr::inner_join(dplyr::select(effects_df, effect, tau)) %>%

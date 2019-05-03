@@ -31,17 +31,19 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
                                    one_of(c("protregroup_id", "protgroup_id", "pepmod_id", "pepmodstate_id", "charge")))
   }
   if ("msproto_ix" %in% colnames(model_data$mschannels)) {
-    res$msprotocol <- dplyr::select(model_data$mschannels, msproto_ix, one_of("instrument")) %>%
+    res$msprotocol <- dplyr::select(model_data$mschannels, msproto_ix,
+                                    one_of("instrument")) %>%
       dplyr::distinct()
     if ("subobjectXmsprotocol" %in% names(model_data)) {
       # remove the 1st (the default) MS protocol
-      res$subobjectXmsprotocol1 <- bind_cols(rep(res$subobject, times=nrow(res$msprotocol)-1L),
-                                             rep(res$msprotocol[-1], each=nrow(res$subobject)))
+      res$subobjectXmsprotocol1 <- dplyr::bind_cols(rep(res$subobject, times=nrow(res$msprotocol)-1L),
+                                                    rep(res$msprotocol[-1], each=nrow(res$subobject)))
     }
   }
   if (is_glmm) {
     res$object_mix_effect <- dplyr::mutate(model_data$mix_effects, tmp="a") %>%
-      left_join(mutate(objs_df, tmp="a")) %>% select(-tmp, -one_of("mean"))
+      dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
+                       dplyr::select(-tmp, -one_of("mean"))
     res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,
                                  glm_object_ix, iaction_id, action_ix, action, is_virtual) %>%
         dplyr::inner_join(objs_df) %>%
@@ -64,12 +66,12 @@ vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info, tail = c("bo
   #print(str(samples.df))
   #print(str(group_cols))
   p_value_all_samples <- function(samples) {
-      bind_rows(lapply(vars_cat_info$names, function(col) {
+      dplyr::bind_rows(lapply(vars_cat_info$names, function(col) {
           tibble(var = col,
                  p_value = pvalue_not_zero(samples[[col]], tail = tail))
           }))
   }
-  p_value.df <- samples.df %>% group_by_at(group_cols) %>% do(p_value_all_samples(.))
+  p_value.df <- samples.df %>% dplyr::group_by_at(group_cols) %>% dplyr::do(p_value_all_samples(.))
   if ('fraction' %in% group_cols) {
     p_value.df$fraction <- as.integer(p_value.df$fraction)
   }
@@ -142,7 +144,7 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
     cur_cond2expr.df[[condition_col]] <- factor(as.character(cur_cond2expr.df[[condition_col]]),
                                                 levels=colnames(cur_contrastXcondition))
 
-    bind_rows(lapply(var_names, function(var_col) {
+    dplyr::bind_rows(lapply(var_names, function(var_col) {
       sample_vals <- samples[[var_col]]
       if (!is.null(val_trans)) {
         if (val_trans == "exp") {
@@ -163,14 +165,15 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
         nsteps = nsteps, maxBandwidth = maxBandwidth,
         quant_probs = quant.probs) %>%
         as_tibble() %>%
-        mutate(var = var_col)
+        dplyr::mutate(var = var_col)
       # TODO se_mean, n_eff, Rhat
       return (res)
     } ) )
   }
   contrast_stats.df <- dplyr::arrange_at(samples.df,
                                          c(group_cols, experiment_col, "iteration", "chain")) %>%
-    group_by_at(group_cols) %>% do(contrast_stats_all_samples(.)) %>%
+    dplyr::group_by_at(group_cols) %>%
+    dplyr::do(contrast_stats_all_samples(.)) %>%
     dplyr::mutate(mean_log2 = mean/log(2),
                   median_log2 = `50%`/log(2),
                   sd_log2 = sd/log(2))
@@ -194,12 +197,12 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
       slice.index(stan_samples[[last_col]], dim_ix+1) %>% as.vector()
     })) %>% as_tibble()
     colnames(indexes.df) <- paste0('index_', names(dim_info))
-    samples.df <- bind_cols(samples.df, indexes.df)
+    samples.df <- dplyr::bind_cols(samples.df, indexes.df)
     for (dim_ix in seq_along(dim_info)) {
       dim_name <- names(dim_info)[[dim_ix]]
       if (!is.null(dim_info[[dim_ix]])) {
         message("Adding ", dim_name, " information")
-        samples.df <- cbind(samples.df, dim_info[[dim_ix]][indexes.df[[dim_ix]], , drop=FALSE])
+        samples.df <- dplyr::bind_cols(samples.df, dim_info[[dim_ix]][indexes.df[[dim_ix]], , drop=FALSE])
       } else {
         warning("No ", dim_name, " information provided")
       }
@@ -213,11 +216,11 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
     res_index <- extract_index(res.df$var_name)
     dims.df <- tibble(ix = seq_along(dim_info),
                       name = names(dim_info)) %>%
-      group_by(name) %>%
-      mutate(local_ix = row_number(),
-             suffix = if (n() > 1) paste0('.', local_ix) else '') %>%
-      ungroup()
-    indexes.df <- tibble(!!!set_names(lapply(seq_along(dim_info), function(dim_ix) {
+      dplyr::group_by(name) %>%
+      dplyr::mutate(local_ix = row_number(),
+                    suffix = if (n() > 1) paste0('.', local_ix) else '') %>%
+      dplyr::ungroup()
+    indexes.df <- tibble(!!!purrr::set_names(lapply(seq_along(dim_info), function(dim_ix) {
       res_index[, dim_ix]
     }), paste0('index_', names(dim_info))))
 
@@ -239,10 +242,10 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
             if (dims.df$suffix[[dim_ix]] != '') {
               colnames(res_dim_info.df) <- paste0(colnames(res_dim_info.df), dims.df$suffix[dim_ix])
             }
-            res.df <- bind_cols(res.df, res_dim_info.df)
+            res.df <- dplyr::bind_cols(res.df, res_dim_info.df)
         }
     }
-    return (bind_cols(indexes.df, res.df))
+    return (dplyr::bind_cols(indexes.df, res.df))
 }
 
 stan_samples_frame <- function(stan_samples, var_names, var_dims) {
@@ -253,14 +256,14 @@ stan_samples_frame <- function(stan_samples, var_names, var_dims) {
       warning("Variable(s) samples not found: ", paste0(setdiff(var_names, names(stan_samples)), collapse=", "))
     }
     avail_var_names <- intersect(var_names, names(stan_samples))
-    samples.df <- tibble(!!!set_names(lapply(avail_var_names, function(var_name) {
+    samples.df <- tibble(!!!purrr::set_names(lapply(avail_var_names, function(var_name) {
       as.vector(stan_samples[[var_name]])
     }), avail_var_names))
     if (ncol(samples.df) > 0) {
         if ('iter_info' %in% names(attributes(stan_samples))) {
           iter_info.df <- attr(stan_samples, 'iter_info')
-          samples.df <- bind_cols(iter_info.df[rep_len(seq_len(nrow(iter_info.df)), nrow(samples.df)), ],
-                                  samples.df)
+          samples.df <- dplyr::bind_cols(iter_info.df[rep_len(seq_len(nrow(iter_info.df)), nrow(samples.df)), ],
+                                         samples.df)
         } else {
           warning("No iter_info found")
         }
@@ -278,7 +281,8 @@ vars_statistics <- function(vars_category, stan_stats, stan_samples, vars_info, 
     vars_cat_info <- vars_info[[vars_category]]
     samples.df <- stan_samples_frame(stan_samples, vars_cat_info$names, dim_info[vars_cat_info$dims])
     # process convergence information
-    stats.df <- filter(stan_stats, str_detect(var_name, paste0('^(', paste0(vars_cat_info$names, collapse='|'), ')(\\[|$)')))
+    stats.df <- dplyr::filter(stan_stats, str_detect(var_name,
+                                                     paste0('^(', paste0(vars_cat_info$names, collapse='|'), ')(\\[|$)')))
     stats.df$var <- extract_var(stats.df$var_name)
     stats.df <- dplyr::mutate(stats.df,
                               mean_log2 = mean/log(2),
@@ -297,7 +301,8 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
     # extract only samples of selected variables
     # convert arrays of samples of selected variables into data frames,
     # add back single copy of dimensions and real iteration information
-    res_mask <- str_detect(names(opt_results$par), paste0('^(', paste0(vars_cat_info$names, collapse='|'), ')(\\[|$)'))
+    res_mask <- str_detect(names(opt_results$par),
+                           paste0('^(', paste0(vars_cat_info$names, collapse='|'), ')(\\[|$)'))
     if (!any(res_mask)) {
         # checkf if the variable is degenerated
         if (prod(sapply(dim_info[vars_cat_info$dims], nrow)) > 0) {
@@ -310,7 +315,7 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
     }
     res.df <- tibble(var_name = names(opt_results$par)[res_mask],
                      mean = opt_results$par[res_mask]) %>%
-        mutate(var = extract_var(var_name))
+        dplyr::mutate(var = extract_var(var_name))
 
     # add additional dimension information
     if (length(vars_cat_info$dims) > 0) {
@@ -375,8 +380,8 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
         }
         return(res)
       }
-      contr_qtl_thresh.df <- bind_rows(contrast_quantile_thresholds(condition.quantiles_lhs, is_lhs = TRUE),
-                                       contrast_quantile_thresholds(condition.quantiles_rhs, is_lhs = FALSE))
+      contr_qtl_thresh.df <- dplyr::bind_rows(contrast_quantile_thresholds(condition.quantiles_lhs, is_lhs = TRUE),
+                                              contrast_quantile_thresholds(condition.quantiles_rhs, is_lhs = FALSE))
       cond_stats.df <- dplyr::inner_join(cond_stats.df, cond_agg_stats.df) %>%
         dplyr::left_join(contr_qtl_thresh.df) %>%
         dplyr::mutate(is_accepted = (cond_min_qtile >= cond_qtile.min_thresh) &
@@ -421,7 +426,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
                                      condition_col, condition_agg_col, experiment_col))) %>%
           dplyr::distinct()
         # inject contrast statistics into vars_results
-        vars_results[[vars_category]]$contrast_stats <- left_join(var_info.df, contrast_stats.df) %>%
+        vars_results[[vars_category]]$contrast_stats <- dplyr::left_join(var_info.df, contrast_stats.df) %>%
           dplyr::mutate(p_value = 2*pmin(prob_nonpos, prob_nonneg)
                         # fake P-values to fit in the plot
                         #prob_nonpos_fake = pmax(if_else(mean < 0, 1E-300, 1E-100), rgamma(n(), shape=1E-2, scale=1E-150), prob_nonpos),
@@ -429,11 +434,12 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
                         #p_value_fake = 2*pmin(prob_nonpos_fake, prob_nonneg_fake)
           ) %>%
           #dplyr::select(-index_observation, -msrun, -msrun_ix) %>% dplyr::distinct() %>%
-          left_join(contrastXmetacondition.df %>% dplyr::filter(contrast %in% rownames(contrastXmetacondition)) %>%
-                    dplyr::rename(contrast_weight = weight) %>%
-                    dplyr::mutate(metacondition_reported = case_when(contrast_type %in% c("filter", "filtering") ~ "lhs",
-                                                                     contrast_type == "comparison" ~ "enriched",
-                                                                     TRUE ~ NA_character_))) %>%
+          dplyr::left_join(contrastXmetacondition.df %>% dplyr::filter(contrast %in% rownames(contrastXmetacondition)) %>%
+                           dplyr::rename(contrast_weight = weight) %>%
+                           dplyr::mutate(metacondition_reported =
+                                           case_when(contrast_type %in% c("filter", "filtering") ~ "lhs",
+                                                     contrast_type == "comparison" ~ "enriched",
+                                                     TRUE ~ NA_character_))) %>%
           dplyr::filter((metacondition_reported == "lhs" & contrast_weight > 0) |
                         (metacondition_reported == "enriched" & contrast_weight * `50%` > 0)) %>%
           dplyr::select(-metacondition_reported, -contrast_type) %>%
@@ -523,7 +529,8 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
         p_value.df <- vars_effect_pvalue(res[[ctg]]$samples, ctg_subset_info, dims_info)
         #print(str(p_value.df))
         #print(str(stats.df))
-        res[[ctg]]$stats <<- left_join(res[[ctg]]$stats %>% mutate(p_value = NULL), p_value.df)
+        res[[ctg]]$stats <<- dplyr::left_join(res[[ctg]]$stats %>%
+                             dplyr::mutate(p_value = NULL), p_value.df)
       }
   }})
 

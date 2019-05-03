@@ -8,7 +8,7 @@ require(stringr)
 # converts matrix to compressed row storage (CSR)
 # wrapper for extract_sparse_parts that uses the specified matrix name
 matrix2csr <- function(mtx_name, mtx) {
-    mtx_sparse <- extract_sparse_parts(mtx)
+    mtx_sparse <- rstan::extract_sparse_parts(mtx)
     mtx_sparse$Nw <- length(mtx_sparse$w)
     names(mtx_sparse) <- paste0(mtx_name, "_", names(mtx_sparse))
     return(mtx_sparse)
@@ -20,8 +20,8 @@ stan.iterations_frame <- function(stan_result)
   n_chains <- dim( stan_result )[[2]]
   n_thin <- stan_result@sim$thin
 
-  expand.grid(sample_ix = seq_len(n_iterations),
-              chain = seq_len(n_chains)) %>%
+  tidyr::crossing(chain = seq_len(n_chains),
+                  sample_ix = seq_len(n_iterations)) %>%
     mutate(iteration = sample_ix * n_thin,
            unpermuted_ix = row_number())
 }
@@ -52,14 +52,14 @@ stan.extract_samples <- function(stan_result, pars, min.iteration = NA, permuted
 }
 
 extract_index <- function(var_names) {
-  var_ndims <- str_count(var_names, fixed(",")) + 1L
-  res <- str_split_fixed(str_remove(str_remove(var_names, '\\]$'), '^[^\\[]+\\['),
-                         fixed(','), var_ndims) %>%
-         as.integer() %>% matrix(ncol=var_ndims)
+  var_ndims <- str_count(var_names, stringr::fixed(",")) + 1L
+  res <- str_remove(var_names, '\\]$') %>% str_remove('^[^\\[]+\\[') %>%
+      str_split_fixed(stringr::fixed(','), var_ndims) %>%
+      as.integer() %>% matrix(ncol=var_ndims)
   return(res)
 }
 extract_var <- function(var_names) {
-  str_remove(var_names, '\\[(?:\\d+\\,)*\\d+\\]$')
+  stringr::str_remove(var_names, '\\[(?:\\d+\\,)*\\d+\\]$')
 }
 
 pvalue_not_zero <- function(samples, tail = c("both", "negative", "positive"))

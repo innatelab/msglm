@@ -1,3 +1,4 @@
+#' @export
 process_msglm_chunk <- function(file_ix,
                                 strip_samples=FALSE, strip_stats=FALSE,
                                 postprocess.f = NULL) {
@@ -20,6 +21,7 @@ process_msglm_chunk <- function(file_ix,
   return ( res )
 }
 
+#' @export
 join_report_frames <- function(reports, frame_extractor=function(report) stop('no frame extractor'),
                                global_vars = c('model_dataset', 'version', 'chunk'),
                                prot_info=NULL)
@@ -50,6 +52,7 @@ join_report_frames <- function(reports, frame_extractor=function(report) stop('n
   return ( joined_res.df )
 }
 
+#' @export
 join_msglm_reports <- function(section, reports, type, results_tag="msglm_results") {
   message( 'Assembling joint ', type, ' report for ', section, '...' )
   res <- join_report_frames(reports, frame_extractor = function(report) {
@@ -70,6 +73,7 @@ join_msglm_reports <- function(section, reports, type, results_tag="msglm_result
   return(res)
 }
 
+#' @export
 join_msglm_reports_allsections <- function(reports, type, results_tag="msglm_results") {
   sections <- names(reports[[1]][[results_tag]])
   res <- lapply(sections, join_msglm_reports, reports, type, results_tag=results_tag)

@@ -3,6 +3,7 @@ require(insilicoMop)
 require(stringr)
 require(purrr)
 
+#' @export
 msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
 {
   is_glmm <- "mix_effects" %in% names(model_data)
@@ -59,6 +60,7 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
   return(res)
 }
 
+#' @export
 vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info, tail = c("both", "negative", "positive"))
 {
   tail = match.arg(tail)
@@ -78,6 +80,7 @@ vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info, tail = c("bo
   return (p_value.df)
 }
 
+#' @export
 vars_contrast_stats <- function(samples.df, var_names, group_cols,
                                 condition_col, contrastXcondition,
                                 experiment_col = condition_col, condition2experiments.df = NULL,
@@ -476,6 +479,7 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
                    condition.quantiles_rhs = condition.quantiles_rhs)
 }
 
+#' @export
 process.stan_fit <- function(msglm.stan_fit, dims_info,
                              vars_info = attr(msglm.stan_fit, "msglm_vars_info"),
                              mschannel_col = "msrun_ix",

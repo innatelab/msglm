@@ -2,6 +2,7 @@ require(stringr)
 
 # convert conditionXeffect matrix to a frame and calculate
 # condition2effect weights
+#' @export
 conditionXeffect_frame <- function(conditionXeffect_mtx, effects_df) {
   tibble::as_tibble(as.table(conditionXeffect_mtx)) %>%
     dplyr::filter(n != 0) %>% dplyr::rename(mult = n) %>%
@@ -16,6 +17,7 @@ conditionXeffect_frame <- function(conditionXeffect_mtx, effects_df) {
 }
 
 # compose replicate effects design matrix
+#' @export
 replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", condition_col="condition", replicate_col="msrun",
                                      replicate_contrast = "contr.poly") {
   # compose replicate effects
@@ -52,6 +54,7 @@ replicate_effects_matrix <- function(mschannels_df, msrun_col="msrun", condition
 }
 
 # extracts the value of given factor from the effect label
+#' @export
 effect_factor <- function(effects, factor_name, factor_levels, default = factor_levels[1]) {
     # FIXME factor levels are not allowed to start with '_' (to workaround factor with names being prefixes of the other factors)
     factor_vals <- str_match(effects, paste0("(?:^|:)", factor_name, "([^:_][^:]*)(?:$|:)"))[,2]

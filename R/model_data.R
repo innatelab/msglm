@@ -1,4 +1,5 @@
 # prepare observations array
+#' @export
 prepare_observations <- function(data.mtx)
 {
   data.vec <- as.vector(data.mtx)
@@ -15,6 +16,7 @@ prepare_observations <- function(data.mtx)
 # given a experimentXeffect matrix,
 # and mapping of the data to objects and experiments, construct
 # a data.frame of all related objectXeffect combinations
+#' @export
 iactXeffect <- function(expXeff, iact2obj, iact2exp) {
   iact_infos <- lapply(seq_along(iact2obj), function(iact_ix){
     iactXeff <- expXeff[iact2exp[[iact_ix]], , drop=FALSE]
@@ -54,6 +56,7 @@ iactXeffect <- function(expXeff, iact2obj, iact2exp) {
 
 # use experimental design matrices and add
 # object/replicate/batch effects information to model_data
+#' @export
 prepare_effects <- function(model_data, underdefined_iactions=FALSE)
 {
   is_glmm <- exists("mix_condXact.mtxs") && exists("mix_effects.df")

@@ -49,6 +49,7 @@ nrows_cumsum <- function(df, group_col) {
   }
 }
 
+#' @export
 stan.prepare_data <- function(base_input_data, model_data,
                               global_labu_shift = global_protgroup_labu_shift,
                               base_repl_shift_tau=0.1, effect_repl_shift_tau=0.25,

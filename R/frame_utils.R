@@ -3,6 +3,7 @@
 # Author: Alexey Stukalov
 ###############################################################################
 
+#' @export
 rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NULL, verbose=FALSE)
 {
   if (is.null(frame_names)) {
@@ -50,6 +51,7 @@ expand_collapsed <- function(df, collapsed_col, separated_col,
 
 # converts data.frame df (long format) into a matrix
 # using row_col and col_col as its rows and columns and val_col as its values
+#' @export
 frame2matrix <- function(df, row_col, col_col, val_col="w", cols=NULL, rows=NULL) {
   mtx_dims <- list(if (!is.null(rows) && length(rows) > 0) rows else if (is.factor(df[[row_col]])) levels(df[[row_col]]) else as.character(unique(df[[row_col]])),
                    if (!is.null(cols) && length(cols) > 0) cols else if (is.factor(df[[col_col]])) levels(df[[col_col]]) else as.character(unique(df[[col_col]])))

@@ -9,6 +9,7 @@
 }
 
 # calculate normalization shifts within one MS condition group
+#' @export
 norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
         msdata_df, mschan_preshifts, condgroup_id, cond_col,
         max_objs=1000L, quant_ratio.max=NA,
@@ -155,6 +156,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
     return (res)
 }
 
+#' @export
 normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
                                   quant_col = "intensity", obj_col = "protgroup_id",
                                   mschan_col = "mschannel", cond_col="condition", condgroup_col = NULL,
@@ -240,6 +242,7 @@ normalize_experiments <- function(stan_norm_model, stan_input_base, msdata_df,
     return(res)
 }
 
+#' @export
 multilevel_normalize_experiments <- function(stan_norm_model, instr_calib,
                                              mschannels_df, msdata_df,
                                   quant_col = "intensity", obj_col = "protgroup_id",

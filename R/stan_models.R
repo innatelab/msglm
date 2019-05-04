@@ -155,6 +155,12 @@ stan.prepare_data <- function(base_input_data, model_data,
   return(res)
 }
 
+# all models
+msglm_model_names <- function() {
+  system.file('stan_models', package="msglm", mustWork=FALSE) %>%
+  list.files(pattern="\\.stan$") %>% sapply(basename) %>% str_remove("\\.stan$")
+}
+
 msglm_stan_model <- function(model_name) {
   stan_models_path <- system.file('stan_models', package="msglm", mustWork=FALSE)
   message("Loading ", model_name, " Stan model")

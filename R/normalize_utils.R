@@ -148,7 +148,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
     }
     col_renames <- "condition"
     names(col_renames) <- cond_col
-    res <- dplyr::rename_at(res, col_renames) %>%
+    res <- dplyr::rename(res, !!!col_renames) %>%
       dplyr::mutate(
         stan_method = stan_method,
         n_objects = stan_input$Nobjects,

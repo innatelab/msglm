@@ -66,7 +66,7 @@ data {
 
   vector[Nmix] mix_effect_mean;
   vector<lower=0>[Nmix] mix_effect_tau;
-  
+
   vector[Nexperiments] experiment_shift;
 
   int<lower=1,upper=Nexperiments> observation2experiment[Nobservations];

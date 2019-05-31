@@ -7,7 +7,7 @@ prepare_observations <- function(data.mtx)
   data.obs.mask <- !is.na(data.vec)
   data.idx <- ifelse(data.obs.mask, cumsum(data.obs.mask), -cumsum(!data.obs.mask))
   data.idx.arr <- matrix(data.idx, ncol = ncol(data.mtx))
-  list(Nobserved = sum(data.obs.mask), # total non-NA  datapoints
+  list(Nobserved = sum(data.obs.mask), # total non-NA datapoints
        oData = array(data.vec[data.obs.mask]), # only non-NA values
        dataIndex = as.array(data.idx.arr) # either index in oData if observed, or -index of non-observed
   )

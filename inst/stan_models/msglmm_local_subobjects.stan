@@ -437,7 +437,7 @@ transformed parameters {
     preiaction_labu = csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect);
     //print("preiaction_labu=", preiaction_labu);
     // distribute iaction_labu components to mixtures and convert to exponent
-    mixtion_abu = exp(preiaction_labu[mixt2iact] + append_row(1.0, obj_mix_effect)[mixt2mix_ext]);
+    mixtion_abu = exp(preiaction_labu[mixt2iact] + append_row(0.0, obj_mix_effect)[mixt2mix_ext]);
     //print("mixtion_abu=", mixtion_abu);
     // do mixing
     supaction_abu = csr_matrix_times_vector(Nsupactions, Nmixtions, supactXmixt_w, supactXmixt_v, supactXmixt_u, mixtion_abu);

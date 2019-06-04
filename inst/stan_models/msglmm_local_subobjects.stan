@@ -55,7 +55,8 @@ data {
   int<lower=0> Neffects;        // number of effects (that define conditions)
   int<lower=0> NbatchEffects;   // number of batch effects (that define assay experimental variation, but not biology)
   int<lower=0> NunderdefObjs;   // number of virtual interactions (the ones not detected but required for comparison)
-  int<lower=1> Nmix;            // number of interactions mixed in each supaction
+  int<lower=1> NmixEffects;     // number of mixing effects
+  int<lower=1> Nmix;            // number of mixing effects combinations used
   int<lower=1> Nmixtions;       // number of premixed interactions (iaction X mix_coefficient)
   int<lower=1,upper=Nobjects> suo2obj[Nsubobjects];
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
@@ -64,8 +65,9 @@ data {
   int<lower=1,upper=Niactions> mixt2iact[Nmixtions];
   int<lower=0,upper=Nmix> mixt2mix[Nmixtions];
 
-  vector[Nmix] mixeffect_mean;
-  vector<lower=0>[Nmix] mixeffect_tau;
+  vector[NmixEffects] mixeffect_mean;
+  vector<lower=0>[NmixEffects] mixeffect_tau;
+  matrix[NmixEffects, Nmix] mixeffXcoef;
 
   vector[Nexperiments] experiment_shift;
 
@@ -166,8 +168,6 @@ transformed data {
   int<lower=0> supactXobjbase_u[Nsupactions + 1];
   int<lower=1,upper=Nobjects> supaction2obj[Nsupactions]; // _v
   int<lower=1,upper=Niactions> supaction2iaction[Nsupactions];
-
-  int<lower=1,upper=Nmix+1> mixt2mix_ext[Nmixtions]; // mixt2mix with all indices shifted by 1
 
   vector[Nobservations] obsXsupact_w;
   int<lower=0> obsXsupact_u[Nobservations + 1];
@@ -315,9 +315,6 @@ transformed data {
   obsXsupact_w = rep_vector(1.0, Nobservations);
   for (i in 1:(Nobservations+1)) obsXsupact_u[i] = i;
 
-  // prepare supactXmixt matrix
-  for (i in 1:Nmixtions) mixt2mix_ext[i] = mixt2mix[i] + 1;
-
   if (Nsubobjects > 0) {
     // subXsuo_shift0 matrix fixes the shift of the first subobject of each
     // object to 0
@@ -397,8 +394,9 @@ transformed parameters {
   vector<lower=0>[NobjEffects] obj_effect_sigma;
   vector[NobjBatchEffects] obj_batch_effect;
 
-  vector<lower=0>[Nmix] obj_mixeffect_sigma;
-  vector[Nmix] obj_mixeffect;
+  vector<lower=0>[NmixEffects] obj_mixeffect_sigma;
+  vector[NmixEffects] obj_mixeffect;
+  vector[Nmix] obj_mixcoef;
 
   vector[Niactions] iaction_labu;
   vector[Nsupactions] supaction_labu;
@@ -421,6 +419,7 @@ transformed parameters {
   // calculate obj_mixeffects
   obj_mixeffect_sigma = obj_mixeffect_lambda_a .* inv_sqrt(obj_mixeffect_lambda_t) .* mixeffect_tau;
   obj_mixeffect = mixeffect_mean + obj_mixeffect_unscaled .* obj_mixeffect_sigma;
+  obj_mixcoef = mixeffXcoef * obj_mixeffect;
 
   // calculate object effects lambdas and scale effects
   obj_effect_sigma = obj_effect_lambda_a .* inv_sqrt(obj_effect_lambda_t) .* obj_effect_tau;
@@ -437,7 +436,7 @@ transformed parameters {
     preiaction_labu = csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect);
     //print("preiaction_labu=", preiaction_labu);
     // distribute iaction_labu components to mixtures and convert to exponent
-    mixtion_abu = exp(preiaction_labu[mixt2iact] + append_row(0.0, obj_mixeffect)[mixt2mix_ext]);
+    mixtion_abu = exp(preiaction_labu[mixt2iact] + obj_mixcoef[mixt2mix]);
     //print("mixtion_abu=", mixtion_abu);
     // do mixing
     supaction_abu = csr_matrix_times_vector(Nsupactions, Nmixtions, supactXmixt_w, supactXmixt_v, supactXmixt_u, mixtion_abu);

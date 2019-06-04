@@ -23,6 +23,8 @@ msglm.vars_info <- list(
 msglmm.vars_info <- msglm.vars_info
 msglmm.vars_info$object_mixeffects <- list(names = c("obj_mixeffect", "obj_mixeffect_sigma"),
                                             dims = c("object_mixeffect"))
+msglmm.vars_info$object_mixcoefs <- list(names = c("obj_mixcoef"),
+                                         dims = c("object_mixcoef"))
 msglmm.vars_info$supactions <- list(names = c("supaction_labu", "supact_repl_shift_sigma"),
                                     dims = c("supaction"))
 
@@ -111,9 +113,11 @@ stan.prepare_data <- function(base_input_data, model_data,
 
   if (is_glmm) {
     message("Setting GLMM interaction data...")
-    res$Nmix <- nrow(model_data$mixeffects)
+    res$Nmix <- nrow(model_data$mixeffXcoef)
+    res$NmixEffects <- nrow(model_data$mixeffects)
     res$mixeffect_mean <- as.array(model_data$mixeffects$prior_mean)
     res$mixeffect_tau <- as.array(model_data$mixeffects$prior_tau)
+    res$mixeffXcoef <- as.matrix(model_data$mixeffXcoef)
 
     res <- modifyList(res, matrix2csr("iactXobjeff", model_data$iactXobjeff))
     iact_data <- list(Nsupactions = nrow(model_data$superactions),
@@ -123,7 +127,7 @@ stan.prepare_data <- function(base_input_data, model_data,
                       iaction2obj = as.array(model_data$interactions$glm_object_ix),
                       Nmixtions = nrow(model_data$mixtions),
                       mixt2iact = as.array(model_data$mixtions$glm_iaction_ix),
-                      mixt2mix = as.array(model_data$mixtions$mixeffect_ix))
+                      mixt2mix = as.array(model_data$mixtions$mixcoef_ix))
     res <- modifyList(res, iact_data)
     res <- modifyList(res, matrix2csr("supactXmixt", model_data$supactXmixt))
   } else {

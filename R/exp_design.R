@@ -2,11 +2,12 @@
 # condition2effect weights
 #' @export
 conditionXeffect_frame <- function(conditionXeffect_mtx, effects_df) {
+  effects_df <- maybe_rename(effects_df, c("prior_tau" = "tau"))
   tibble::as_tibble(as.table(conditionXeffect_mtx)) %>%
     dplyr::filter(n != 0) %>% dplyr::rename(mult = n) %>%
     # estimate the weight of a condition in an effect
-    dplyr::inner_join(dplyr::select(effects_df, effect, tau)) %>%
-    dplyr::mutate(w = tau * mult) %>%
+    dplyr::inner_join(dplyr::select(effects_df, effect, prior_tau)) %>%
+    dplyr::mutate(w = prior_tau * mult) %>%
     dplyr::group_by_at(names(dimnames(conditionXeffect_mtx))[[1]]) %>%
     dplyr::mutate(eff_w = w/sum(w)) %>%
     dplyr::group_by_at(names(dimnames(conditionXeffect_mtx))[[2]]) %>%

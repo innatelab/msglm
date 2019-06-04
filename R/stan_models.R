@@ -68,6 +68,10 @@ stan.prepare_data <- function(base_input_data, model_data,
                      seq_len(nrow(model_data$mixeffects)))) {
     stop("model_data$mixeffects are not ordered")
   }
+  model_data$effects <- maybe_rename(model_data$effects, c("prior_mean" = "mean", "prior_tau" = "tau"))
+  if (is_glmm) {
+    model_data$mixeffects <- maybe_rename(model_data$mixeffects, c("prior_mean" = "mean", "prior_tau" = "tau"))
+  }
   res <- base_input_data
   res <- c(res, list(
     Nobservations = nrow(obs_df),
@@ -92,8 +96,8 @@ stan.prepare_data <- function(base_input_data, model_data,
     miss2observation = as.array(model_data$msdata$glm_observation_ix[!is.na(model_data$msdata$mdata_ix)]),
     qData = as.array(model_data$msdata$intensity[!is.na(model_data$msdata$intensity)]),
     global_labu_shift = global_labu_shift,
-    effect_tau = effects.df$tau,
-    effect_mean = effects.df$mean,
+    effect_tau = effects.df$prior_tau,
+    effect_mean = effects.df$prior_mean,
     obj_base_repl_shift_tau = base_repl_shift_tau,
     obj_effect_repl_shift_tau = effect_repl_shift_tau,
     obj_batch_effect_tau = batch_tau,
@@ -108,8 +112,8 @@ stan.prepare_data <- function(base_input_data, model_data,
   if (is_glmm) {
     message("Setting GLMM interaction data...")
     res$Nmix <- nrow(model_data$mixeffects)
-    res$mixeffect_mean <- as.array(model_data$mixeffects$mean)
-    res$mixeffect_tau <- as.array(model_data$mixeffects$tau)
+    res$mixeffect_mean <- as.array(model_data$mixeffects$prior_mean)
+    res$mixeffect_tau <- as.array(model_data$mixeffects$prior_tau)
 
     res <- modifyList(res, matrix2csr("iactXobjeff", model_data$iactXobjeff))
     iact_data <- list(Nsupactions = nrow(model_data$superactions),

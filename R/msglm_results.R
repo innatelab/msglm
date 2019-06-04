@@ -15,13 +15,18 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
         dplyr::distinct() %>%
         dplyr::inner_join(objs_df),
     object = model_data$objects, # use full object information
-    object_effect = dplyr::select(model_data$object_effects, -one_of("mean")) %>%
+    object_effect = model_data$object_effects %>%
         dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
-        dplyr::inner_join(objs_df),
-    object_batch_effect = dplyr::select(model_data$object_batch_effects, -one_of("mean")) %>%
+        dplyr::inner_join(objs_df) %>%
+        maybe_rename(c("prior_mean" = "mean", "prior_tau" = "tau")),
+    object_batch_effect = model_data$object_batch_effects %>%
         dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
         dplyr::inner_join(objs_df)
   )
+  if (!rlang::has_name(res$object_effect, "prior_mean")) { # set the default min to 0
+    message("effects$prior_mean missing, setting to 0")
+    res$object_effect$prior_mean <- 0.0
+  }
   if ("subobjects" %in% names(model_data)) {
     res$subobject <- dplyr::select(model_data$subobjects, glm_object_ix, glm_subobject_ix,
                                    one_of(c("protregroup_id", "protgroup_id", "pepmod_id", "pepmodstate_id", "charge")))
@@ -39,7 +44,12 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
   if (is_glmm) {
     res$object_mixeffect <- dplyr::mutate(model_data$mixeffects, tmp="a") %>%
       dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
-                       dplyr::select(-tmp, -one_of("mean"))
+                       dplyr::select(-tmp)
+    res$object_mixeffect <- maybe_rename(res$object_mixeffect, c("prior_mean" = "mean", "prior_tau" = "tau"))
+    if (!rlang::has_name(res$object_mixeffect, "prior_mean")) { # set the default min to 0
+      message("mixeffects$prior_mean missing, setting to 0")
+      res$object_mixeffect$prior_mean <- 0.0
+    }
     res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,
                                  glm_object_ix, iaction_id, action_ix, action, is_virtual) %>%
         dplyr::inner_join(objs_df) %>%

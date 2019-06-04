@@ -38,6 +38,23 @@ rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NU
   return (res)
 }
 
+maybe_rename <- function(df, cols, verbose=FALSE) {
+  for (i in seq_along(cols)) {
+    old_col <- cols[[i]]
+    if (rlang::has_name(df, old_col)) {
+      new_col <- names(cols)[[i]]
+      if (is.na(new_col) || (new_col == old_col)) next
+      if (rlang::has_name(df, new_col)) {
+        message(new_col, " already exists, ", old_col, " not renamed")
+      } else {
+        message("renaming ", old_col, " to ", new_col)
+        df <- dplyr::rename_at(df, c(new_col = old_col))
+      }
+    }
+  }
+  return(df)
+}
+
 # converts data.frame df (long format) into a matrix
 # using row_col and col_col as its rows and columns and val_col as its values
 #' @export

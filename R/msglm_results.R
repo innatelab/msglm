@@ -1,7 +1,7 @@
 #' @export
 msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
 {
-  is_glmm <- "mix_effects" %in% names(model_data)
+  is_glmm <- "mixeffects" %in% names(model_data)
   xaction_ix_col <- if (is_glmm) "glm_supaction_ix" else "glm_iaction_ix"
 
   objs_df <- model_data$objects
@@ -37,7 +37,7 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
     }
   }
   if (is_glmm) {
-    res$object_mix_effect <- dplyr::mutate(model_data$mix_effects, tmp="a") %>%
+    res$object_mixeffect <- dplyr::mutate(model_data$mixeffects, tmp="a") %>%
       dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
                        dplyr::select(-tmp, -one_of("mean"))
     res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,
@@ -478,7 +478,7 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
 process.stan_fit <- function(msglm.stan_fit, dims_info,
                              vars_info = attr(msglm.stan_fit, "msglm_vars_info"),
                              mschannel_col = "msrun_ix",
-                             effect_vars = unlist(lapply(vars_info, function(vi) str_subset(vi$names, "_effect(?:_replCI)?$"))),
+                             effect_vars = unlist(lapply(vars_info, function(vi) str_subset(vi$names, "_(?:mix)?effect(?:_replCI)?$"))),
                              contrast_vars = unlist(lapply(vars_info, function(vi) {
                                rel_dims <- names(dims_info)[sapply(names(dims_info), function(dname) any(str_detect(colnames(dims_info[[dname]]), "^(msrun|mschannel|condition|action)")))]
                                if (any(vi$dims %in% rel_dims)) str_subset(vi$names, "(?:labu|shift)(?:_replCI)?$") else c()

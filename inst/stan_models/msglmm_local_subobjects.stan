@@ -64,8 +64,8 @@ data {
   int<lower=1,upper=Niactions> mixt2iact[Nmixtions];
   int<lower=0,upper=Nmix> mixt2mix[Nmixtions];
 
-  vector[Nmix] mix_effect_mean;
-  vector<lower=0>[Nmix] mix_effect_tau;
+  vector[Nmix] mixeffect_mean;
+  vector<lower=0>[Nmix] mixeffect_tau;
 
   vector[Nexperiments] experiment_shift;
 
@@ -386,9 +386,9 @@ parameters {
   vector<lower=0.0>[NobjBatchEffectsPos] obj_batch_effect_unscaled_pos;
   vector[NobjBatchEffectsOther] obj_batch_effect_unscaled_other;
 
-  vector<lower=0.0>[Nmix] obj_mix_effect_lambda_t;
-  vector<lower=0.0>[Nmix] obj_mix_effect_lambda_a;
-  vector[Nmix] obj_mix_effect_unscaled;
+  vector<lower=0.0>[Nmix] obj_mixeffect_lambda_t;
+  vector<lower=0.0>[Nmix] obj_mixeffect_lambda_a;
+  vector[Nmix] obj_mixeffect_unscaled;
 }
 
 transformed parameters {
@@ -397,8 +397,8 @@ transformed parameters {
   vector<lower=0>[NobjEffects] obj_effect_sigma;
   vector[NobjBatchEffects] obj_batch_effect;
 
-  vector<lower=0>[Nmix] obj_mix_effect_sigma;
-  vector[Nmix] obj_mix_effect;
+  vector<lower=0>[Nmix] obj_mixeffect_sigma;
+  vector[Nmix] obj_mixeffect;
 
   vector[Niactions] iaction_labu;
   vector[Nsupactions] supaction_labu;
@@ -418,9 +418,9 @@ transformed parameters {
     obj_base_labu = obj_base_labu0;
   }
 
-  // calculate obj_mix_effects
-  obj_mix_effect_sigma = obj_mix_effect_lambda_a .* inv_sqrt(obj_mix_effect_lambda_t) .* mix_effect_tau;
-  obj_mix_effect = mix_effect_mean + obj_mix_effect_unscaled .* obj_mix_effect_sigma;
+  // calculate obj_mixeffects
+  obj_mixeffect_sigma = obj_mixeffect_lambda_a .* inv_sqrt(obj_mixeffect_lambda_t) .* mixeffect_tau;
+  obj_mixeffect = mixeffect_mean + obj_mixeffect_unscaled .* obj_mixeffect_sigma;
 
   // calculate object effects lambdas and scale effects
   obj_effect_sigma = obj_effect_lambda_a .* inv_sqrt(obj_effect_lambda_t) .* obj_effect_tau;
@@ -437,7 +437,7 @@ transformed parameters {
     preiaction_labu = csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect);
     //print("preiaction_labu=", preiaction_labu);
     // distribute iaction_labu components to mixtures and convert to exponent
-    mixtion_abu = exp(preiaction_labu[mixt2iact] + append_row(0.0, obj_mix_effect)[mixt2mix_ext]);
+    mixtion_abu = exp(preiaction_labu[mixt2iact] + append_row(0.0, obj_mixeffect)[mixt2mix_ext]);
     //print("mixtion_abu=", mixtion_abu);
     // do mixing
     supaction_abu = csr_matrix_times_vector(Nsupactions, Nmixtions, supactXmixt_w, supactXmixt_v, supactXmixt_u, mixtion_abu);
@@ -508,9 +508,9 @@ model {
     // batch effect parameters, cauchy prior on sigma
     //condition_repl_effect_sigma ~ inv_gamma(1.5, 1.0);
 
-    obj_mix_effect_lambda_t ~ chi_square(2.0);
-    obj_mix_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
-    obj_mix_effect_unscaled ~ normal(0.0, 1.0);
+    obj_mixeffect_lambda_t ~ chi_square(2.0);
+    obj_mixeffect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+    obj_mixeffect_unscaled ~ normal(0.0, 1.0);
 
     //underdef_obj_shift ~ normal(0.0, 10.0);
 

@@ -21,8 +21,8 @@ msglm.vars_info <- list(
 )
 
 msglmm.vars_info <- msglm.vars_info
-msglmm.vars_info$object_mix_effects <- list(names = c("obj_mix_effect", "obj_mix_effect_sigma"),
-                                            dims = c("object_mix_effect"))
+msglmm.vars_info$object_mixeffects <- list(names = c("obj_mixeffect", "obj_mixeffect_sigma"),
+                                            dims = c("object_mixeffect"))
 msglmm.vars_info$supactions <- list(names = c("supaction_labu", "supact_repl_shift_sigma"),
                                     dims = c("supaction"))
 
@@ -46,7 +46,7 @@ stan.prepare_data <- function(base_input_data, model_data,
                               batch_tau=0.3)
 {
   message('Converting MSGLM model data to Stan-readable format...')
-  is_glmm <- "mix_effects" %in% names(model_data)
+  is_glmm <- "mixeffects" %in% names(model_data)
   if (any(as.integer(model_data$effects$effect) != seq_len(nrow(model_data$effects)))) {
     stop("model_data$effects are not ordered")
   }
@@ -64,9 +64,9 @@ stan.prepare_data <- function(base_input_data, model_data,
   if (any(obs_df$glm_observation_ix != seq_len(nrow(obs_df)))) {
     stop("model_data$msdata not ordered by observations / have missing observations")
   }
-  if (is_glmm && any(as.integer(model_data$mix_effects$mix_effect) !=
-                     seq_len(nrow(model_data$mix_effects)))) {
-    stop("model_data$mix_effects are not ordered")
+  if (is_glmm && any(as.integer(model_data$mixeffects$mixeffect) !=
+                     seq_len(nrow(model_data$mixeffects)))) {
+    stop("model_data$mixeffects are not ordered")
   }
   res <- base_input_data
   res <- c(res, list(
@@ -107,9 +107,9 @@ stan.prepare_data <- function(base_input_data, model_data,
 
   if (is_glmm) {
     message("Setting GLMM interaction data...")
-    res$Nmix <- nrow(model_data$mix_effects)
-    res$mix_effect_mean <- as.array(model_data$mix_effects$mean)
-    res$mix_effect_tau <- as.array(model_data$mix_effects$tau)
+    res$Nmix <- nrow(model_data$mixeffects)
+    res$mixeffect_mean <- as.array(model_data$mixeffects$mean)
+    res$mixeffect_tau <- as.array(model_data$mixeffects$tau)
 
     res <- modifyList(res, matrix2csr("iactXobjeff", model_data$iactXobjeff))
     iact_data <- list(Nsupactions = nrow(model_data$superactions),
@@ -119,7 +119,7 @@ stan.prepare_data <- function(base_input_data, model_data,
                       iaction2obj = as.array(model_data$interactions$glm_object_ix),
                       Nmixtions = nrow(model_data$mixtions),
                       mixt2iact = as.array(model_data$mixtions$glm_iaction_ix),
-                      mixt2mix = as.array(model_data$mixtions$mix_effect_ix))
+                      mixt2mix = as.array(model_data$mixtions$mixeffect_ix))
     res <- modifyList(res, iact_data)
     res <- modifyList(res, matrix2csr("supactXmixt", model_data$supactXmixt))
   } else {

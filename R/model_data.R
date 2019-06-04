@@ -59,14 +59,14 @@ iactXeffect <- function(expXeff, iact2obj, iact2exp) {
 #' @export
 prepare_effects <- function(model_data, underdefined_iactions=FALSE)
 {
-  is_glmm <- exists("mix_condXact.mtxs") && exists("mix_effects.df")
+  is_glmm <- exists("mix_condXact.mtxs") && exists("mixeffects.df")
   if (is_glmm) {
-    message("Detected mix_effects data for GLMM model")
+    message("Detected mixeffects data for GLMM model")
     # "GLMM" mixing model
-    if (any(names(mix_condXact.mtxs) != c("(Intercept)", as.character(mix_effects.df$mix_effect)))) {
+    if (any(names(mix_condXact.mtxs) != c("(Intercept)", as.character(mixeffects.df$mixeffect)))) {
       stop("Mismatch between mix_condXact.mtxs matrix names and mix effect names")
     }
-    model_data$mix_effects <- mix_effects.df
+    model_data$mixeffects <- mixeffects.df
     model_data$mix_condXact <- mix_condXact.mtxs
     sactXiact.mtxs <- lapply(model_data$mix_condXact, function(condXact.mtx){
       res <- iactXeffect(condXact.mtx,
@@ -88,14 +88,14 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
       dplyr::left_join(dplyr::select(model_data$conditions, condition, condition_ix)) %>%
       dplyr::mutate(glm_iaction_ix = row_number(),
              is_virtual = FALSE)
-    model_data$mixtions <- dplyr::bind_rows(lapply(names(sactXiact.mtxs), function(mix_eff){
-      tibble::tibble(mix_effect = mix_eff,
-                     iaction_id = colnames(sactXiact.mtxs[[mix_eff]]$mtx))
+    model_data$mixtions <- dplyr::bind_rows(lapply(names(sactXiact.mtxs), function(mixeff){
+      tibble::tibble(mixeffect = mixeff,
+                     iaction_id = colnames(sactXiact.mtxs[[mixeff]]$mtx))
     })) %>%
       dplyr::mutate(mixtion_ix = row_number(),
-                    mixtion = paste0(mix_effect, " ", iaction_id),
-                    mix_effect = factor(mix_effect, levels=levels(mix_effects.df$mix_effect)),
-                    mix_effect_ix = coalesce(as.integer(mix_effect), 0L)) %>%
+                    mixtion = paste0(mixeffect, " ", iaction_id),
+                    mixeffect = factor(mixeffect, levels=levels(mixeffects.df$mixeffect)),
+                    mixeffect_ix = coalesce(as.integer(mixeffect), 0L)) %>%
     dplyr::left_join(dplyr::select(model_data$interactions, iaction_id, glm_iaction_ix)) %>%
     dplyr::arrange(mixtion_ix)
     model_data$supactXmixt <- do.call(cbind, lapply(sactXiact.mtxs, function(x) x$mtx))

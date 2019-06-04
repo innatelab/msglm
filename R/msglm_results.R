@@ -66,7 +66,8 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
 }
 
 #' @export
-vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info, tail = c("both", "negative", "positive"))
+vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info,
+                               tail = c("both", "negative", "positive"))
 {
   tail = match.arg(tail)
   group_cols <- paste0('index_', vars_cat_info$dims)
@@ -534,7 +535,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
       ctg_subset_info$names <- intersect(ctg_subset_info$names, effect_vars)
 
       if (length(ctg_subset_info$names) > 0 & !is.null(res[[ctg]]$samples)) {
-        message( 'Calculating P-values for ', ctg, ' variables...' )
+        message('Calculating P-values for ', ctg, ' variables...')
         p_value.df <- vars_effect_pvalue(res[[ctg]]$samples, ctg_subset_info, dims_info)
         #print(str(p_value.df))
         #print(str(stats.df))

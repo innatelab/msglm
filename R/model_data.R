@@ -59,16 +59,16 @@ iactXeffect <- function(expXeff, iact2obj, iact2exp) {
 #' @export
 prepare_effects <- function(model_data, underdefined_iactions=FALSE)
 {
-  is_glmm <- exists("mix_condXact.mtxs") && exists("mixeffects.df")
+  is_glmm <- exists("supXcond.mtxs") && exists("mixeffects.df")
   if (is_glmm) {
     message("Detected mixeffects data for GLMM model")
     # "GLMM" mixing model
-    if (any(names(mix_condXact.mtxs) != c("(Intercept)", as.character(mixeffects.df$mixeffect)))) {
-      stop("Mismatch between mix_condXact.mtxs matrix names and mix effect names")
+    if (any(names(supXcond.mtxs) != c("(Intercept)", as.character(mixeffects.df$mixeffect)))) {
+      stop("Mismatch between supXcond.mtxs matrix names and mix effect names")
     }
     model_data$mixeffects <- mixeffects.df
-    model_data$mix_condXact <- mix_condXact.mtxs
-    sactXiact.mtxs <- lapply(model_data$mix_condXact, function(condXact.mtx){
+    model_data$supXcond <- supXcond.mtxs
+    sactXiact.mtxs <- lapply(model_data$supXcond, function(supXcond.mtx){
       res <- iactXeffect(condXact.mtx,
                          model_data$superactions$glm_object_ix,
                          model_data$superactions$condition_ix)
@@ -84,7 +84,7 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
       return(res)
     })
     model_data$interactions <- dplyr::distinct(dplyr::bind_rows(lapply(sactXiact.mtxs, function(x) x$iaction_df))) %>%
-      dplyr::mutate(action_ix = factor(action, levels = colnames(mix_condXact.mtxs[[1]]))) %>%
+      dplyr::mutate(action_ix = factor(action, levels = colnames(supXcond.mtxs[[1]]))) %>%
       dplyr::left_join(dplyr::select(model_data$conditions, condition, condition_ix)) %>%
       dplyr::mutate(glm_iaction_ix = row_number(),
              is_virtual = FALSE)

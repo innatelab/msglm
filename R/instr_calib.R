@@ -41,7 +41,7 @@ log1pexp <- function(x) { log1p(exp(x)) }
 
 instrument.detection_likelihood_log <- function(is_detected, expected_log, instr_calib) {
   z = expected_log * instr_calib$signalLogDetectionFactor + instr_calib$signalLogDetectionIntercept
-  return ( sapply(z, function(x) if_else( is_detected, -log1pexp(-x), #+params.logDetectionMax # invlogit(z)*detMax
-                    -log1pexp(x) ) ) ) #logsumexp( -Distributions.log1pexp(z)+params.logDetectionMax, params.log1mDetectionMax ) ) # invlogit(-z)*detMax+(1-detMax)
+  return (sapply(z, function(x) if_else(is_detected, -log1pexp(-x), #+params.logDetectionMax # invlogit(z)*detMax
+                    -log1pexp(x)))) #logsumexp( -Distributions.log1pexp(z)+params.logDetectionMax, params.log1mDetectionMax ) ) # invlogit(-z)*detMax+(1-detMax)
 }
 

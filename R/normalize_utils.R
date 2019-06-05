@@ -307,7 +307,7 @@ multilevel_normalize_experiments <- function(instr_calib,
                                            vb.iter=vb.iter, verbose=verbose)
     lev_shift_col <- paste0(lev_name, "_shift")
     mschan_shifts_df <- dplyr::left_join(mschan_shifts_df,
-                                          dplyr::select_at(lev_shifts_df, c(lev_info$cond_col, "shift")))
+                                         dplyr::select_at(lev_shifts_df, c(lev_info$cond_col, "shift")))
     colnames(mschan_shifts_df)[colnames(mschan_shifts_df)=="shift"] <- lev_shift_col
     mschan_shifts_df[[total_shift_col]] <- mschan_shifts_df[[total_shift_col]] +
           tidyr::replace_na(mschan_shifts_df[[lev_shift_col]], 0.0)

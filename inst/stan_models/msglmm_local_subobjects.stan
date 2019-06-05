@@ -67,7 +67,7 @@ data {
 
   vector[NmixEffects] mixeffect_mean;
   vector<lower=0>[NmixEffects] mixeffect_tau;
-  matrix[NmixEffects, Nmix] mixeffXcoef;
+  matrix[Nmix, NmixEffects] mixcoefXeff;
 
   vector[Nexperiments] experiment_shift;
 
@@ -383,9 +383,9 @@ parameters {
   vector<lower=0.0>[NobjBatchEffectsPos] obj_batch_effect_unscaled_pos;
   vector[NobjBatchEffectsOther] obj_batch_effect_unscaled_other;
 
-  vector<lower=0.0>[Nmix] obj_mixeffect_lambda_t;
-  vector<lower=0.0>[Nmix] obj_mixeffect_lambda_a;
-  vector[Nmix] obj_mixeffect_unscaled;
+  vector<lower=0.0>[NmixEffects] obj_mixeffect_lambda_t;
+  vector<lower=0.0>[NmixEffects] obj_mixeffect_lambda_a;
+  vector[NmixEffects] obj_mixeffect_unscaled;
 }
 
 transformed parameters {
@@ -419,7 +419,7 @@ transformed parameters {
   // calculate obj_mixeffects
   obj_mixeffect_sigma = obj_mixeffect_lambda_a .* inv_sqrt(obj_mixeffect_lambda_t) .* mixeffect_tau;
   obj_mixeffect = mixeffect_mean + obj_mixeffect_unscaled .* obj_mixeffect_sigma;
-  obj_mixcoef = mixeffXcoef * obj_mixeffect;
+  obj_mixcoef = mixcoefXeff * obj_mixeffect;
 
   // calculate object effects lambdas and scale effects
   obj_effect_sigma = obj_effect_lambda_a .* inv_sqrt(obj_effect_lambda_t) .* obj_effect_tau;

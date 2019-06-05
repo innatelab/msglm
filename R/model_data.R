@@ -63,39 +63,53 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
   if (is_glmm) {
     message("Detected mixeffects data for GLMM model")
     # "GLMM" mixing model
-    if (any(names(supXcond.mtxs) != c("(Intercept)", as.character(mixeffects.df$mixeffect)))) {
-      stop("Mismatch between supXcond.mtxs matrix names and mix effect names")
+    if (any(names(supXcond.mtxs) != rownames(mixcoefXeff.mtx))) {
+      stop("Mismatch between supXcond.mtxs matrix names and mix coefficient names")
+    }
+    if (any(mixeffects.df$mixeffect != colnames(mixcoefXeff.mtx))) {
+      stop("Mismatch between mixcoefXeff.mtx matrix colnames and mix effect names")
+    }
+    for (i in seq_along(supXcond.mtxs)) {
+      if (any(colnames(supXcond.mtxs[[i]]) != model_data$conditions$condition)) {
+        stop("Mismatch between supXcond.mtxs[[", names(supXcond.mtxs)[[i]],
+             "]] matrix colnames and condition names")
+      }
+      if (any(rownames(supXcond.mtxs[[i]]) != model_data$supconditions$supcondition)) {
+        stop("Mismatch between supXcond.mtxs[[", names(supXcond.mtxs)[[i]],
+             "]] matrix rownames and supcondition names")
+      }
     }
     model_data$mixeffects <- mixeffects.df
+    model_data$mixcoefs <- tibble(mixcoef = rownames(mixcoefXeff.mtx))
+    model_data$mixcoefXeff <- mixcoefXeff.mtx
     model_data$supXcond <- supXcond.mtxs
     sactXiact.mtxs <- lapply(model_data$supXcond, function(supXcond.mtx){
-      res <- iactXeffect(condXact.mtx,
+      res <- iactXeffect(supXcond.mtx,
                          model_data$superactions$glm_object_ix,
-                         model_data$superactions$condition_ix)
+                         model_data$superactions$supcondition_ix)
       dimnames(res$mtx) <- list(sact=dimnames(res$mtx)[[1]],
                                 iact=dimnames(res$mtx)[[2]])
       res$mtx <- res$mtx[, colSums(abs(res$mtx)) != 0.0, drop=FALSE]
       res$df <- dplyr::rename(res$df, act=eff, iact=objeff)
-      res$iaction_df <- dplyr::rename(res$objeff_df, action=eff,
+      res$iaction_df <- dplyr::rename(res$objeff_df, condition=eff,
                                       iaction_id=objeff,
-                                      glm_object_ix=obj) %>%
-        dplyr::mutate(condition = action)
+                                      glm_object_ix=obj)
       res$objeff_df <- NULL
       return(res)
     })
     model_data$interactions <- dplyr::distinct(dplyr::bind_rows(lapply(sactXiact.mtxs, function(x) x$iaction_df))) %>%
-      dplyr::mutate(action_ix = factor(action, levels = colnames(supXcond.mtxs[[1]]))) %>%
-      dplyr::left_join(dplyr::select(model_data$conditions, condition, condition_ix)) %>%
+      dplyr::mutate(condition = factor(condition, levels = colnames(supXcond.mtxs[[1]])),
+                    condition_ix = as.integer(condition)) %>%
       dplyr::mutate(glm_iaction_ix = row_number(),
              is_virtual = FALSE)
-    model_data$mixtions <- dplyr::bind_rows(lapply(names(sactXiact.mtxs), function(mixeff){
-      tibble::tibble(mixeffect = mixeff,
-                     iaction_id = colnames(sactXiact.mtxs[[mixeff]]$mtx))
+    model_data$mixtions <- dplyr::bind_rows(lapply(names(sactXiact.mtxs), function(mixcoef){
+      tibble::tibble(mixcoef = mixcoef,
+                     iaction_id = colnames(sactXiact.mtxs[[mixcoef]]$mtx))
     })) %>%
       dplyr::mutate(mixtion_ix = row_number(),
-                    mixtion = paste0(mixeffect, " ", iaction_id),
-                    mixeffect = factor(mixeffect, levels=levels(mixeffects.df$mixeffect)),
-                    mixeffect_ix = coalesce(as.integer(mixeffect), 0L)) %>%
+                    mixtion = paste0(mixcoef, " ", iaction_id),
+                    mixcoef = factor(mixcoef, levels=rownames(mixcoefXeff.mtx)),
+                    mixcoef_ix = coalesce(as.integer(mixcoef), 0L)) %>%
     dplyr::left_join(dplyr::select(model_data$interactions, iaction_id, glm_iaction_ix)) %>%
     dplyr::arrange(mixtion_ix)
     model_data$supactXmixt <- do.call(cbind, lapply(sactXiact.mtxs, function(x) x$mtx))
@@ -112,7 +126,7 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
   model_data$iactXobjeff <- iactXobjeff$mtx
   dimnames(model_data$iactXobjeff) <- list(interaction = model_data$interactions$iaction_id,
                                            objeff = dimnames(model_data$iactXobjeff)[[2]])
-  model_data$effects <- dplyr::select(effects.df, effect, is_positive) %>%
+  model_data$effects <- effects.df %>%
       dplyr::mutate(effect = factor(effect, levels=levels(model_data$object_effects$effect))) %>%
       dplyr::arrange(effect)
 

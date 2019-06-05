@@ -3,28 +3,31 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
 {
   is_glmm <- "mixeffects" %in% names(model_data)
   xaction_ix_col <- if (is_glmm) "glm_supaction_ix" else "glm_iaction_ix"
+  xdition_ix_col <- if (is_glmm) "supcondition_ix" else "condition_ix"
+  xdition_col <-  if (is_glmm) "supcondition" else "condition"
 
   objs_df <- model_data$objects
   if (!is.null(object_cols)) {
     objs_df <- dplyr::select(objs_df, !!!unique(c("glm_object_ix", object_cols)))
   }
   res <- list(iteration = NULL,
-    msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, condition),
+    msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, one_of("condition", "supcondition")),
     observation = dplyr::select(model_data$msdata, glm_observation_ix, !!xaction_ix_col, glm_object_ix,
-                                condition_ix, condition, msrun, msrun_ix) %>%
+                                !!xdition_ix_col, !!xdition_col, msrun, msrun_ix) %>%
         dplyr::distinct() %>%
         dplyr::inner_join(objs_df),
     object = model_data$objects, # use full object information
     object_effect = model_data$object_effects %>%
         dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
         dplyr::inner_join(objs_df) %>%
+        dplyr::inner_join(model_data$effects) %>%
         maybe_rename(c("prior_mean" = "mean", "prior_tau" = "tau")),
     object_batch_effect = model_data$object_batch_effects %>%
         dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
         dplyr::inner_join(objs_df)
   )
   if (!rlang::has_name(res$object_effect, "prior_mean")) { # set the default min to 0
-    message("effects$prior_mean missing, setting to 0")
+    message("object_effects$prior_mean missing, setting to 0")
     res$object_effect$prior_mean <- 0.0
   }
   if ("subobjects" %in% names(model_data)) {
@@ -41,6 +44,9 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
                                                     rep(res$msprotocol[-1], each=nrow(res$subobject)))
     }
   }
+  res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,
+                               glm_object_ix, iaction_id, condition_ix, condition, is_virtual) %>%
+    dplyr::inner_join(objs_df)
   if (is_glmm) {
     res$object_mixeffect <- dplyr::mutate(model_data$mixeffects, tmp="a") %>%
       dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
@@ -50,16 +56,11 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
       message("mixeffects$prior_mean missing, setting to 0")
       res$object_mixeffect$prior_mean <- 0.0
     }
-    res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,
-                                 glm_object_ix, iaction_id, action_ix, action, is_virtual) %>%
-        dplyr::inner_join(objs_df) %>%
-        dplyr::rename(condition = action) # FIXME: hack to make contrasts works
+    res$object_mixcoef <- dplyr::mutate(model_data$mixcoefs, tmp="a") %>%
+      dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
+      dplyr::select(-tmp)
     res$supaction <- dplyr::select(model_data$superactions, glm_supaction_ix,
-                                   glm_object_ix, supaction_id, condition_ix, condition, is_virtual) %>%
-        dplyr::inner_join(objs_df)
-  } else {
-    res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,
-                                 glm_object_ix, iaction_id, condition_ix, condition, is_virtual) %>%
+                                   glm_object_ix, supaction_id, supcondition_ix, supcondition, is_virtual) %>%
         dplyr::inner_join(objs_df)
   }
   return(res)
@@ -360,6 +361,9 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
     vars_cat_subset_info$names <- intersect(vars_cat_subset_info$names, var_names)
     if (length(vars_cat_subset_info$names) > 0) {
       message('Filtering ', vars_category, ' to use for contrasts...')
+      if (!rlang::has_name(vars_results[[vars_category]]$stats, "condition")) {
+        next # FIXME skipping supcondition-related vars
+      }
       cond_stats.df <- dplyr::inner_join(vars_results[[vars_category]]$stats,
                                          dplyr::mutate(contrastXcondition.df, is_lhs = weight > 0)) %>%
         dplyr::group_by_at(c(obj_id_cols, contrast_col, metacondition_col,

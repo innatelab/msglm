@@ -113,11 +113,11 @@ stan.prepare_data <- function(base_input_data, model_data,
 
   if (is_glmm) {
     message("Setting GLMM interaction data...")
-    res$Nmix <- nrow(model_data$mixeffXcoef)
+    res$Nmix <- nrow(model_data$mixcoefXeff)
     res$NmixEffects <- nrow(model_data$mixeffects)
     res$mixeffect_mean <- as.array(model_data$mixeffects$prior_mean)
     res$mixeffect_tau <- as.array(model_data$mixeffects$prior_tau)
-    res$mixeffXcoef <- as.matrix(model_data$mixeffXcoef)
+    res$mixcoefXeff <- as.matrix(model_data$mixcoefXeff)
 
     res <- modifyList(res, matrix2csr("iactXobjeff", model_data$iactXobjeff))
     iact_data <- list(Nsupactions = nrow(model_data$superactions),

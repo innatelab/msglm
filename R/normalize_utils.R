@@ -43,15 +43,13 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
     if (nrow(msdata_df) == 0L) {
         # degenerated case, no data
         warning("No valid observations in group ", condgroup_id)
-        res <- tibble(condition = as.character(msdata_df$condition[1]),
-                      shift = 0.0)
-        colnames(res) <- c(cond_col, "shift")
+        res <- tibble(condition = unique(msdata_df$condition),
+                      shift = 0.0) %>% rlang::set_names(nm=c(cond_col, "shift"))
         return (res)
     } else if (n_distinct(msdata_df$condition) == 1L) {
         # another degenerated case, single condition
-        res <- tibble(condition = as.character(msdata_df$condition[1]),
-                      shift = 0.0)
-        colnames(res) <- c(cond_col, "shift")
+        res <- tibble(condition = msdata_df$condition[1],
+                      shift = 0.0) %>% rlang::set_names(nm=c(cond_col, "shift"))
         return (res)
     }
     #if (any(is.na(msdata_df$quant))) {

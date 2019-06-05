@@ -3,11 +3,6 @@
 # Author: astukalov
 ###############################################################################
 
-# coalesce with null (y if x is null or empty, x otherwise)
-"%||%" <- function(x, y) {
-  if (!is.null(x) && length(x) > 0) x else y
-}
-
 # calculate normalization shifts within one MS condition group
 #' @export
 norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,

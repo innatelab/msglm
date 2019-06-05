@@ -37,6 +37,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
     } else {
         valid_objs
     }
+    msdata_df_orig <- msdata_df
     msdata_df <- dplyr::semi_join(msdata_df, sel_objs)
     stan_input <- stan_input_base
     stan_input$Nobjects <- nrow(sel_objs)
@@ -138,6 +139,10 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
         res$shift <- res$shift - median(res$shift)
     } else if (shifts_constraint == "mean=0") {
         res$shift <- res$shift - mean(res$shift)
+    }
+    # fix back the condition col into logical
+    if (is.logical(msdata_df_orig$condition)) {
+      res <- dplyr::mutate(res, condition = as.logical(condition))
     }
     col_renames <- "condition"
     names(col_renames) <- cond_col

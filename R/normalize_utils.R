@@ -27,7 +27,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
                        quant_max = max(norm_quant, na.rm=TRUE),
                        sd = sd(norm_quant, na.rm=TRUE)) %>% dplyr::ungroup() %>%
       dplyr::mutate(sd_rel = sd/quant_med,
-                    sd_quantile = percent_rank(if_else(!is.na(sd_rel), sd_rel, Inf)),
+                    sd_quantile = percent_rank(replace_na(sd_rel, Inf)),
                     is_valid = is.na(quant_ratio.max) |
                                (quant_min*quant_ratio.max > quant_med &
                                 quant_max < quant_ratio.max*quant_med))
@@ -88,7 +88,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
                                                   levels=levels(mschan_df$mschannel)))
     msdata_df <- dplyr::left_join(tidyr::expand(msdata_df, obj, mschannel), msdata_df) %>%
       dplyr::arrange(as.integer(obj), as.integer(mschannel)) %>%
-      dplyr::mutate(safe_quant = if_else(is.na(quant), 0.0, quant))
+      dplyr::mutate(safe_quant = replace_na(quant, 0.0))
 
     stan_input$qData <- matrix(msdata_df$safe_quant,
                                ncol = nrow(mschan_df),
@@ -280,8 +280,7 @@ multilevel_normalize_experiments <- function(instr_calib,
     # use exisiting shifts
     mschan_shifts_df <- mschan_preshifts_df[c(mschan_col, mschan_preshift_col)]
     mschan_shifts_df <- dplyr::left_join(mschan_df, mschan_shifts_df)
-    mschan_shifts_df[[total_shift_col]] <- if_else(!is.na(mschan_shifts_df[[mschan_preshift_col]]),
-                                                   mschan_shifts_df[[mschan_preshift_col]], 0.0)
+    mschan_shifts_df[[total_shift_col]] <- replace_na(mschan_shifts_df[[mschan_preshift_col]])
   }
   lev_norm_res <- list()
   for (i in seq_along(norm_levels)) {
@@ -313,8 +312,7 @@ multilevel_normalize_experiments <- function(instr_calib,
                                           dplyr::select_at(lev_shifts_df, c(lev_info$cond_col, "shift")))
     colnames(mschan_shifts_df)[colnames(mschan_shifts_df)=="shift"] <- lev_shift_col
     mschan_shifts_df[[total_shift_col]] <- mschan_shifts_df[[total_shift_col]] +
-          if_else(is.na(mschan_shifts_df[[lev_shift_col]]), 0.0,
-                  mschan_shifts_df[[lev_shift_col]])
+          tidyr::replace_na(mschan_shifts_df[[lev_shift_col]], 0.0)
     lev_norm_res[[lev_name]] <- list(level_shifts = lev_shifts_df,
                                      mschannel_shifts = mschan_shifts_df)
   }

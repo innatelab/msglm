@@ -136,16 +136,15 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
         stop('Unknown method ', stan_method)
     }
     if (shifts_constraint == "median=0") {
-        res$shift <- res$shift - median(res$shift)
+        res <- dplyr::mutate(res, shift = shift - median(shift))
     } else if (shifts_constraint == "mean=0") {
-        res$shift <- res$shift - mean(res$shift)
+        res <- dplyr::mutate(res, shift = shift - mean(shift))
     }
     # fix back the condition col into logical
     if (is.logical(msdata_df_orig$condition)) {
       res <- dplyr::mutate(res, condition = as.logical(condition))
     }
-    col_renames <- "condition"
-    names(col_renames) <- cond_col
+    col_renames <- rlang::set_names("condition", nm=cond_col)
     res <- dplyr::rename(res, !!!col_renames) %>%
       dplyr::mutate(
         stan_method = stan_method,
@@ -184,8 +183,7 @@ normalize_experiments <- function(stan_input_base, msdata_df,
       mschan_preshifts <- tibble(mschannel = sort(unique(msdata_df_std$mschannel)),
                                  preshift = rep.int(0.0, n_distinct(msdata_df_std$mschannel)))
     } else {
-      mschan_preshifts <- mschan_preshifts[,c(mschan_col, preshift_col)]
-      colnames(mschan_preshifts) <- c("mschannel", "preshift")
+      mschan_preshifts <- dplyr::select_at(mschan_preshifts, c(mschannel = mschan_col, preshift = preshift_col))
     }
     if (!is.na(mschan_shift.min) && is.finite(mschan_shift.min)) {
       mschan_preshifts <- dplyr::inner_join(mschan_preshifts, dplyr::distinct(dplyr::select(msdata_df_std, mschannel, condgroup))) %>%
@@ -276,8 +274,8 @@ multilevel_normalize_experiments <- function(instr_calib,
     mschan_shifts_df[[total_shift_col]] <- 0.0
   } else {
     # use exisiting shifts
-    mschan_shifts_df <- mschan_preshifts_df[c(mschan_col, mschan_preshift_col)]
-    mschan_shifts_df <- dplyr::left_join(mschan_df, mschan_shifts_df)
+    mschan_shifts_df <- dplyr::select_at(mschan_preshifts_df, c(mschan_col, mschan_preshift_col))
+    mschan_shifts_df <- dplyr::left_join(mschan_df, mschan_shifts_df, by = mschan_col)
     mschan_shifts_df[[total_shift_col]] <- replace_na(mschan_shifts_df[[mschan_preshift_col]])
   }
   lev_norm_res <- list()

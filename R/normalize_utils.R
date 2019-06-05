@@ -290,7 +290,7 @@ multilevel_normalize_experiments <- function(instr_calib,
                                            obj_col = obj_col, quant_col = quant_col,
                                            mschan_col = mschan_col,
                                            cond_col = lev_info$cond_col,
-                                           condgroup_col = lev_info$condgroup_col %||% (next_lev_info$cond_col %||% NULL),
+                                           condgroup_col = if (rlang::has_name(lev_info, "condgroup_col")) {lev_info$condgroup_col} else {next_lev_info$cond_col %||% NULL}, # NULL in lev_info is possible
                                            mschan_preshifts = mschan_shifts_df,
                                            preshift_col = if (is.null(mschan_shifts_df)) NA_character_ else total_shift_col,
                                            shifts_constraint = lev_info$shifts_contraint %||% shifts_constraint,

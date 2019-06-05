@@ -56,13 +56,15 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
     #if (any(is.na(msdata_df$quant))) {
     #  stop("Non-quanted observations detected")
     #}
-    mschan_df <- dplyr::select(msdata_df, mschannel, condition) %>%
-      dplyr::distinct() %>% dplyr::arrange(condition, mschannel) %>%
+    mschan_df <- dplyr::select(msdata_df, mschannel, condition, sumgroup) %>%
+      dplyr::distinct() %>% dplyr::arrange(sumgroup, condition, mschannel) %>%
       dplyr::mutate(mschannel = as.character(mschannel),
-                    condition = as.character(condition)) %>%
+                    condition = as.character(condition),
+                    sumgroup = as.character(sumgroup)) %>%
       dplyr::inner_join(mschan_preshifts) %>%
       dplyr::mutate(mschannel = factor(mschannel, levels=mschannel),
-                    condition = factor(condition, levels=unique(condition))) %>%
+                    condition = factor(condition, levels=unique(condition)),
+                    sumgroup = factor(sumgroup, levels=unique(sumgroup))) %>%
       dplyr::arrange(as.integer(mschannel))
     if (any(is.na(mschan_df$preshift))) {
         warning("No pre-shifts for mschannels: ",
@@ -70,11 +72,14 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
     }
     stan_input$Nmschannels <- nrow(mschan_df)
     stan_input$Nshifts <- n_distinct(mschan_df$condition)
+    stan_input$Nsumgroups <- n_distinct(mschan_df$sumgroup)
     message("Normalizing group '", condgroup_id, "', ",
             stan_input$Nobjects, " object(s), ",
             stan_input$Nshifts, " shift(s) to identify, ",
-            stan_input$Nmschannels, " mschannel(s)")
+            stan_input$Nmschannels, " mschannel(s), ",
+            stan_input$Nsumgroups, " averaging mschannel group(s)")
     stan_input$mschannel2shift <- as.array(as.integer(mschan_df$condition))
+    stan_input$mschannel2sumgroup <- as.array(as.integer(mschan_df$sumgroup))
     stan_input$mschannel_preshift <- as.array(mschan_df$preshift)
     msdata_df <- dplyr::mutate(msdata_df,
                                obj = factor(as.character(obj)),
@@ -156,7 +161,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
 #' @export
 normalize_experiments <- function(stan_input_base, msdata_df,
                                   quant_col = "intensity", obj_col = "protgroup_id",
-                                  mschan_col = "mschannel", cond_col="condition", condgroup_col = NULL,
+                                  mschan_col = "mschannel", cond_col="condition", condgroup_col = NULL, sumgroup_col = NULL,
                                   mschan_preshifts = NULL, preshift_col="shift",
                                   stan_method = c("mcmc", "optimizing", "vb"),
                                   max_objs=1000L,
@@ -175,9 +180,13 @@ normalize_experiments <- function(stan_input_base, msdata_df,
       msdata_df$`__fake_condgroup__` <- TRUE
       condgroup_col <- "__fake_condgroup__"
     }
-    # prepare "standartized" data frame
-    msdata_df_std <- msdata_df[,c(obj_col, mschan_col, cond_col, condgroup_col, quant_col)]
-    names(msdata_df_std) <-c("obj", "mschannel", "condition", "condgroup", "quant")
+    if (is.null(sumgroup_col)) {
+      msdata_df$`__fake_sumgroup__` <- TRUE
+      sumgroup_col <- "__fake_sumgroup__"
+    }
+    # prepare "standartized" data frame (note that some original columns may be duplicated)
+    msdata_df_std <- msdata_df[,c(obj_col, mschan_col, cond_col, condgroup_col, sumgroup_col, quant_col)]
+    names(msdata_df_std) <-c("obj", "mschannel", "condition", "condgroup", "sumgroup", "quant")
     if (is.null(mschan_preshifts)) {
       # no shifts by default
       mschan_preshifts <- tibble(mschannel = sort(unique(msdata_df_std$mschannel)),
@@ -186,7 +195,7 @@ normalize_experiments <- function(stan_input_base, msdata_df,
       mschan_preshifts <- dplyr::select_at(mschan_preshifts, c(mschannel = mschan_col, preshift = preshift_col))
     }
     if (!is.na(mschan_shift.min) && is.finite(mschan_shift.min)) {
-      mschan_preshifts <- dplyr::inner_join(mschan_preshifts, dplyr::distinct(dplyr::select(msdata_df_std, mschannel, condgroup))) %>%
+      mschan_preshifts <- dplyr::inner_join(mschan_preshifts, dplyr::distinct(dplyr::select(msdata_df_std, mschannel, condgroup, sumgroup))) %>%
           dplyr::group_by(condgroup) %>%
           dplyr::mutate(is_used = preshift >= mean(preshift) + mschan_shift.min) %>%
           dplyr::ungroup()
@@ -236,6 +245,8 @@ normalize_experiments <- function(stan_input_base, msdata_df,
       new_colnames[new_colnames == "condgroup"] <- condgroup_col
       colnames(res) <- new_colnames
     }
+    # remove sumgroup column
+    res$sumgroup <- NULL
     return(res)
 }
 
@@ -262,7 +273,7 @@ multilevel_normalize_experiments <- function(instr_calib,
                                'sigmaOffset', 'sigmaBend', 'sigmaSmooth',
                                'zShift', 'zScale')]
   # FIXME compose msrun info
-  lev_cols <- unique(c(unlist(lapply(norm_levels, function(lev) c(lev$cond_col, lev$condgroup_col))), mschan_col))
+  lev_cols <- unique(c(unlist(lapply(norm_levels, function(lev) c(lev$cond_col, lev$condgroup_col, lev$sumgroup_col))), mschan_col))
   lev_cols <- lev_cols[!is.na(lev_cols)]
   mschan_df <- dplyr::select_at(mschannels_df, lev_cols) %>% dplyr::distinct()
   msdata_df <- dplyr::select_at(msdata_df, c(obj_col, mschan_col, quant_col)) %>%
@@ -291,6 +302,7 @@ multilevel_normalize_experiments <- function(instr_calib,
                                            mschan_col = mschan_col,
                                            cond_col = lev_info$cond_col,
                                            condgroup_col = if (rlang::has_name(lev_info, "condgroup_col")) {lev_info$condgroup_col} else {next_lev_info$cond_col %||% NULL}, # NULL in lev_info is possible
+                                           sumgroup_col = lev_info$sumgroup_col %||% NULL,
                                            mschan_preshifts = mschan_shifts_df,
                                            preshift_col = if (is.null(mschan_shifts_df)) NA_character_ else total_shift_col,
                                            shifts_constraint = lev_info$shifts_contraint %||% shifts_constraint,

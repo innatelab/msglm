@@ -9,7 +9,9 @@ data {
 
   int<lower=1> Nmschannels;    // number of MS channels
   int<lower=1> Nshifts;        // number of mschannel_shifts to estimate
+  int<lower=1> Nsumgroups;     // number of mschannel sumgroups (normalized intensities are averaged independently within each sumgroup)
   int<lower=1,upper=Nshifts> mschannel2shift[Nmschannels];
+  int<lower=1,upper=Nsumgroups> mschannel2sumgroup[Nmschannels];
 
   vector[Nmschannels]  mschannel_preshift; // fixed mschannel pre-shifts
   matrix<lower=0>[Nobjects, Nmschannels] qData;
@@ -34,22 +36,30 @@ transformed data {
     matrix[Nobjects, Nmschannels] qLogStd;
     matrix<lower=0>[Nobjects, Nmschannels] qDataScaled;
     matrix<lower=0>[Nobjects, Nmschannels] meanDenomScaled;
-    int<lower=0> NobsPerObject[Nobjects];
+    int<lower=0> NobsPerObject[Nobjects, Nsumgroups];
     matrix[Nshifts, Nshifts-1] shift_transform;
+    matrix<lower=0,upper=1>[Nmschannels, Nmschannels] sum_mask; // 1 if mschannels i and j are averaged, 0 otherwise (transitive)
 
     shift_transform = rep_matrix(0.0, Nshifts, Nshifts-1);
     for (i in 1:Nshifts-1) {
         shift_transform[i, i] = 1.0;
         shift_transform[Nshifts, i] = -1.0;
     }
+    for (i in 1:Nmschannels) {
+        for (j in 1:Nmschannels) {
+            sum_mask[i, j] = mschannel2sumgroup[i] == mschannel2sumgroup[j] ? 1.0 : 0.0;
+        }
+    }
 
     zScore = (log(qData) - zShift) * zScale;
 
-    NobsPerObject = rep_array(0, Nobjects);
+    NobsPerObject = rep_array(0, Nobjects, Nsumgroups);
     for (i in 1:Nmschannels) {
+        int g;
+        g = mschannel2sumgroup[i];
         for (j in 1:Nobjects) {
             if (qData[j,i] > 0.0) {
-                NobsPerObject[j] = NobsPerObject[j] + 1;
+                NobsPerObject[j, g] = NobsPerObject[j, g] + 1;
             }
         }
     }
@@ -61,11 +71,13 @@ transformed data {
         }
     }
     for (i in 1:Nmschannels) {
+        int g;
+        g = mschannel2sumgroup[i];
         for (j in 1:Nobjects) {
             if (qData[j, i] > 0.0) {
                 real qScale;
                 qScale = exp(-qLogStd[j, i]);
-                meanDenomScaled[j, i] = qScale/NobsPerObject[j];
+                meanDenomScaled[j, i] = qScale/NobsPerObject[j, g];
                 qDataScaled[j, i] = qScale*qData[j, i];
             } else {
                 meanDenomScaled[j, i] = 0.0;
@@ -109,7 +121,7 @@ model {
 
     total_mschan_shift = mschannel_preshift + shift[mschannel2shift];
     // operator to sum channel intensities in each mschannel and copy it to all mschannels
-    sum_mschans = exp(rep_matrix(total_mschan_shift', Nmschannels) - rep_matrix(total_mschan_shift, Nmschannels));
+    sum_mschans = exp(rep_matrix(total_mschan_shift', Nmschannels) - rep_matrix(total_mschan_shift, Nmschannels)).*sum_mask;
     //print("avg_exps=", average_mschans);
     to_vector(qDataScaled) ~ double_exponential(to_vector((qData * sum_mschans) .* meanDenomScaled), data_sigma);
 }

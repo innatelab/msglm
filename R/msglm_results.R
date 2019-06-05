@@ -77,7 +77,7 @@ vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info,
   p_value_all_samples <- function(samples) {
       dplyr::bind_rows(lapply(vars_cat_info$names, function(col) {
           tibble(var = col,
-                 p_value = pvalue_not_zero(samples[[col]], tail = tail))
+                 p_value = pvalue_not_zero(samples[[col]] - (if (rlang::has_name(samples, "prior_mean")) samples$prior_mean else 0.0), tail = tail))
           }))
   }
   p_value.df <- samples.df %>% dplyr::group_by_at(group_cols) %>% dplyr::do(p_value_all_samples(.))

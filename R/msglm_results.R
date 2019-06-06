@@ -30,7 +30,9 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
     message("object_effects$prior_mean missing, setting to 0")
     res$object_effect$prior_mean <- 0.0
   }
-  res$object_effect <- mutate(res$object_effect, prior_mean_log2=prior_mean/log(2))
+  res$object_effect <- mutate(res$object_effect,
+                              prior_mean=if_else(var %in% c("obj_effect", "obj_effect_replCI"), prior_mean, NA_real_),
+                              prior_mean_log2=prior_mean/log(2))
   if ("subobjects" %in% names(model_data)) {
     res$subobject <- dplyr::select(model_data$subobjects, glm_object_ix, glm_subobject_ix,
                                    one_of(c("protregroup_id", "protgroup_id", "pepmod_id", "pepmodstate_id", "charge")))
@@ -57,7 +59,9 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
       message("mixeffects$prior_mean missing, setting to 0")
       res$object_mixeffect$prior_mean <- 0.0
     }
-    res$object_mixeffect <- mutate(res$object_mixeffect, prior_mean_log2=prior_mean/log(2))
+    res$object_mixeffect <- mutate(res$object_mixeffect,
+                                   prior_mean=if_else(var %in% c("obj_mixeffect"), prior_mean, NA_real_),
+                                   prior_mean_log2=prior_mean/log(2))
     res$object_mixcoef <- dplyr::mutate(model_data$mixcoefs, tmp="a") %>%
       dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
       dplyr::select(-tmp)

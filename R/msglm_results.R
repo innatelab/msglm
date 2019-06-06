@@ -57,7 +57,8 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
       message("mixeffects$prior_mean missing, setting to 0")
       res$object_mixeffect$prior_mean <- 0.0
     }
-    res$object_mixcoef <- dplyr::mutate(model_data$mixcoefs, prior_mean_log2=prior_mean/log(2), tmp="a") %>%
+    res$object_mixeffect <- mutate(res$object_mixeffect, prior_mean_log2=prior_mean/log(2))
+    res$object_mixcoef <- dplyr::mutate(model_data$mixcoefs, tmp="a") %>%
       dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
       dplyr::select(-tmp)
     res$supaction <- dplyr::select(model_data$superactions, glm_supaction_ix,

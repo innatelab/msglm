@@ -190,8 +190,13 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
         stanmodel <- msglm_stan_model("msglm_local_subobjects")
       }
     } else {
-      stanmodel <- msglm_stan_model("msglm_local")
-      vars_info <- msglm.vars_info
+      if ("Nsupactions" %in% names(stan_input_data)) {
+        vars_info <- msglmm.vars_info
+        stanmodel <- msglm_stan_model("msglmm_local")
+      } else {
+        vars_info <- msglm.vars_info
+        stanmodel <- msglm_stan_model("msglm_local")
+      }
       # exclude subobject-related
       vars_info$subobjects <- NULL
       vars_info$subobjectXmsprotocol <- NULL

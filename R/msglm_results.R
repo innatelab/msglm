@@ -31,7 +31,6 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
     res$object_effect$prior_mean <- 0.0
   }
   res$object_effect <- mutate(res$object_effect,
-                              prior_mean=if_else(var %in% c("obj_effect", "obj_effect_replCI"), prior_mean, NA_real_),
                               prior_mean_log2=prior_mean/log(2))
   if ("subobjects" %in% names(model_data)) {
     res$subobject <- dplyr::select(model_data$subobjects, glm_object_ix, glm_subobject_ix,
@@ -60,7 +59,6 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
       res$object_mixeffect$prior_mean <- 0.0
     }
     res$object_mixeffect <- mutate(res$object_mixeffect,
-                                   prior_mean=if_else(var %in% c("obj_mixeffect"), prior_mean, NA_real_),
                                    prior_mean_log2=prior_mean/log(2))
     res$object_mixcoef <- dplyr::mutate(model_data$mixcoefs, tmp="a") %>%
       dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
@@ -541,6 +539,12 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   message('Calculating P-values..')
   local({
     for (ctg in names(res)) {
+      # unset prior mean for non-effect vars (e.g. obj_effect_sigma)
+      if (rlang::has_name(res[[ctg]]$stats, "prior_mean")) {
+        res[[ctg]]$stats <<- dplyr::mutate(res[[ctg]]$stats,
+                                           prior_mean=if_else(var %in% effect_vars, prior_mean, NA_real_),
+                                           prior_mean_log2=if_else(var %in% effect_vars, prior_mean_log2, NA_real_))
+      }
       ctg_subset_info <- vars_info[[ctg]]
       ctg_subset_info$names <- intersect(ctg_subset_info$names, effect_vars)
 

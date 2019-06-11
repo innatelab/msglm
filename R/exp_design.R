@@ -7,7 +7,7 @@ conditionXeffect_frame <- function(conditionXeffect_mtx, effects_df) {
     dplyr::filter(n != 0) %>% dplyr::rename(mult = n) %>%
     # estimate the weight of a condition in an effect
     dplyr::inner_join(dplyr::select(effects_df, effect, prior_tau)) %>%
-    dplyr::mutate(w = prior_tau * mult) %>%
+    dplyr::mutate(w = prior_tau * abs(mult)) %>%
     dplyr::group_by_at(names(dimnames(conditionXeffect_mtx))[[1]]) %>%
     dplyr::mutate(eff_w = w/sum(w)) %>%
     dplyr::group_by_at(names(dimnames(conditionXeffect_mtx))[[2]]) %>%

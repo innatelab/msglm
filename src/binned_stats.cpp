@@ -3,6 +3,8 @@
 #include "binned_values.h"
 
 #include <Rcpp.h>
+
+typedef std::vector<int> experiment_set_t;
 #if __has_include(<unordered_map>)
     #include <unordered_map>
     typedef std::unordered_map<std::size_t, experiment_set_t> experiment_map_t;
@@ -10,6 +12,7 @@
     #include <tr1/unordered_map>
     typedef std::tr1::unordered_map<std::size_t, experiment_set_t> experiment_map_t;
 #endif
+
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/extended_p_square.hpp>
@@ -295,7 +298,6 @@ Rcpp::List ContrastStatistics(
     std::size_t nexperiments = X.ncol();
     LOG_DEBUG2("nmcmc_samples=" << nsamples << " nexperiments=" << nexperiments);
 
-    typedef std::vector<int> experiment_set_t;
     experiment_map_t condition2experiments;
 
     for ( int i = 0; i < experiments2conditions_condition.size(); i++ ) {

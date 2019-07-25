@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <cmath>
 #include <Rcpp.h>
-#include <tr1/unordered_map>
 #include <boost/math/distributions/normal.hpp>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>

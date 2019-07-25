@@ -3,7 +3,11 @@
 #include "binned_values.h"
 
 #include <Rcpp.h>
-#include <tr1/unordered_map>
+#if __has_include(<unordered_map>)
+    #include <unordered_map>
+#elif __has_include(<tr1/unordered_map>)
+    #include <tr1/unordered_map>
+#endif
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/extended_p_square.hpp>

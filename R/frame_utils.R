@@ -48,7 +48,7 @@ maybe_rename <- function(df, cols, verbose=FALSE) {
         message(new_col, " already exists, ", old_col, " not renamed")
       } else {
         message("renaming ", old_col, " to ", new_col)
-        df <- dplyr::rename_at(df, c(new_col = old_col))
+        df <- dplyr::rename_at(df, old_col, ~new_col)
       }
     }
   }

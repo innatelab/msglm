@@ -503,17 +503,17 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                                if (any(vi$dims %in% rel_dims)) str_subset(vi$names, "(?:labu|shift)(?:_replCI)?$") else c()
                               })),
                              condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
-                             keep.samples=FALSE, min.iteration=NA, verbose=FALSE)
+                             keep.samples=FALSE, min.iteration=NA, chains=NA, verbose=FALSE)
 {
   message('Extracting MCMC samples...')
   all_pars <- unlist(sapply(vars_info, function(vi) vi$names))
   msglm.stan_samples <- stan.extract_samples(msglm.stan_fit,
-                                             pars=all_pars, min.iteration=min.iteration,
+                                             pars=all_pars, min.iteration=min.iteration, chains=chains,
                                              permuted=TRUE)
 
   message('Computing parameters statistics...')
   msglm.stan_stats <- msglm.stan_fit %>%
-    stan.extract_samples(pars = all_pars, min.iteration = min.iteration) %>%
+    stan.extract_samples(pars = all_pars, min.iteration = min.iteration, chains=chains) %>%
     monitor(print = FALSE) %>% as.data.frame
   msglm.stan_stats$var_name <- rownames(msglm.stan_stats)
 

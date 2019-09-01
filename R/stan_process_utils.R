@@ -27,26 +27,28 @@ stan.iterations_frame <- function(stan_result)
 stan.extract_samples <- function(stan_result, pars, min.iteration = NA, permuted = FALSE)
 {
   res <- rstan::extract(stan_result, pars = pars, permuted = permuted, inc_warmup = !is.na(min.iteration))
-  if ( permuted ) {
-    attr(res, 'iter_info') <- stan.iterations_frame(stan_result)
+  if (permuted) {
+    iter_info.df <- stan.iterations_frame(stan_result)
+  } else {
+    iter_info.df <- NULL
   }
-  if ( !is.na(min.iteration) ) {
+  if (!is.na(min.iteration)) {
     n_thin <- stan_result@sim$thin
-    if ( permuted ) {
-      iter_info <- attr(res, 'iter_info') %>% dplyr::filter(iteration >= min.iteration - stan_result@sim$warmup)
-      sample_ixs <- sort(iter_info$unpermuted_ix)
+    if (permuted) {
+      iter_info.df <- dplyr::filter(iter_info.df, iteration >= min.iteration - stan_result@sim$warmup)
+      sample_ixs <- sort(iter_info.df$unpermuted_ix)
+      n_samples_per_chain <- n_distinct(sample_ixs)
       res <- lapply(res, function(var_samples) {
         new_dims <- dim(var_samples)
-        new_dims[[1]] <- n_distinct(sample_ixs)
+        new_dims[[1]] <- n_samples_per_chain
         array(var_samples[slice.index(var_samples, 1) %in% sample_ixs], dim = new_dims) })
-      attr(res, 'iter_info') <- iter_info
-      res
     } else {
-      res[seq(from=as.integer(ceiling(min.iteration/n_thin)), dim(res)[[1]]), , ]
+      res <- res[seq(from=as.integer(ceiling(min.iteration/n_thin)), dim(res)[[1]]), , ]
     }
-  } else {
-    res
+  if (!is.null(iter_info.df)) {
+    attr(res, 'iter_info') <- iter_info.df
   }
+  return(res)
 }
 
 extract_index <- function(var_names) {

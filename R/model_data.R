@@ -111,6 +111,8 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
     model_data$supactXmixt <- do.call(cbind, lapply(sactXiact.mtxs, function(x) x$mtx))
     dimnames(model_data$supactXmixt) <- list(superaction = model_data$superactions$supaction_id,
                                              mixtion = model_data$mixtions$mixtion)
+  } else {
+    iaction_ids <- unique(model_data$interaction$iaction_id)
   }
 
   iactXobjeff <- iactXeffect(conditionXeffect.mtx, model_data$interactions$glm_object_ix,

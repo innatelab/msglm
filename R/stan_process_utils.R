@@ -79,7 +79,10 @@ extract_var <- function(var_names) {
 pvalue_not_zero <- function(samples, tail = c("both", "negative", "positive"))
 {
   tail = match.arg(tail)
-  if (tail == "negative") {
+  if (length(samples) == 0L) {
+    warning("No samples provided, returning P-value=NA")
+    return(NA_real_)
+  } else if (tail == "negative") {
     return(ProbabilityLessZeroSmoothed(samples, nsteps = 100, bandwidth = NA))
   } else if (tail == "positive") {
     return(ProbabilityLessZeroSmoothed(-samples, nsteps = 100, bandwidth = NA))

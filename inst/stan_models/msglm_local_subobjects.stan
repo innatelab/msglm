@@ -48,7 +48,6 @@ data {
   int<lower=0> NunderdefObjs;   // number of virtual interactions (the ones not detected but required for comparison)
   int<lower=1,upper=Nobjects> suo2obj[Nsubobjects];
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
-  int<lower=1,upper=Nconditions> iaction2condition[Niactions];
   int<lower=1,upper=Nobjects> underdef_objs[NunderdefObjs];
 
   vector[Nexperiments] experiment_shift;

@@ -206,11 +206,16 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
 
 .attach_dim_info.by_array_index <- function(samples.df, stan_samples, dim_info)
 {
-    indexes.df <- do.call(cbind, lapply(seq_along(dim_info), function(dim_ix) {
-      last_col <- colnames(samples.df)[[ncol(samples.df)]]
-      slice.index(stan_samples[[last_col]], dim_ix+1) %>% as.vector()
-    })) %>% as_tibble()
-    colnames(indexes.df) <- paste0('index_', names(dim_info))
+    indexes.mtx <- if (nrow(samples.df) > 0L) {
+      do.call(cbind, lapply(seq_along(dim_info), function(dim_ix) {
+        last_col <- colnames(samples.df)[[ncol(samples.df)]]
+        slice.index(stan_samples[[last_col]], dim_ix+1) %>% as.vector()
+      }))
+    } else { # degenerated case
+      matrix(integer(0L), ncol=length(dim_info))
+    }
+    colnames(indexes.mtx) <- paste0('index_', names(dim_info))
+    indexes.df <- as_tibble(indexes.mtx)
     samples.df <- dplyr::bind_cols(samples.df, indexes.df)
     for (dim_ix in seq_along(dim_info)) {
       dim_name <- names(dim_info)[[dim_ix]]
@@ -274,19 +279,17 @@ stan_samples_frame <- function(stan_samples, var_names, var_dims) {
     samples.df <- tibble(!!!purrr::set_names(lapply(avail_var_names, function(var_name) {
       as.vector(stan_samples[[var_name]])
     }), avail_var_names))
-    if (ncol(samples.df) > 0) {
-        if ('iter_info' %in% names(attributes(stan_samples))) {
-          iter_info.df <- attr(stan_samples, 'iter_info')
-          samples.df <- dplyr::bind_cols(iter_info.df[rep_len(seq_len(nrow(iter_info.df)), nrow(samples.df)), ],
-                                         samples.df)
-        } else {
-          warning("No iter_info found")
-        }
+    if ('iter_info' %in% names(attributes(stan_samples))) {
+      iter_info.df <- attr(stan_samples, 'iter_info')
+      samples.df <- dplyr::bind_cols(iter_info.df[rep_len(seq_len(nrow(iter_info.df)), nrow(samples.df)), ],
+                                     samples.df)
+    } else {
+      warning("No iter_info found")
+    }
 
-        # add additional dimension information
-        if (length(var_dims) > 0) {
-            samples.df <- .attach_dim_info.by_array_index(samples.df, stan_samples, var_dims)
-        }
+    # add additional dimension information
+    if (length(var_dims) > 0) {
+        samples.df <- .attach_dim_info.by_array_index(samples.df, stan_samples, var_dims)
     }
     return (samples.df)
 }

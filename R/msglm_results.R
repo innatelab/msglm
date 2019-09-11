@@ -227,7 +227,7 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
 .attach_dim_info.by_var_name <- function(data.df, dim_info)
 {
     res.df <- data.df
-    res_index <- extract_index(res.df$var_name)
+    res_index <- extract_index(res.df$var_name, ndim=length(dim_info))
     dims.df <- tibble(ix = seq_along(dim_info),
                       name = names(dim_info)) %>%
       dplyr::group_by(name) %>%
@@ -248,9 +248,10 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
         }
         if (!is.null(dim_info[[dim_ix]])) {
             res.df[[dim_name]] <- NULL
-            if (nrow(dim_info[[dim_ix]]) != max(res_index[,dim_ix])) {
+            maxdimix = if (nrow(res_index)>0L) max(res_index[,dim_ix]) else 0L
+            if (nrow(dim_info[[dim_ix]]) != maxdimix) {
                 stop('Dimension #', dim_ix, '(', dim_name,') info contains ', nrow(dim_info[[dim_ix]]),
-                     ' elements, the data contain ', max(res_index[,dim_ix]))
+                     ' elements, the data contain ', maxdimix)
             }
             res_dim_info.df <- dim_info[[dim_ix]][res_index[,dim_ix], , drop=FALSE]
             if (dims.df$suffix[[dim_ix]] != '') {
@@ -302,7 +303,7 @@ vars_statistics <- function(vars_category, stan_stats, stan_samples, vars_info, 
                               mean_log2 = mean/log(2),
                               median_log2 = `50%`/log(2),
                               sd_log2 = sd/log(2))
-    if (nrow(stats.df) > 0 && length(vars_cat_info$dims) > 0) {
+    if (length(vars_cat_info$dims) > 0) {
         stats.df <- .attach_dim_info.by_var_name(stats.df, dim_info[vars_cat_info$dims])
     }
     return (list(samples=samples.df, stats=stats.df))

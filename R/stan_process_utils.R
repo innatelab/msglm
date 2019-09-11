@@ -62,11 +62,14 @@ stan.extract_samples <- function(stan_result, pars, chains = NA, min.iteration =
   return(res)
 }
 
-extract_index <- function(var_names) {
+extract_index <- function(var_names, ndims=NA_integer_) {
   var_ndims <- str_count(var_names, stringr::fixed(",")) + 1L
+  if ((length(var_ndims) > 0) && !is.na(ndims) && var_ndims != ndims) {
+    stop('Data have ', var_ndims, ' dimension(s), expected ', ndims)
+  }
   res <- str_remove(var_names, '\\]$') %>% str_remove('^[^\\[]+\\[') %>%
       str_split_fixed(stringr::fixed(','), var_ndims) %>%
-      as.integer() %>% matrix(ncol=var_ndims)
+      as.integer() %>% matrix(ncol=if(length(var_ndims)==0L) replace_na(ndims, 0L) else var_ndims)
   return(res)
 }
 extract_var <- function(var_names) {

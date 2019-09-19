@@ -1,4 +1,18 @@
 functions {
+    int ndistinct(int[] ixs, int maxix) {
+      int ix2nused[maxix] = rep_array(0, maxix);
+      int res = 0;
+      for (ix in ixs) {
+        ix2nused[ix] += 1;
+      }
+      for (n in ix2nused) {
+        if (n > 0) {
+          res += 1;
+        }
+      }
+      return res;
+    }
+
     real intensity_log_std(real z, real scaleHi, real scaleLo, real offset, real bend, real smooth) {
         return 0.5*(scaleHi+scaleLo)*(z-bend) + 0.5*(scaleHi-scaleLo)*sqrt((z-bend)*(z-bend)+smooth) + offset;
     }
@@ -141,17 +155,17 @@ transformed data {
   vector[Nobservations] obsXiact_w;
   int<lower=0> obsXiact_u[Nobservations + 1];
 
-  int<lower=0> Nobservations0;  // number of observations degrees of freedom ()
+  int<lower=0> NrealIactions = ndistinct(observation2iaction, Niactions);
+  int<lower=0> Nobservations0 = Nobservations - NrealIactions; // number of observations degrees of freedom ()
+  int<lower=0> obsXobs0_Nw = effXeff0_Nw(NrealIactions, observation2iaction);
+  vector[obsXobs0_Nw] obsXobs_shift0_w;
+  int<lower=1, upper=obsXobs0_Nw + 1> obsXobs_shift0_u[Nobservations + 1];
+  int<lower=1, upper=Nobservations0> obsXobs_shift0_v[obsXobs0_Nw];
 
-  int<lower=0> obsXobs0_Nw;
-  vector[effXeff0_Nw(Niactions, observation2iaction)] obsXobs_shift0_w;
-  int<lower=1, upper=effXeff0_Nw(Niactions, observation2iaction) + 1> obsXobs_shift0_u[Nobservations + 1];
-  int<lower=1, upper=Nobservations - Niactions> obsXobs_shift0_v[effXeff0_Nw(Niactions, observation2iaction)];
-
-  int<lower=0> suoXsuo0_Nw;
-  vector[effXeff0_Nw(Nobjects, suo2obj)] suoXsuo_shift0_w;
-  int<lower=0, upper=effXeff0_Nw(Nobjects, suo2obj) + 1> suoXsuo_shift0_u[Nsubobjects + 1];
-  int<lower=0, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[effXeff0_Nw(Nobjects, suo2obj)];
+  int<lower=0> suoXsuo0_Nw = effXeff0_Nw(Nobjects, suo2obj);
+  vector[suoXsuo0_Nw] suoXsuo_shift0_w;
+  int<lower=0, upper=suoXsuo0_Nw + 1> suoXsuo_shift0_u[Nsubobjects + 1];
+  int<lower=0, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[suoXsuo0_Nw];
 
   // prepare reshuffling of positive/other obj effects
   NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
@@ -213,7 +227,6 @@ transformed data {
   miss2iaction = observation2iaction[miss2observation];
 
   // prepare obsXobs_shift0
-  obsXobs0_Nw = effXeff0_Nw(Niactions, observation2iaction);
   {
     int iaction2nobs[Niactions];
 
@@ -262,7 +275,6 @@ transformed data {
         }
     }
   }
-  Nobservations0 = Nobservations - Niactions;
   //print("obsXobs_shift0=", csr_to_dense_matrix(Nobservations, Nobservations0, obsXobs_shift0_w, obsXobs_shift0_v, obsXobs_shift0_u));
 
   iactXobjeff4sigma_w = square(iactXobjeff_w);
@@ -271,7 +283,6 @@ transformed data {
   obsXiact_w = rep_vector(1.0, Nobservations);
   for (i in 1:(Nobservations+1)) obsXiact_u[i] = i;
 
-  suoXsuo0_Nw = effXeff0_Nw(Nobjects, suo2obj);
   suoXsuo_shift0_u = rep_array(0, Nsubobjects+1);
   if (Nsubobjects > 0) {
     int obj2nsuo[Nobjects];

@@ -498,14 +498,19 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
 }
 
 #' @export
+default_contrast_vars <- function(vars_info) {
+  unlist(lapply(vars_info, function(vi) {
+    rel_dims <- names(dims_info)[sapply(names(dims_info), function(dname) any(str_detect(colnames(dims_info[[dname]]), "^(msrun|mschannel|condition|action)")))]
+    if (any(vi$dims %in% rel_dims)) str_subset(str_subset(vi$names, "(?:labu|shift)(?:_replCI)?$"), "_repl_shift(?:replCI)?$", negate=TRUE) else c()
+  }))
+}
+
+#' @export
 process.stan_fit <- function(msglm.stan_fit, dims_info,
                              vars_info = attr(msglm.stan_fit, "msglm_vars_info"),
                              mschannel_col = "msrun_ix",
                              effect_vars = unlist(lapply(vars_info, function(vi) str_subset(vi$names, "_(?:mix)?effect(?:_replCI)?$"))),
-                             contrast_vars = unlist(lapply(vars_info, function(vi) {
-                               rel_dims <- names(dims_info)[sapply(names(dims_info), function(dname) any(str_detect(colnames(dims_info[[dname]]), "^(msrun|mschannel|condition|action)")))]
-                               if (any(vi$dims %in% rel_dims)) str_subset(vi$names, "(?:labu|shift)(?:_replCI)?$") else c()
-                              })),
+                             contrast_vars = default_contrast_vars(vars_info),
                              condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
                              keep.samples=FALSE, min.iteration=NA, chains=NA, verbose=FALSE)
 {

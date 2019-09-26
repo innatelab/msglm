@@ -6,7 +6,7 @@ msglm.vars_info <- list(
   #                     dims = c('batch_effect')),
   iactions = list(names=c('iact_repl_shift_sigma', 'iaction_labu', 'iaction_labu_replCI'),
                   dims=c('iaction')),
-  observations = list(names=c('obs_labu', "obs_repl_shift"),
+  observations = list(names=c('obs_labu', "obs_repl_shift", "obs_batch_shift"),
                       dims=c('observation')),
   subobjects = list(names=c('suo_shift_unscaled', 'suo_llh'),
                     dims=c('subobject')),

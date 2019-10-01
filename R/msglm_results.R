@@ -408,7 +408,8 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
         dplyr::mutate(is_accepted = (cond_min_qtile >= cond_qtile.min_thresh) &
                                     (cond_max_qtile <= cond_qtile.max_thresh))
       cond_stats.df <- dplyr::filter(cond_stats.df, is_accepted)
-      message('Calculating contrasts for ', vars_category, ' variables...')
+      message('Calculating contrasts for ', vars_category,
+              ' variables (', paste0(vars_cat_subset_info$names, collapse=' '), ')...')
       samples.df <- dplyr::semi_join(vars_results[[vars_category]]$samples, cond_stats.df) # exclude unused conditions
       experiment_col <- if (mschannel_col %in% colnames(samples.df)) mschannel_col
                         else if (condition_col %in% colnames(samples.df)) condition_col

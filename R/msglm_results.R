@@ -502,7 +502,7 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
 default_contrast_vars <- function(vars_info) {
   unlist(lapply(vars_info, function(vi) {
     rel_dims <- names(dims_info)[sapply(names(dims_info), function(dname) any(str_detect(colnames(dims_info[[dname]]), "^(msrun|mschannel|condition|action)")))]
-    if (any(vi$dims %in% rel_dims)) str_subset(str_subset(vi$names, "(?:labu|shift)(?:_replCI)?$"), "_repl_shift(?:replCI)?$", negate=TRUE) else c()
+    if (any(vi$dims %in% rel_dims)) str_subset(vi$names, "(?:_labu)(?:_replCI)?$") else c()
   }))
 }
 

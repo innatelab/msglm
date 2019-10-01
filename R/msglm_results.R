@@ -11,9 +11,9 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
     objs_df <- dplyr::select(objs_df, !!!unique(c("glm_object_ix", object_cols)))
   }
   res <- list(iteration = NULL,
-    msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, one_of("condition", "supcondition")),
+    msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, one_of("mschannel", "mschannel_ix", "mstag", "condition", "supcondition")),
     observation = dplyr::select(model_data$msdata, glm_observation_ix, !!xaction_ix_col, glm_object_ix,
-                                !!xdition_ix_col, !!xdition_col, msrun, msrun_ix) %>%
+                                !!xdition_ix_col, !!xdition_col, msrun, msrun_ix, one_of("mschannel", "mschannel_ix", "mstag")) %>%
         dplyr::distinct() %>%
         dplyr::inner_join(objs_df),
     object = model_data$objects, # use full object information

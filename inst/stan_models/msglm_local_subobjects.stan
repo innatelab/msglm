@@ -47,6 +47,22 @@ functions {
         for (i in 1:ngroups) nw += (neffs[i]-1)*neffs[i];
         return nw;
     }
+
+    int[] objeffects_reshuffle(int[] objeff2eff, int[] iseffpositive) {
+        int cur_pos_eff = 0;
+        int cur_other_eff = sum(iseffpositive[objeff2eff]);
+        int res[size(objeff2eff)];
+        for (i in 1:size(objeff2eff)) {
+            if (iseffpositive[objeff2eff[i]]) {
+                cur_pos_eff += 1;
+                res[i] = cur_pos_eff;
+            } else {
+                cur_other_eff += 1;
+                res[i] = cur_other_eff;
+            }
+        }
+        return res;
+    }
 }
 
 data {
@@ -131,20 +147,21 @@ transformed data {
   vector[Nquanted] qLogStd; // log(sd(qData))-obj_base
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
 
-  int<lower=1,upper=Niactions> quant2iaction[Nquanted];
-  int<lower=1,upper=Nexperiments> quant2experiment[Nquanted];
+  int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2observation];
+  int<lower=1,upper=Nexperiments> quant2experiment[Nquanted] = observation2experiment[quant2observation];
   int<lower=1,upper=Nmsprotocols*Nsubobjects> quant2msprotoXsuo[((Nmsprotocols > 1) && (Nsubobjects > 0)) ? Nquanted : 0];
-  int<lower=1,upper=Niactions> miss2iaction[Nmissed];
-  int<lower=1,upper=Nexperiments> miss2experiment[Nmissed];
+  int<lower=1,upper=Niactions> miss2iaction[Nmissed] = observation2iaction[miss2observation];
+  int<lower=1,upper=Nexperiments> miss2experiment[Nmissed] = observation2experiment[miss2observation];
   int<lower=1,upper=Nmsprotocols*Nsubobjects> miss2msprotoXsuo[((Nmsprotocols > 1) && (Nsubobjects > 0)) ? Nmissed : 0];
-  int<lower=0,upper=NobjEffects> NobjEffectsPos;
-  int<lower=0,upper=NobjEffects> NobjEffectsOther;
-  int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects];
-  vector<lower=0>[NobjEffects] obj_effect_tau;
-  vector[NobjEffects] obj_effect_mean;
 
-  int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsPos;
-  int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsOther;
+  int<lower=0,upper=NobjEffects> NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
+  int<lower=0,upper=NobjEffects> NobjEffectsOther = NobjEffects - NobjEffectsPos;
+  int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects];
+  vector<lower=0>[NobjEffects] obj_effect_tau = effect_tau[obj_effect2effect];
+  vector[NobjEffects] obj_effect_mean = effect_mean[obj_effect2effect];
+
+  int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsPos = sum(batch_effect_is_positive[obj_batch_effect2batch_effect]);
+  int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsOther = NobjBatchEffects - NobjBatchEffectsPos;
   int<lower=1,upper=NobjBatchEffects> obj_batch_effect_reshuffle[NobjBatchEffects];
 
   vector[iactXobjeff_Nw] iactXobjeff4sigma_w;
@@ -167,45 +184,9 @@ transformed data {
   int<lower=0, upper=suoXsuo0_Nw + 1> suoXsuo_shift0_u[Nsubobjects + 1];
   int<lower=0, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[suoXsuo0_Nw];
 
-  // prepare reshuffling of positive/other obj effects
-  NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
-  NobjEffectsOther = NobjEffects - NobjEffectsPos;
-  {
-    int cur_pos_eff;
-    int cur_other_eff;
-    cur_pos_eff = 0;
-    cur_other_eff = NobjEffectsPos;
-    for (i in 1:NobjEffects) {
-      if (effect_is_positive[obj_effect2effect[i]]) {
-        cur_pos_eff += 1;
-        obj_effect_reshuffle[i] = cur_pos_eff;
-      } else {
-        cur_other_eff += 1;
-        obj_effect_reshuffle[i] = cur_other_eff;
-      }
-    }
-  }
-  obj_effect_tau = effect_tau[obj_effect2effect];
-  obj_effect_mean = effect_mean[obj_effect2effect];
-
-  // prepare reshuffling of positive/other batch effects
-  NobjBatchEffectsPos = sum(batch_effect_is_positive[obj_batch_effect2batch_effect]);
-  NobjBatchEffectsOther = NobjBatchEffects - NobjBatchEffectsPos;
-  {
-    int cur_pos_eff;
-    int cur_other_eff;
-    cur_pos_eff = 0;
-    cur_other_eff = NobjBatchEffectsPos;
-    for (i in 1:NobjBatchEffects) {
-      if (batch_effect_is_positive[obj_batch_effect2batch_effect[i]]) {
-        cur_pos_eff += 1;
-        obj_batch_effect_reshuffle[i] = cur_pos_eff;
-      } else {
-        cur_other_eff += 1;
-        obj_batch_effect_reshuffle[i] = cur_other_eff;
-      }
-    }
-  }
+  // prepare reshuffling of positive/other effects
+  obj_effect_reshuffle = objeffects_reshuffle(obj_effect2effect, effect_is_positive);
+  obj_batch_effect_reshuffle = objeffects_reshuffle(obj_batch_effect2batch_effect, batch_effect_is_positive);
 
   // preprocess signals (MS noise)
   {
@@ -221,10 +202,6 @@ transformed data {
       qLogStd[i] -= global_labu_shift; // obs_labu is modeled without obj_base
     }
   }
-  quant2experiment = observation2experiment[quant2observation];
-  quant2iaction = observation2iaction[quant2observation];
-  miss2experiment = observation2experiment[miss2observation];
-  miss2iaction = observation2iaction[miss2observation];
 
   // prepare obsXobs_shift0
   {
@@ -420,7 +397,7 @@ transformed parameters {
     obs_repl_shift = csr_matrix_times_vector(Nobservations, Nobservations0, obsXobs_shift0_w, obsXobs_shift0_v, obsXobs_shift0_u, obs_shift0);
     obs_labu += obs_repl_shift;
   }
-  // calculate objXexp_batch_shift (doesn't make sense to add to obs_labu)
+  // calculate obs_batch_shift (doesn't make sense to add to obs_labu)
   if (NbatchEffects > 0) {
     vector[NobjBatchEffects] obj_batch_effect_sigma;
 

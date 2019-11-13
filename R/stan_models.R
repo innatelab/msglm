@@ -10,8 +10,8 @@ msglm.vars_info <- list(
                       dims=c('observation')),
   subobjects = list(names=c('suo_shift_unscaled', 'suo_llh'),
                     dims=c('subobject')),
-  subobjectXmsprotocol = list(names=c('suo_msproto_shift_unscaled'),
-                              dims=c('subobjectXmsprotocol1')),
+  subobject_batch_effects = list(names=c('suoXobs_batch_shift'),
+                                 dims=c('subobjectXobservation')),
   objects = list(names=c('obj_base_labu', 'obj_base_labu_replCI', "obj_base_repl_shift_sigma"),
                  dims=c('object')),
   object_effects = list(names=c('obj_effect_sigma', 'obj_effect_repl_shift_sigma', 'obj_effect', 'obj_effect_replCI'),
@@ -145,6 +145,13 @@ stan.prepare_data <- function(base_input_data, model_data,
     res$miss2suo <- as.array(as.integer(model_data$msdata$glm_subobject_ix[!is.na(model_data$msdata$mdata_ix)]))
     res$Nmsprotocols <- 0L
     res$experiment2msproto <- integer(0)
+    # subobject-specific batch effects
+    if ("suo_batch_effects" %in% names(model_data)) {
+      res$NbatchEffects <- ncol(msrunXsubbatchEffect.mtx)
+      res$NsuoBatchEffects <- nrow(model_data$suo_batch_effects)
+      res$suo_batch_effect2subbatch_effect <- as.array(as.integer(model_data$suo_batch_effects$subbatch_effect))
+      res <- modifyList(res, matrix2csr("suoxobsXsuobatcheff", model_data$suoxobsXsuobatcheff))
+    }
   }
   if ('msproto_ix' %in% names(model_data$mschannels)) {
     res$Nmsprotocols <- n_distinct(model_data$mschannels$msproto_ix)

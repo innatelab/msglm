@@ -16,7 +16,7 @@ msglm.vars_info <- list(
                  dims=c('object')),
   object_effects = list(names=c('obj_effect_sigma', 'obj_effect_repl_shift_sigma', 'obj_effect', 'obj_effect_replCI'),
                         dims=c('object_effect')),
-  object_batch_effects = list(names=c('obj_batch_effect'), #'obj_batch_effect_unscaled', 'obj_batch_effect_sigma',
+  object_batch_effects = list(names=c('obj_batch_effect', 'obj_batch_effect_sigma'), #'obj_batch_effect_unscaled',
                               dims=c('object_batch_effect'))
 )
 

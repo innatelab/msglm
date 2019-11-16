@@ -141,18 +141,19 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
       dplyr::arrange(batch_effect)
   model_data$obsXobjbatcheff <- obsXobjbatcheff$mtx
 
-  suoXobs = tidyr::crossing(msrun_ix = unique(model_data$observations$msrun_ix),
-                            glm_subobject_ix = model_data$subobjects$glm_subobject_ix)
+  suoXobs = tidyr::crossing(glm_observation_ix = model_data$observations$glm_observation_ix,
+                            glm_subobject_ix = model_data$subobjects$glm_subobject_ix) %>%
+      dplyr::left_join(select(model_data$observations, glm_observation_ix, msrun_ix))
   suoxobsXsuobatcheff <- iactXeffect(msrunXsubbatchEffect.mtx[unique(model_data$mschannels$msrun), , drop=FALSE],
                                      suoXobs$glm_subobject_ix,
                                      suoXobs$msrun_ix)
-  model_data$suo_batch_effects <- suoxobsXsubbatcheff$objeff_df %>%
+  model_data$suo_subbatch_effects <- suoxobsXsuobatcheff$objeff_df %>%
     dplyr::rename(glm_subobject_ix = obj,
                   subbatch_effect = eff,
-                  suo_batch_effect = objeff) %>%
-    dplyr::arrange(suo_batch_effect)
+                  suo_subbatch_effect = objeff) %>%
+    dplyr::arrange(suo_subbatch_effect)
   model_data$subbatch_effects <- dplyr::select(subbatch_effects.df, subbatch_effect, is_positive) %>%
-      dplyr::mutate(subbatch_effect = factor(subbatch_effect, levels=levels(model_data$suo_batch_effects$subbatch_effect))) %>%
+      dplyr::mutate(subbatch_effect = factor(subbatch_effect, levels=levels(model_data$suo_subbatch_effects$subbatch_effect))) %>%
       dplyr::arrange(subbatch_effect)
   model_data$suoxobsXsuobatcheff <- suoxobsXsuobatcheff$mtx
 

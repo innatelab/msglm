@@ -35,16 +35,16 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
   if ("subobjects" %in% names(model_data)) {
     res$subobject <- dplyr::select(model_data$subobjects, glm_object_ix, glm_subobject_ix,
                                    one_of(c("protregroup_id", "protgroup_id", "pepmod_id", "pepmodstate_id", "charge")))
+    if ("suo_subbatch_effects" %in% names(model_data)) {
+      res$subobject_subbatch_effect <- model_data$suo_subbatch_effects %>%
+        dplyr::mutate(glm_subobject_ix = as.integer(glm_subobject_ix)) %>%
+        dplyr::left_join(res$subobject)
+    }
   }
   if ("msproto_ix" %in% colnames(model_data$mschannels)) {
     res$msprotocol <- dplyr::select(model_data$mschannels, msproto_ix,
                                     one_of("instrument")) %>%
       dplyr::distinct()
-    if ("subobjectXmsprotocol" %in% names(model_data)) {
-      # remove the 1st (the default) MS protocol
-      res$subobjectXmsprotocol1 <- dplyr::bind_cols(rep(res$subobject, times=nrow(res$msprotocol)-1L),
-                                                    rep(res$msprotocol[-1], each=nrow(res$subobject)))
-    }
   }
   res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,
                                glm_object_ix, iaction_id, condition_ix, condition, is_virtual) %>%

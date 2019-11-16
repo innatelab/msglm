@@ -1,6 +1,6 @@
 # variables description for msglm_local model
 msglm.vars_info <- list(
-  global = list(names=c('suo_shift_sigma', 'suo_msproto_shift_sigma'),
+  global = list(names=c('suo_shift_sigma'),
                 dims=c()),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
   #batch_effects = list(names = c('batch_effect_sigma'),
   #                     dims = c('batch_effect')),
@@ -10,8 +10,10 @@ msglm.vars_info <- list(
                       dims=c('observation')),
   subobjects = list(names=c('suo_shift_unscaled', 'suo_llh'),
                     dims=c('subobject')),
-  subobject_batch_effects = list(names=c('suoXobs_batch_shift'),
-                                 dims=c('subobjectXobservation')),
+  #subobject_subbatch_shifts = list(names=c('suoxobs_subbatch_shift'),
+  #                                 dims=c('subobjectXobservation')),
+  subobject_subbatch_effects = list(names=c('suo_subbatch_effect', 'suo_subbatch_effect_sigma'),
+                                    dims=c('subobject_subbatch_effect')),
   objects = list(names=c('obj_base_labu', 'obj_base_labu_replCI', "obj_base_repl_shift_sigma"),
                  dims=c('object')),
   object_effects = list(names=c('obj_effect_sigma', 'obj_effect_repl_shift_sigma', 'obj_effect', 'obj_effect_replCI'),
@@ -45,7 +47,7 @@ nrows_cumsum <- function(df, group_col) {
 stan.prepare_data <- function(base_input_data, model_data,
                               global_labu_shift = global_protgroup_labu_shift,
                               base_repl_shift_tau=0.1, effect_repl_shift_tau=0.25,
-                              batch_tau=0.3)
+                              batch_tau=0.3, subbatch_tau=batch_tau)
 {
   message('Converting MSGLM model data to Stan-readable format...')
   is_glmm <- "mixeffects" %in% names(model_data)
@@ -146,10 +148,12 @@ stan.prepare_data <- function(base_input_data, model_data,
     res$Nmsprotocols <- 0L
     res$experiment2msproto <- integer(0)
     # subobject-specific batch effects
-    if ("suo_batch_effects" %in% names(model_data)) {
-      res$NbatchEffects <- ncol(msrunXsubbatchEffect.mtx)
-      res$NsuoBatchEffects <- nrow(model_data$suo_batch_effects)
-      res$suo_batch_effect2subbatch_effect <- as.array(as.integer(model_data$suo_batch_effects$subbatch_effect))
+    if ("suo_subbatch_effects" %in% names(model_data)) {
+      res$NsubBatchEffects <- ncol(msrunXsubbatchEffect.mtx)
+      res$NsuoBatchEffects <- nrow(model_data$suo_subbatch_effects)
+      res$suo_subbatch_effect_tau <- subbatch_tau
+      res$suo_subbatch_effect2subbatch_effect <- as.array(as.integer(model_data$suo_subbatch_effects$subbatch_effect))
+      res$subbatch_effect_is_positive = as.array(as.integer(model_data$subbatch_effects$is_positive))
       res <- modifyList(res, matrix2csr("suoxobsXsuobatcheff", model_data$suoxobsXsuobatcheff))
     }
   }
@@ -206,9 +210,9 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
       }
       # exclude subobject-related
       vars_info$subobjects <- NULL
-      vars_info$subobjectXmsprotocol <- NULL
+      vars_info$subobject_subbatch_effects <- NULL
       vars_info$global$names <- setdiff(vars_info$global$names,
-                                        c('suo_shift_sigma', 'suo_msproto_shift_sigma'))
+                                        c('suo_shift_sigma'))
     }
     res <- rstan::sampling(stanmodel,
              pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,

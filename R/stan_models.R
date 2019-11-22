@@ -63,7 +63,7 @@ stan.prepare_data <- function(base_input_data, model_data,
     model_data$msdata$mschannel_ix <- model_data$msdata$msrun_ix
   }
   xaction_ix_col <- if (is_glmm) "glm_supaction_ix" else "glm_iaction_ix"
-  obs_df <- dplyr::select(model_data$msdata, glm_observation_ix, mschannel_ix, msrun_ix, glm_object_ix, !!xaction_ix_col) %>%
+  obs_df <- dplyr::select(model_data$observations, glm_observation_ix, mschannel_ix, msrun_ix, glm_object_ix, !!xaction_ix_col) %>%
     dplyr::distinct()
   if (any(obs_df$glm_observation_ix != seq_len(nrow(obs_df)))) {
     stop("model_data$msdata not ordered by observations / have missing observations")
@@ -81,7 +81,7 @@ stan.prepare_data <- function(base_input_data, model_data,
     Nobservations = nrow(obs_df),
     Nexperiments = n_distinct(model_data$mschannels$mschannel_ix),
     Nconditions = nrow(conditionXeffect.mtx),
-    Nobjects = n_distinct(model_data$msdata$glm_object_ix),
+    Nobjects = n_distinct(model_data$interactions$glm_object_ix),
     experiment_shift = as.array(model_data$mschannels$model_mschannel_shift),
     observation2experiment = as.array(obs_df$mschannel_ix),
     Neffects = ncol(conditionXeffect.mtx),

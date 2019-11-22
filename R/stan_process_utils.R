@@ -8,6 +8,9 @@
 matrix2csr <- function(mtx_name, mtx) {
     mtx_sparse <- rstan::extract_sparse_parts(mtx)
     mtx_sparse$Nw <- length(mtx_sparse$w)
+    mtx_sparse$u <- as.array(mtx_sparse$u)
+    mtx_sparse$v <- as.array(mtx_sparse$v)
+    mtx_sparse$w <- as.array(mtx_sparse$w)
     names(mtx_sparse) <- paste0(mtx_name, "_", names(mtx_sparse))
     return(mtx_sparse)
 }

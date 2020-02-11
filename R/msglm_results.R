@@ -391,13 +391,15 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
         res <- tibble(contrast = unique(cond_agg_stats.df[[contrast_col]]),
                       cond_qtile.min_thresh = 0, cond_qtile.max_thresh = 1,
                       is_lhs = is_lhs)
-        if (is.list(cond_qtls)) {
-          rownames(res) <- res$contrast
-          res[names(cond_qtls), 'cond_qtile.min_thresh'] <- sapply(cond_qtls, function(qtl) qtl[[1]])
-          res[names(cond_qtls), 'cond_qtile.max_thresh'] <- sapply(cond_qtls, function(qtl) qtl[[2]])
-        } else {
-          res$cond_qtile.min_thresh <- cond_qtls[[1]]
-          res$cond_qtile.max_thresh <- cond_qtls[[2]]
+        if (nrow(res) > 0) {
+          if (is.list(cond_qtls)) {
+            rownames(res) <- res$contrast
+            res[names(cond_qtls), 'cond_qtile.min_thresh'] <- sapply(cond_qtls, function(qtl) qtl[[1]])
+            res[names(cond_qtls), 'cond_qtile.max_thresh'] <- sapply(cond_qtls, function(qtl) qtl[[2]])
+          } else {
+            res$cond_qtile.min_thresh <- cond_qtls[[1]]
+            res$cond_qtile.max_thresh <- cond_qtls[[2]]
+          }
         }
         return(res)
       }

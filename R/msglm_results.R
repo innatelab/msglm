@@ -363,7 +363,9 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
   contrastXcondition.df <- contrastXmetacondition.df %>%
     dplyr::inner_join(conditionXmetacondition.df) %>%
     dplyr::arrange_at(c(contrast_col, "contrast_type", metacondition_col, condition_col))
-
+  if (!has_name(contrastXcondition.df, "is_preserved_condition")) {
+    contrastXcondition.df$is_preserved_condition <- FALSE
+  }
   for (vars_category in names(vars_results)) {
     vars_cat_subset_info <- vars_info[[vars_category]]
     vars_cat_subset_info$names <- intersect(vars_cat_subset_info$names, var_names)
@@ -408,7 +410,8 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
       cond_stats.df <- dplyr::inner_join(cond_stats.df, cond_agg_stats.df) %>%
         dplyr::left_join(contr_qtl_thresh.df) %>%
         dplyr::mutate(is_accepted = (cond_min_qtile >= cond_qtile.min_thresh) &
-                                    (cond_max_qtile <= cond_qtile.max_thresh))
+                                    ((cond_max_qtile <= cond_qtile.max_thresh) |
+                                     (is_rhs & is_preserved_condition)))
       cond_stats.df <- dplyr::filter(cond_stats.df, is_accepted)
       message('Calculating contrasts for ', vars_category,
               ' variables (', paste0(vars_cat_subset_info$names, collapse=' '), ')...')

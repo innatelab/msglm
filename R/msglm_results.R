@@ -363,7 +363,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
   contrastXcondition.df <- contrastXmetacondition.df %>%
     dplyr::inner_join(conditionXmetacondition.df) %>%
     dplyr::arrange_at(c(contrast_col, "contrast_type", metacondition_col, condition_col))
-  if (!has_name(contrastXcondition.df, "is_preserved_condition")) {
+  if (!rlang::has_name(contrastXcondition.df, "is_preserved_condition")) {
     contrastXcondition.df$is_preserved_condition <- FALSE
   }
   for (vars_category in names(vars_results)) {
@@ -377,7 +377,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
       cond_stats.df <- dplyr::inner_join(vars_results[[vars_category]]$stats,
                                          dplyr::mutate(contrastXcondition.df, is_lhs = weight > 0)) %>%
         dplyr::group_by_at(c(obj_id_cols, contrast_col, metacondition_col,
-                             condition_agg_col, "is_lhs")) %>%
+                             condition_agg_col, "is_lhs", "is_preserved_condition")) %>%
         dplyr::summarize(cond_mean = mean(mean)) %>% dplyr::ungroup()
       cond_agg_stats.df <- dplyr::group_by_at(cond_stats.df, c(obj_id_cols, contrast_col,
                                               metacondition_col, condition_agg_col, "is_lhs")) %>%
@@ -411,7 +411,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
         dplyr::left_join(contr_qtl_thresh.df) %>%
         dplyr::mutate(is_accepted = (cond_min_qtile >= cond_qtile.min_thresh) &
                                     ((cond_max_qtile <= cond_qtile.max_thresh) |
-                                     (is_rhs & is_preserved_condition)))
+                                     (!is_lhs & is_preserved_condition)))
       cond_stats.df <- dplyr::filter(cond_stats.df, is_accepted)
       message('Calculating contrasts for ', vars_category,
               ' variables (', paste0(vars_cat_subset_info$names, collapse=' '), ')...')

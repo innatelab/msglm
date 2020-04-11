@@ -397,6 +397,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
           if (is.list(cond_qtls)) {
             rownames(res) <- res$contrast
             res[names(cond_qtls), 'cond_qtile.min_thresh'] <- sapply(cond_qtls, function(qtl) qtl[[1]])
+            rownames(res) <- res$contrast
             res[names(cond_qtls), 'cond_qtile.max_thresh'] <- sapply(cond_qtls, function(qtl) qtl[[2]])
           } else {
             res$cond_qtile.min_thresh <- cond_qtls[[1]]

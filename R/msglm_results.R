@@ -79,9 +79,13 @@ vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info,
   #print(str(samples.df))
   #print(str(group_cols))
   p_value_all_samples <- function(samples) {
-      dplyr::bind_rows(lapply(vars_cat_info$names, function(col) {
+      missing_samples = setdiff(vars_cat_info$names, names(samples))
+      if (length(missing_samples) > 0) {
+        warning("Missing samples for vars: ", paste0(missing_samples, collapse=" "))
+      }
+      dplyr::bind_rows(lapply(vars_cat_info$names[vars_cat_info$names %in% names(samples)], function(col) {
           tibble(var = col,
-                 p_value = pvalue_not_zero(samples[[col]] - (if (rlang::has_name(samples, "prior_mean")) samples$prior_mean else 0.0), tail = tail))
+                 p_value = pvalue_not_zero(rlang::as_double(samples[[col]]) - (if (rlang::has_name(samples, "prior_mean")) samples$prior_mean else 0.0), tail = tail))
           }))
   }
   p_value.df <- samples.df %>% dplyr::group_by_at(group_cols) %>% dplyr::do(p_value_all_samples(.))

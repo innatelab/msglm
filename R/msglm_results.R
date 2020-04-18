@@ -11,9 +11,9 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
     objs_df <- dplyr::select(objs_df, !!!unique(c("glm_object_ix", object_cols)))
   }
   res <- list(iteration = NULL,
-    msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, one_of("mschannel", "mschannel_ix", "mstag", "condition", "supcondition")),
+    msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, any_of("mschannel", "mschannel_ix", "mstag", "condition", "supcondition")),
     observation = dplyr::select(model_data$msdata, glm_observation_ix, !!xaction_ix_col, glm_object_ix,
-                                !!xdition_ix_col, !!xdition_col, msrun, msrun_ix, one_of("mschannel", "mschannel_ix", "mstag")) %>%
+                                !!xdition_ix_col, !!xdition_col, msrun, msrun_ix, any_of("mschannel", "mschannel_ix", "mstag")) %>%
         dplyr::distinct() %>%
         dplyr::inner_join(objs_df),
     object = model_data$objects, # use full object information
@@ -34,7 +34,7 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
                               prior_mean_log2=prior_mean/log(2))
   if ("subobjects" %in% names(model_data)) {
     res$subobject <- dplyr::select(model_data$subobjects, glm_object_ix, glm_subobject_ix,
-                                   one_of(c("protregroup_id", "protgroup_id", "pepmod_id", "pepmodstate_id", "charge")))
+                                   any_of(c("protregroup_id", "protgroup_id", "pepmod_id", "pepmodstate_id", "charge")))
     if ("suo_subbatch_effects" %in% names(model_data)) {
       res$subobject_subbatch_effect <- model_data$suo_subbatch_effects %>%
         dplyr::mutate(glm_subobject_ix = as.integer(glm_subobject_ix)) %>%
@@ -43,7 +43,7 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
   }
   if ("msproto_ix" %in% colnames(model_data$mschannels)) {
     res$msprotocol <- dplyr::select(model_data$mschannels, msproto_ix,
-                                    one_of("instrument")) %>%
+                                    any_of("instrument")) %>%
       dplyr::distinct()
   }
   res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,

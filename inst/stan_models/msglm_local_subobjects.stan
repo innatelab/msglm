@@ -479,7 +479,7 @@ model {
       obj_batch_effect_unscaled_other ~ normal(0.0, 1.0);
     }
     if (Nsubobjects > 0) {
-      suo_shift_sigma ~ inv_gamma(1.0, 1.0);
+      suo_shift_sigma ~ inv_gamma(3.0, 3.0);
       suo_shift_unscaled ~ normal(0.0, 1.0);
       if (NsubBatchEffects > 0) {
         suo_subbatch_effect_lambda_t ~ chi_square(3.0);

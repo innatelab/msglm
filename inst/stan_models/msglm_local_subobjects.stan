@@ -131,9 +131,17 @@ data {
   // global model constants
   real global_labu_shift;   // shift to be applied to all XXX_labu variables to get the real log intensity
   vector<lower=0>[Neffects] effect_tau;
+  vector<lower=0>[Neffects] effect_scale;
+  vector<lower=0>[Neffects] effect_df;
+  real<lower=0> effect_slab_df;
+  real<lower=0> effect_slab_scale;
   real<lower=0> obj_base_repl_shift_tau;
   real<lower=0> obj_effect_repl_shift_tau;
   real<lower=0> obj_batch_effect_tau;
+  real<lower=0> batch_effect_scale;
+  real<lower=0> batch_effect_df;
+  real<lower=0> batch_effect_slab_df;
+  real<lower=0> batch_effect_slab_scale;
   real<lower=0> suo_subbatch_effect_tau;
   real<lower=0> obj_base_labu_sigma;
   real<upper=0> underdef_obj_shift;
@@ -169,6 +177,8 @@ transformed data {
   int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects];
   vector<lower=0>[NobjEffects] obj_effect_tau = effect_tau[obj_effect2effect];
   vector[NobjEffects] obj_effect_mean = effect_mean[obj_effect2effect];
+  vector<lower=0>[NobjEffects] obj_effect_df = effect_df[obj_effect2effect];
+  vector<lower=0>[NobjEffects] obj_effect_scale = effect_scale[obj_effect2effect];
 
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsPos = sum(batch_effect_is_positive[obj_batch_effect2batch_effect]);
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsOther = NobjBatchEffects - NobjBatchEffectsPos;
@@ -351,8 +361,11 @@ parameters {
   vector[Nsubobjects > 0 ? Nsubobjects-Nobjects : 0] suo_shift0_unscaled; // subobject shift within object
 
   //real<lower=0.0> obj_effect_tau;
+  real<lower=0.0> effect_slab_c_t;
   vector<lower=0.0>[NobjEffects] obj_effect_lambda_t;
   vector<lower=0.0>[NobjEffects] obj_effect_lambda_a;
+  vector<lower=0.0>[NobjEffects] obj_effect_eta_t;
+  vector<lower=0.0>[NobjEffects] obj_effect_eta_a;
   vector<lower=0.0>[NobjEffectsPos] obj_effect_unscaled_pos;
   vector[NobjEffectsOther] obj_effect_unscaled_other;
 
@@ -362,8 +375,11 @@ parameters {
   vector[Nobservations0] obs_shift0;
 
   //real<lower=0> obj_batch_effect_sigma;
+  real<lower=0.0> batch_effect_slab_c_t;
   vector<lower=0>[NobjBatchEffects] obj_batch_effect_lambda_t;
   vector<lower=0>[NobjBatchEffects] obj_batch_effect_lambda_a;
+  vector<lower=0.0>[NobjBatchEffects] obj_batch_effect_eta_t;
+  vector<lower=0.0>[NobjBatchEffects] obj_batch_effect_eta_a;
   vector<lower=0.0>[NobjBatchEffectsPos] obj_batch_effect_unscaled_pos;
   vector[NobjBatchEffectsOther] obj_batch_effect_unscaled_other;
 
@@ -376,8 +392,10 @@ parameters {
 transformed parameters {
   vector[Nobjects] obj_base_labu;
   vector[NobjEffects] obj_effect;
-  vector<lower=0>[NobjEffects] obj_effect_sigma;
+  real<lower=0> effect_slab_c;
+  vector<lower=0>[NobjEffects] obj_effect_sigma; // AKA lambda_tilde*tau in rstanarm
   vector[NobjBatchEffects] obj_batch_effect;
+  real<lower=0> batch_effect_slab_c;
   vector<lower=0>[NobjBatchEffects] obj_batch_effect_sigma;
   vector[NsuoBatchEffects] suo_subbatch_effect;
   vector<lower=0>[NsuoBatchEffects] suo_subbatch_effect_sigma;
@@ -399,7 +417,13 @@ transformed parameters {
   }
 
   // calculate effects lambdas and scale effects
-  obj_effect_sigma = obj_effect_lambda_a ./ sqrt(obj_effect_lambda_t) .* obj_effect_tau;
+  {
+      vector[NobjEffects] obj_effect_sigma_pre; // AKA lambda_eta2 in rstanarm
+      real effect_slab_c2 = square(effect_slab_scale) * effect_slab_c_t; // AKA c2 in rstanarm
+      effect_slab_c = effect_slab_scale * sqrt(effect_slab_c_t);
+      obj_effect_sigma_pre = square(obj_effect_lambda_a .* obj_effect_eta_a) .* obj_effect_lambda_t .* obj_effect_eta_t;
+      obj_effect_sigma = sqrt(effect_slab_c2 * obj_effect_sigma_pre ./ (effect_slab_c2 + square(obj_effect_tau) .* obj_effect_sigma_pre)) .* obj_effect_tau;
+  }
   obj_effect = obj_effect_mean + append_row(obj_effect_unscaled_pos, obj_effect_unscaled_other)[obj_effect_reshuffle] .* obj_effect_sigma;
 
   // calculate iaction_labu
@@ -419,9 +443,15 @@ transformed parameters {
   }
   // calculate obs_batch_shift (doesn't make sense to add to obs_labu)
   if (NbatchEffects > 0) {
-    obj_batch_effect_sigma = obj_batch_effect_lambda_a ./ sqrt(obj_batch_effect_lambda_t) * obj_batch_effect_tau;
+    vector[NobjBatchEffects] obj_batch_effect_sigma_pre; // AKA lambda_eta2 in rstanarm
+    real batch_effect_slab_c2 = square(batch_effect_slab_scale) * batch_effect_slab_c_t; // AKA c2 in rstanarm
+    batch_effect_slab_c = batch_effect_slab_scale * sqrt(batch_effect_slab_c_t);
+    obj_batch_effect_sigma_pre = square(obj_batch_effect_lambda_a .* obj_batch_effect_eta_a) .* obj_batch_effect_lambda_t .* obj_batch_effect_eta_t;
+    obj_batch_effect_sigma = sqrt(batch_effect_slab_c2 * obj_batch_effect_sigma_pre ./ (batch_effect_slab_c2 + square(obj_batch_effect_tau) * obj_batch_effect_sigma_pre)) * obj_batch_effect_tau;
     obj_batch_effect = append_row(obj_batch_effect_unscaled_pos, obj_batch_effect_unscaled_other)[obj_batch_effect_reshuffle] .* obj_batch_effect_sigma;
     obs_batch_shift = csr_matrix_times_vector(Nobservations, NobjBatchEffects, obsXobjbatcheff_w, obsXobjbatcheff_v, obsXobjbatcheff_u, obj_batch_effect);
+  } else {
+    batch_effect_slab_c = 0.0;
   }
   // calculate suo_labu_shift
   if (Nsubobjects > 1) {
@@ -446,10 +476,13 @@ model {
     // treatment effect parameters, horseshoe prior
     //obj_effect_tau ~ student_t(2, 0.0, 1.0);
     //obj_effect_lambda ~ student_t(2, 0.0, obj_effect_tau);
-    obj_effect_lambda_t ~ chi_square(2.0);
+    obj_effect_lambda_t ~ inv_gamma(0.5 * obj_effect_df, 0.5 * obj_effect_df);
     obj_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+    obj_effect_eta_t ~ inv_gamma(0.5 * obj_effect_scale, 0.5 * obj_effect_scale);
+    obj_effect_eta_a ~ normal(0.0, 1.0); // 1.0 = 2/2
     obj_effect_unscaled_pos ~ normal(0.0, 1.0);
     obj_effect_unscaled_other ~ normal(0.0, 1.0);
+    effect_slab_c_t ~ inv_gamma(0.5 * effect_slab_df, 0.5 * effect_slab_df);
     // batch effect parameters, cauchy prior on sigma
     //condition_repl_effect_sigma ~ inv_gamma(1.5, 1.0);
 
@@ -472,8 +505,11 @@ model {
 
     //obj_batch_effect_lambda ~ student_t(2, 0.0, obj_batch_effect_tau);
     if (NbatchEffects > 0) {
-      obj_batch_effect_lambda_t ~ chi_square(3.0);
-      obj_batch_effect_lambda_a ~ normal(0.0, 1.0);
+      obj_batch_effect_lambda_t ~ inv_gamma(0.5 * batch_effect_df, 0.5 * batch_effect_df);
+      obj_batch_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+      obj_batch_effect_eta_t ~ inv_gamma(0.5 * batch_effect_scale, 0.5 * batch_effect_scale);
+      obj_batch_effect_eta_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+      batch_effect_slab_c_t ~ inv_gamma(0.5 * batch_effect_slab_df, 0.5 * batch_effect_slab_df);
       //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
       obj_batch_effect_unscaled_pos ~ normal(0.0, 1.0);
       obj_batch_effect_unscaled_other ~ normal(0.0, 1.0);

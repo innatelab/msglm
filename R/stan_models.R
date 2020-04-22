@@ -1,6 +1,6 @@
 # variables description for msglm_local model
 msglm.vars_info <- list(
-  global = list(names=c('suo_shift_sigma'),
+  global = list(names=c('suo_shift_sigma', 'effect_slab_c', 'batch_effect_slab_c'),
                 dims=c()),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
   #batch_effects = list(names = c('batch_effect_sigma'),
   #                     dims = c('batch_effect')),
@@ -46,8 +46,10 @@ nrows_cumsum <- function(df, group_col) {
 #' @export
 stan.prepare_data <- function(base_input_data, model_data,
                               global_labu_shift = global_protgroup_labu_shift,
+                              effect_slab_df = 4, effect_slab_scale = 2.5,
                               base_repl_shift_tau=0.1, effect_repl_shift_tau=0.25,
-                              batch_tau=0.3, subbatch_tau=batch_tau)
+                              batch_tau=0.3, batch_slab_df = 4, batch_slab_scale = 2.5, batch_df = 1, batch_scale = 1.0,
+                              subbatch_tau=batch_tau)
 {
   message('Converting MSGLM model data to Stan-readable format...')
   is_glmm <- "mixeffects" %in% names(model_data)
@@ -102,9 +104,15 @@ stan.prepare_data <- function(base_input_data, model_data,
     global_labu_shift = global_labu_shift,
     effect_tau = effects.df$prior_tau,
     effect_mean = effects.df$prior_mean,
+    effect_df = if (rlang::has_name(effects.df, "prior_df")) {effects.df$prior_df} else {rep.int(1.0, nrow(effects.df))},
+    effect_scale = if (rlang::has_name(effects.df, "prior_scale")) {effects.df$prior_scale} else {rep.int(1.0, nrow(effects.df))},
+    effect_slab_df = effect_slab_df,
+    effect_slab_scale = effect_slab_scale,
     obj_base_repl_shift_tau = base_repl_shift_tau,
     obj_effect_repl_shift_tau = effect_repl_shift_tau,
     obj_batch_effect_tau = batch_tau,
+    batch_effect_df = batch_df, batch_effect_scale = batch_scale,
+    batch_effect_slab_df =  batch_slab_df, batch_effect_slab_scale = batch_slab_scale,
     obj_base_labu_sigma = 4.0,
     #obj_batch_effect_sigma = 0.25,
     underdef_obj_shift = -8.0#,

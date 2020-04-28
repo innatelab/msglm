@@ -353,6 +353,7 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
 
 calc_contrasts <- function(vars_results, vars_info, dims_info,
                            contrastXmetacondition, conditionXmetacondition.df, contrasts.df,
+                           contrastXcondition.df = NULL,
                            mschannel_col = "mschannel_ix",
                            condition_agg_col = "condition", var_names = c('iaction_labu', 'iaction_labu_replCI', 'obs_labu'),
                            obj_dim = "object",
@@ -364,9 +365,13 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
   contrastXmetacondition.df <- as_tibble(as.table(contrastXmetacondition)) %>%
     dplyr::filter(n != 0) %>% dplyr::rename(weight=n) %>%
     dplyr::inner_join(contrasts.df)
-  contrastXcondition.df <- contrastXmetacondition.df %>%
-    dplyr::inner_join(conditionXmetacondition.df) %>%
-    dplyr::arrange_at(c(contrast_col, "contrast_type", metacondition_col, condition_col))
+  if (is.null(contrastXcondition.df)) { # autogenerate
+    contrastXcondition.df <- contrastXmetacondition.df %>%
+      dplyr::inner_join(conditionXmetacondition.df) %>%
+      dplyr::arrange_at(c(contrast_col, "contrast_type", metacondition_col, condition_col))
+  } else {
+    message("Using existing contrastXcondition")
+  }
   if (!rlang::has_name(contrastXcondition.df, "is_preserved_condition")) {
     contrastXcondition.df$is_preserved_condition <- FALSE
   }
@@ -424,7 +429,8 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
       experiment_col <- if (mschannel_col %in% colnames(samples.df)) mschannel_col
                         else if (condition_col %in% colnames(samples.df)) condition_col
                         else condition_col
-      metacondition2experiments.df <- dplyr::inner_join(dplyr::semi_join(conditionXmetacondition.df, cond_stats.df),
+      metacondition2experiments.df <- dplyr::inner_join(dplyr::semi_join(dplyr::select_at(conditionXmetacondition.df, c(condition_col, metacondition_col)),
+                                                                         cond_stats.df),
                                                         dplyr::distinct(dplyr::select(samples.df,
                                                                                       !!!unique(c(condition_col, experiment_col)))))
       if (nrow(samples.df) == 0) {
@@ -581,6 +587,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   res <- calc_contrasts(res, vars_info, dims_info,
                         contrastXmetacondition.mtx, conditionXmetacondition.df,
                         dplyr::distinct(dplyr::select(contrastXmetacondition.df, contrast, contrast_type)),
+                        contrastXcondition.df = if(exists('contrastXcondition.df')){contrastXcondition.df}else{NULL},
                         var_names = contrast_vars,
                         mschannel_col = mschannel_col,
                         condition.quantiles_lhs = condition.quantiles_lhs,

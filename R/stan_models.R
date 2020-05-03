@@ -48,7 +48,7 @@ stan.prepare_data <- function(base_input_data, model_data,
                               global_labu_shift = global_protgroup_labu_shift,
                               effect_slab_df = 4, effect_slab_scale = 2.5,
                               base_repl_shift_tau=0.1, effect_repl_shift_tau=0.25,
-                              batch_tau=0.3, batch_slab_df = 4, batch_slab_scale = 2.5, batch_df = 1, batch_df2 = 1.0,
+                              batch_tau=0.3, batch_slab_df = 4, batch_slab_scale = 2.5, batch_df = 1.0, batch_df2 = 4.0,
                               subbatch_tau=batch_tau)
 {
   message('Converting MSGLM model data to Stan-readable format...')

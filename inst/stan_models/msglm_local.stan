@@ -114,15 +114,15 @@ data {
   // global model constants
   real global_labu_shift;   // shift to be applied to all XXX_labu variables to get the real log intensity
   vector<lower=0>[Neffects] effect_tau;
-  vector<lower=0>[Neffects] effect_scale;
   vector<lower=0>[Neffects] effect_df;
+  vector<lower=0>[Neffects] effect_df2;
   real<lower=0> effect_slab_df;
   real<lower=0> effect_slab_scale;
   real<lower=0> obj_base_repl_shift_tau;
   real<lower=0> obj_effect_repl_shift_tau;
   real<lower=0> obj_batch_effect_tau;
-  real<lower=0> batch_effect_scale;
   real<lower=0> batch_effect_df;
+  real<lower=0> batch_effect_df2;
   real<lower=0> batch_effect_slab_df;
   real<lower=0> batch_effect_slab_scale;
   real<lower=0> obj_base_labu_sigma;
@@ -160,7 +160,7 @@ transformed data {
   vector<lower=0>[NobjEffects] obj_effect_tau = effect_tau[obj_effect2effect];
   vector[NobjEffects] obj_effect_mean = effect_mean[obj_effect2effect];
   vector<lower=0>[NobjEffects] obj_effect_df = effect_df[obj_effect2effect];
-  vector<lower=0>[NobjEffects] obj_effect_scale = effect_scale[obj_effect2effect];
+  vector<lower=0>[NobjEffects] obj_effect_df2 = effect_df2[obj_effect2effect];
 
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsPos = sum(batch_effect_is_positive[obj_batch_effect2batch_effect]);
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsOther = NobjBatchEffects - NobjBatchEffectsPos;
@@ -362,7 +362,7 @@ model {
     //obj_effect_lambda ~ student_t(2, 0.0, obj_effect_tau);
     obj_effect_lambda_t ~ inv_gamma(0.5 * obj_effect_df, 0.5 * obj_effect_df);
     obj_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
-    obj_effect_eta_t ~ inv_gamma(0.5 * obj_effect_scale, 0.5 * obj_effect_scale);
+    obj_effect_eta_t ~ inv_gamma(0.5 * obj_effect_df2, 0.5 * obj_effect_df2);
     obj_effect_eta_a ~ normal(0.0, 1.0); // 1.0 = 2/2
     obj_effect_unscaled_pos ~ normal(0.0, 1.0);
     obj_effect_unscaled_other ~ normal(0.0, 1.0);
@@ -391,7 +391,7 @@ model {
     if (NbatchEffects > 0) {
       obj_batch_effect_lambda_t ~ inv_gamma(0.5 * batch_effect_df, 0.5 * batch_effect_df);
       obj_batch_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
-      obj_batch_effect_eta_t ~ inv_gamma(0.5 * batch_effect_scale, 0.5 * batch_effect_scale);
+      obj_batch_effect_eta_t ~ inv_gamma(0.5 * batch_effect_df2, 0.5 * batch_effect_df2);
       obj_batch_effect_eta_a ~ normal(0.0, 1.0); // 1.0 = 2/2
       batch_effect_slab_c_t ~ inv_gamma(0.5 * batch_effect_slab_df, 0.5 * batch_effect_slab_df);
       //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);

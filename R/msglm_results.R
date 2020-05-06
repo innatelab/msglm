@@ -465,13 +465,19 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
           dplyr::distinct()
         # inject contrast statistics into vars_results
         vars_results[[vars_category]]$contrast_stats <- dplyr::left_join(var_info.df, contrast_stats.df) %>%
-          dplyr::mutate(p_value = 2*pmin(prob_nonpos, prob_nonneg)
+          dplyr::mutate(p_value = 2*pmin(prob_nonpos, prob_nonneg),
                         # fake P-values to fit in the plot
                         #prob_nonpos_fake = pmax(if_else(mean < 0, 1E-300, 1E-100), rgamma(n(), shape=1E-2, scale=1E-150), prob_nonpos),
                         #prob_nonneg_fake = pmax(if_else(mean > 0, 1E-300, 1E-100), rgamma(n(), shape=1E-2, scale=1E-150), prob_nonneg),
                         #p_value_fake = 2*pmin(prob_nonpos_fake, prob_nonneg_fake)
           ) %>%
           #dplyr::select(-index_observation, -msrun, -msrun_ix) %>% dplyr::distinct() %>%
+          dplyr::left_join(group_by(cond_stats.df, contrast, is_lhs) %>%
+                           dplyr::summarise(conditions = str_c(condition, collapse=" ")) %>%
+                           dplyr::group_by(contrast) %>%
+                           dplyr::summarise(conditions_lhs = conditions[is_lhs],
+                                            conditions_rhs = conditions[!is_lhs]) %>%
+                           dplyr::ungroup()) %>%
           dplyr::left_join(contrastXmetacondition.df %>% dplyr::filter(contrast %in% rownames(contrastXmetacondition)) %>%
                            dplyr::rename(contrast_weight = weight) %>%
                            dplyr::mutate(metacondition_reported =

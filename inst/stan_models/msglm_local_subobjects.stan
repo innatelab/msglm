@@ -409,6 +409,7 @@ transformed parameters {
   vector[NsuoBatchEffects > 0 ? Nobservations*Nsubobjects : 0] suoxobs_subbatch_shift;
 
   vector[Nsubobjects] suo_shift_unscaled; // subcomponent shift within object
+  vector[Nsubobjects] suo_shift; // subcomponent shift within object
 
   // correct baseline abundances of underdefined objects
   obj_base_labu = obj_base_labu0;
@@ -459,6 +460,8 @@ transformed parameters {
   } else if (Nsubobjects == 1) {
     suo_shift_unscaled = rep_vector(0.0, Nsubobjects);
   }
+  suo_shift = suo_shift_unscaled * suo_shift_sigma;
+
   // calculate suoXobs_subbatch_shift (doesn't make sense to add to obs_labu)
   if (NsubBatchEffects > 0) {
     suo_subbatch_effect_sigma = suo_subbatch_effect_lambda_a ./ sqrt(suo_subbatch_effect_lambda_t) * suo_subbatch_effect_tau;
@@ -537,8 +540,6 @@ model {
         //mLogAbu = iaction_shift[miss2iaction] + experiment_shift[miss2experiment];
         if (Nsubobjects > 0) {
             // adjust by subcomponent shift
-            vector[Nsubobjects] suo_shift;
-            suo_shift = suo_shift_unscaled * suo_shift_sigma;
             q_labu += suo_shift[quant2suo];
             m_labu += suo_shift[miss2suo];
 
@@ -577,9 +578,7 @@ generated quantities {
     if (Nsubobjects > 0) {
         vector[Nquanted] q_labu;
         vector[Nmissed] m_labu;
-        vector[Nsubobjects] suo_shift;
 
-        suo_shift = suo_shift_unscaled * suo_shift_sigma;
         // prepare predicted abundances
         q_labu = obs_labu[quant2observation] + experiment_shift[quant2experiment] + suo_shift[quant2suo];
         m_labu = obs_labu[miss2observation] + experiment_shift[miss2experiment] + suo_shift[miss2suo];

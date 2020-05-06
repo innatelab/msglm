@@ -8,7 +8,7 @@ msglm.vars_info <- list(
                   dims=c('iaction')),
   observations = list(names=c('obs_labu', "obs_repl_shift", "obs_batch_shift"),
                       dims=c('observation')),
-  subobjects = list(names=c('suo_shift_unscaled', 'suo_llh'),
+  subobjects = list(names=c('suo_shift', 'suo_llh'),
                     dims=c('subobject')),
   #subobject_subbatch_shifts = list(names=c('suoxobs_subbatch_shift'),
   #                                 dims=c('subobjectXobservation')),

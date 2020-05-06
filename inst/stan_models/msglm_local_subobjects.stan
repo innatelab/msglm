@@ -357,7 +357,8 @@ parameters {
   vector[Nobjects] obj_base_labu0; // baseline object abundance without underdefinedness adjustment
   vector<lower=0.01>[Nobservations0 > 0 ? Nobjects : 0] obj_base_repl_shift_sigma;
 
-  real<lower=0.0> suo_shift_sigma;
+  real<lower=0.0> suo_shift_sigma_a;
+  real<lower=0.0> suo_shift_sigma_t;
   vector[Nsubobjects > 0 ? Nsubobjects-Nobjects : 0] suo_shift0_unscaled; // subobject shift within object
 
   //real<lower=0.0> obj_effect_tau;
@@ -408,6 +409,7 @@ transformed parameters {
   vector[NobjBatchEffects > 0 ? Nobservations : 0] obs_batch_shift;
   vector[NsuoBatchEffects > 0 ? Nobservations*Nsubobjects : 0] suoxobs_subbatch_shift;
 
+  real<lower=0> suo_shift_sigma;
   vector[Nsubobjects] suo_shift_unscaled; // subcomponent shift within object
   vector[Nsubobjects] suo_shift; // subcomponent shift within object
 
@@ -460,6 +462,7 @@ transformed parameters {
   } else if (Nsubobjects == 1) {
     suo_shift_unscaled = rep_vector(0.0, Nsubobjects);
   }
+  suo_shift_sigma = suo_shift_sigma_a * sqrt(suo_shift_sigma_t);
   suo_shift = suo_shift_unscaled * suo_shift_sigma;
 
   // calculate suoXobs_subbatch_shift (doesn't make sense to add to obs_labu)
@@ -518,10 +521,11 @@ model {
       obj_batch_effect_unscaled_other ~ normal(0.0, 1.0);
     }
     if (Nsubobjects > 0) {
-      suo_shift_sigma ~ inv_gamma(3.0, 3.0);
+      suo_shift_sigma_t ~ inv_gamma(2.0, 2.0);
+      suo_shift_sigma_a ~ normal(0.0, 1.0);
       suo_shift_unscaled ~ normal(0.0, 1.0);
       if (NsubBatchEffects > 0) {
-        suo_subbatch_effect_lambda_t ~ chi_square(3.0);
+        suo_subbatch_effect_lambda_t ~ inv_gamma(2.0, 2.0);
         suo_subbatch_effect_lambda_a ~ normal(0.0, 1.0);
         //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
         suo_subbatch_effect_unscaled_pos ~ normal(0.0, 1.0);

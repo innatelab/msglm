@@ -197,7 +197,7 @@ msglm_stan_model <- function(model_name) {
 
 #' @export
 stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
-                          adapt_delta=0.9, max_treedepth=11)
+                          adapt_delta=0.9, stepsize=NA_real_, max_treedepth=11)
 {
     message("Running Stan MCMC...")
     if ("Nsubobjects" %in% names(stan_input_data)) {
@@ -222,12 +222,16 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
       vars_info$global$names <- setdiff(vars_info$global$names,
                                         c('suo_shift_sigma'))
     }
+    control_params <- list(adapt_delta=adapt_delta, max_treedepth=max_treedepth)
+    if (!is.na(stepsize)) {
+      control_params$stepsize <- stepsize
+    }
     res <- rstan::sampling(stanmodel,
              pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,
              data = stan_input_data,
              #init = function() { pcp_peaks_glm.generate_init_params(pcp_peaks_glm.model_data) },
              iter = iter, chains = chains, thin = thin,
-             control = list(adapt_delta=adapt_delta, max_treedepth=max_treedepth))
+             control = control_params)
     attr(res, "msglm_vars_info") <- vars_info
     return(res)
 }

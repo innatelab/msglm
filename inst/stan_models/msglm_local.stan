@@ -118,6 +118,9 @@ data {
   vector<lower=0>[Neffects] effect_df2;
   real<lower=0> effect_slab_df;
   real<lower=0> effect_slab_scale;
+  real obj_labu_min; // minimal average abundance of an object
+  real<lower=0> obj_labu_min_scale; // scale that defines the softness of lower abundance limit
+  real<lower=0> obj_base_labu_sigma; // sigma of average abundance distribution
   real<lower=0> obj_base_repl_shift_tau;
   real<lower=0> obj_effect_repl_shift_tau;
   real<lower=0> obj_batch_effect_tau;
@@ -125,7 +128,6 @@ data {
   real<lower=0> batch_effect_df2;
   real<lower=0> batch_effect_slab_df;
   real<lower=0> batch_effect_slab_scale;
-  real<lower=0> obj_base_labu_sigma;
   real<upper=0> underdef_obj_shift;
 
   // instrument calibrated parameters (FIXME: msproto-dependent)
@@ -265,7 +267,7 @@ parameters {
   //vector<lower=0>[Nconditions] condition_repl_effect_sigma;
 
   vector[Nobjects] obj_base_labu0; // baseline object abundance without underdefinedness adjustment
-  vector<lower=0.01>[Nobservations0 > 0 ? Nobjects : 0] obj_base_repl_shift_sigma;
+  vector<lower=0.001>[Nobservations0 > 0 ? Nobjects : 0] obj_base_repl_shift_sigma;
 
   //real<lower=0.0> obj_effect_tau;
   real<lower=0.0> effect_slab_c_t;
@@ -278,7 +280,7 @@ parameters {
 
   //real<lower=0> obj_repl_effect_sigma;
   //vector<lower=0>[Nobjects*Nexperiments] repl_shift_lambda;
-  vector<lower=0.01>[Nobservations0 > 0 ? NobjEffects : 0] obj_effect_repl_shift_sigma;
+  vector<lower=0.001>[Nobservations0 > 0 ? NobjEffects : 0] obj_effect_repl_shift_sigma;
   vector[Nobservations0] obs_shift0;
 
   //real<lower=0> obj_batch_effect_sigma;
@@ -398,6 +400,9 @@ model {
       obj_batch_effect_unscaled_pos ~ normal(0.0, 1.0);
       obj_batch_effect_unscaled_other ~ normal(0.0, 1.0);
     }
+
+    // soft lower limit of protein abundance for each observation
+    1 ~ bernoulli_logit((obs_labu - obj_labu_min) * obj_labu_min_scale);
 
     // calculate the likelihood
     {

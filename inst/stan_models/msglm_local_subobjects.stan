@@ -135,6 +135,7 @@ data {
   vector<lower=0>[Neffects] effect_df2;
   real<lower=0> effect_slab_df;
   real<lower=0> effect_slab_scale;
+  real<lower=0> obj_base_labu_sigma; // sigma of average abundance distribution
   real<lower=0> obj_base_repl_shift_tau;
   real<lower=0> obj_effect_repl_shift_tau;
   real<lower=0> obj_batch_effect_tau;
@@ -143,7 +144,6 @@ data {
   real<lower=0> batch_effect_slab_df;
   real<lower=0> batch_effect_slab_scale;
   real<lower=0> suo_subbatch_effect_tau;
-  real<lower=0> obj_base_labu_sigma;
   real<upper=0> underdef_obj_shift;
 
   // instrument calibrated parameters (FIXME: msproto-dependent)

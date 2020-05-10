@@ -467,7 +467,7 @@ transformed parameters {
 
   // calculate suoXobs_subbatch_shift (doesn't make sense to add to obs_labu)
   if (NsubBatchEffects > 0) {
-    suo_subbatch_effect_sigma = suo_subbatch_effect_lambda_a ./ sqrt(suo_subbatch_effect_lambda_t) * suo_subbatch_effect_tau;
+    suo_subbatch_effect_sigma = suo_subbatch_effect_lambda_a .* sqrt(suo_subbatch_effect_lambda_t) * suo_subbatch_effect_tau;
     suo_subbatch_effect = append_row(suo_subbatch_effect_unscaled_pos, suo_subbatch_effect_unscaled_other)[suo_subbatch_effect_reshuffle] .* suo_subbatch_effect_sigma;
     suoxobs_subbatch_shift = csr_matrix_times_vector(Nobservations*Nsubobjects, NsuoBatchEffects, suoxobsXsuobatcheff_w, suoxobsXsuobatcheff_v, suoxobsXsuobatcheff_u,
                                                      suo_subbatch_effect);
@@ -521,11 +521,11 @@ model {
       obj_batch_effect_unscaled_other ~ normal(0.0, 1.0);
     }
     if (Nsubobjects > 0) {
-      suo_shift_sigma_t ~ inv_gamma(2.0, 2.0);
+      suo_shift_sigma_t ~ inv_gamma(0.5 * 2.0, 0.5 * 2.0);
       suo_shift_sigma_a ~ normal(0.0, 1.0);
       suo_shift_unscaled ~ normal(0.0, 1.0);
       if (NsubBatchEffects > 0) {
-        suo_subbatch_effect_lambda_t ~ inv_gamma(2.0, 2.0);
+        suo_subbatch_effect_lambda_t ~ inv_gamma(0.5 * 4.0, 0.5 * 4.0);
         suo_subbatch_effect_lambda_a ~ normal(0.0, 1.0);
         //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
         suo_subbatch_effect_unscaled_pos ~ normal(0.0, 1.0);

@@ -355,7 +355,7 @@ parameters {
   //vector<lower=0>[Nconditions] condition_repl_effect_sigma;
 
   vector[Nobjects] obj_base_labu0; // baseline object abundance without underdefinedness adjustment
-  vector<lower=0.01>[Nobservations0 > 0 ? Nobjects : 0] obj_base_repl_shift_sigma;
+  vector<lower=0.001>[Nobservations0 > 0 ? Nobjects : 0] obj_base_repl_shift_sigma;
 
   real<lower=0.0> suo_shift_sigma_a;
   real<lower=0.0> suo_shift_sigma_t;
@@ -372,7 +372,7 @@ parameters {
 
   //real<lower=0> obj_repl_effect_sigma;
   //vector<lower=0>[Nobjects*Nexperiments] repl_shift_lambda;
-  vector<lower=0.01>[Nobservations0 > 0 ? NobjEffects : 0] obj_effect_repl_shift_sigma;
+  vector<lower=0.001>[Nobservations0 > 0 ? NobjEffects : 0] obj_effect_repl_shift_sigma;
   vector[Nobservations0] obs_shift0;
 
   //real<lower=0> obj_batch_effect_sigma;

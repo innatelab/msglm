@@ -135,6 +135,8 @@ data {
   vector<lower=0>[Neffects] effect_df2;
   real<lower=0> effect_slab_df;
   real<lower=0> effect_slab_scale;
+  real obj_labu_min; // minimal average abundance of an object
+  real<lower=0> obj_labu_min_scale; // scale that defines the softness of lower abundance limit
   real<lower=0> obj_base_labu_sigma; // sigma of average abundance distribution
   real<lower=0> obj_base_repl_shift_tau;
   real<lower=0> obj_effect_repl_shift_tau;
@@ -532,6 +534,9 @@ model {
         suo_subbatch_effect_unscaled_other ~ normal(0.0, 1.0);
       }
     }
+
+    // soft lower limit of protein abundance for each observation
+    1 ~ bernoulli_logit((obs_labu - obj_labu_min) * obj_labu_min_scale);
 
     // calculate the likelihood
     {

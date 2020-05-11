@@ -416,7 +416,7 @@ transformed parameters {
   vector[Nsubobjects] suo_shift; // subcomponent shift within object
 
   // correct baseline abundances of underdefined objects
-  obj_base_labu = obj_base_labu0;
+  obj_base_labu = obj_base_labu0 * obj_base_labu_sigma;
   for (i in 1:NunderdefObjs) {
     obj_base_labu[underdef_objs[i]] = obj_base_labu[underdef_objs[i]] + underdef_obj_shift;
   }
@@ -480,16 +480,16 @@ model {
     // abundance distribution
     //obj_base ~ normal(zShift, 1.0);
     //obj_shift_sigma ~ inv_gamma(2.0, 0.33/zScale); // mode is 1/zScale
-    obj_base_labu0 ~ normal(0, obj_base_labu_sigma);
+    obj_base_labu0 ~ std_normal();
     // treatment effect parameters, horseshoe prior
     //obj_effect_tau ~ student_t(2, 0.0, 1.0);
     //obj_effect_lambda ~ student_t(2, 0.0, obj_effect_tau);
     obj_effect_lambda_t ~ inv_gamma(0.5 * obj_effect_df, 0.5 * obj_effect_df);
-    obj_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+    obj_effect_lambda_a ~ std_normal(); // 1.0 = 2/2
     obj_effect_eta_t ~ inv_gamma(0.5 * obj_effect_df2, 0.5 * obj_effect_df2);
-    obj_effect_eta_a ~ normal(0.0, 1.0); // 1.0 = 2/2
-    obj_effect_unscaled_pos ~ normal(0.0, 1.0);
-    obj_effect_unscaled_other ~ normal(0.0, 1.0);
+    obj_effect_eta_a ~ std_normal(); // 1.0 = 2/2
+    obj_effect_unscaled_pos ~ std_normal();
+    obj_effect_unscaled_other ~ std_normal();
     effect_slab_c_t ~ inv_gamma(0.5 * effect_slab_df, 0.5 * effect_slab_df);
     // batch effect parameters, cauchy prior on sigma
     //condition_repl_effect_sigma ~ inv_gamma(1.5, 1.0);
@@ -514,24 +514,24 @@ model {
     //obj_batch_effect_lambda ~ student_t(2, 0.0, obj_batch_effect_tau);
     if (NbatchEffects > 0) {
       obj_batch_effect_lambda_t ~ inv_gamma(0.5 * batch_effect_df, 0.5 * batch_effect_df);
-      obj_batch_effect_lambda_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+      obj_batch_effect_lambda_a ~ std_normal(); // 1.0 = 2/2
       obj_batch_effect_eta_t ~ inv_gamma(0.5 * batch_effect_df2, 0.5 * batch_effect_df2);
-      obj_batch_effect_eta_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+      obj_batch_effect_eta_a ~ std_normal(); // 1.0 = 2/2
       batch_effect_slab_c_t ~ inv_gamma(0.5 * batch_effect_slab_df, 0.5 * batch_effect_slab_df);
       //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
-      obj_batch_effect_unscaled_pos ~ normal(0.0, 1.0);
-      obj_batch_effect_unscaled_other ~ normal(0.0, 1.0);
+      obj_batch_effect_unscaled_pos ~ std_normal();
+      obj_batch_effect_unscaled_other ~ std_normal();
     }
     if (Nsubobjects > 0) {
       suo_shift_sigma_t ~ inv_gamma(0.5 * 2.0, 0.5 * 2.0);
-      suo_shift_sigma_a ~ normal(0.0, 1.0);
-      suo_shift_unscaled ~ normal(0.0, 1.0);
+      suo_shift_sigma_a ~ std_normal();
+      suo_shift_unscaled ~ std_normal();
       if (NsubBatchEffects > 0) {
         suo_subbatch_effect_lambda_t ~ inv_gamma(0.5 * 4.0, 0.5 * 4.0);
-        suo_subbatch_effect_lambda_a ~ normal(0.0, 1.0);
+        suo_subbatch_effect_lambda_a ~ std_normal();
         //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
-        suo_subbatch_effect_unscaled_pos ~ normal(0.0, 1.0);
-        suo_subbatch_effect_unscaled_other ~ normal(0.0, 1.0);
+        suo_subbatch_effect_unscaled_pos ~ std_normal();
+        suo_subbatch_effect_unscaled_other ~ std_normal();
       }
     }
 

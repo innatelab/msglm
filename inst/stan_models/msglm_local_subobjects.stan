@@ -226,7 +226,7 @@ transformed data {
   int<lower=1, upper=obsXobs0_Nw + 1> obsXobs_shift0_u[Nobservations + 1];
   int<lower=1, upper=Nobservations0> obsXobs_shift0_v[obsXobs0_Nw];
 
-  int<lower=0> suoXsuo0_Nw = contr_poly_Nw(Nobjects, suo2obj);
+  int<lower=0> suoXsuo0_Nw = contr_treatment_Nw(Nobjects, suo2obj);
   vector[suoXsuo0_Nw] suoXsuo_shift0_w;
   int<lower=0, upper=suoXsuo0_Nw + 1> suoXsuo_shift0_u[Nsubobjects + 1];
   int<lower=0, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[suoXsuo0_Nw];
@@ -343,8 +343,8 @@ transformed data {
         obj_nsuo = obj2nsuo[obj_ix];
         if (obj_nsuo > 1) {
             int nW = 0;
-            // (re)generate contr_poly for interaction FIXME pre-build contr_poly for 2..max_nsuo
-            matrix[obj_nsuo, obj_nsuo-1] obj_suoXsuo0 = contr_poly(obj_nsuo);
+            // (re)generate contr_treatment for interaction FIXME pre-build contr_poly for 2..max_nsuo
+            matrix[obj_nsuo, obj_nsuo-1] obj_suoXsuo0 = contr_treatment(obj_nsuo);
 
             if (obj2nsuo_2ndpass[obj_ix] == 0) {
                 // reserve (nsuo-1) suo_shift0 variables

@@ -589,6 +589,9 @@ model {
         suo_subbatch_effect_unscaled_pos ~ std_normal();
         suo_subbatch_effect_unscaled_other ~ std_normal();
       }
+      // soft lower limit of relative subojbect abundance
+      // FIXME different params than obj_labu_min/obj_labu_min_scale
+      1 ~ bernoulli_logit((suo_shift - obj_labu_min) * obj_labu_min_scale);
     }
 
     // soft lower limit of protein abundance for each observation

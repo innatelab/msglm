@@ -372,7 +372,6 @@ transformed data {
         obj_nsuo = obj2nsuo[obj_ix];
         if (obj_nsuo > 1) {
             int nW = 0;
-            // (re)generate contr_treatment for interaction FIXME pre-build contr_poly for 2..max_nsuo
             matrix[obj_nsuo, obj_nsuo-1] obj_suoXsuo0 = contr_treatment(obj_nsuo);
 
             if (obj2nsuo_2ndpass[obj_ix] == 0) {

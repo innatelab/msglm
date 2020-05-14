@@ -415,7 +415,7 @@ parameters {
 
   vector[Nobjects] obj_base_labu0; // baseline object abundance without underdefinedness adjustment
 
-  real<lower=1.0> suo_shift_sigma;
+  //real<lower=1.0> suo_shift_sigma;
   vector[Nsubobjects > 0 ? Nsubobjects-Nobjects : 0] suo_shift0_unscaled; // subobject shift within object
 
   //real<lower=0.0> obj_effect_tau;
@@ -467,7 +467,6 @@ transformed parameters {
   vector[NobjBatchEffects > 0 ? Nobservations : 0] obs_batch_shift;
   vector[NsuoBatchEffects > 0 ? Nobservations*Nsubobjects : 0] suoxobs_subbatch_shift;
 
-  vector[Nsubobjects] suo_shift_unscaled; // subcomponent shift within object
   vector[Nsubobjects] suo_shift; // subcomponent shift within object
 
   // correct baseline abundances of underdefined objects
@@ -512,11 +511,11 @@ transformed parameters {
   }
   // calculate suo_labu_shift
   if (Nsubobjects > 1) {
-    suo_shift_unscaled = csr_matrix_times_vector(Nsubobjects, Nsubobjects - Nobjects, suoXsuo_shift0_w, suoXsuo_shift0_v, suoXsuo_shift0_u, suo_shift0_unscaled);
+    suo_shift = csr_matrix_times_vector(Nsubobjects, Nsubobjects - Nobjects, suoXsuo_shift0_w, suoXsuo_shift0_v, suoXsuo_shift0_u, suo_shift0_unscaled);
   } else if (Nsubobjects == 1) {
-    suo_shift_unscaled = rep_vector(0.0, Nsubobjects);
+    suo_shift = rep_vector(0.0, Nsubobjects);
   }
-  suo_shift = suo_shift_unscaled * suo_shift_sigma;
+  //suo_shift = suo_shift_unscaled * suo_shift_sigma;
 
   // calculate suoXobs_subbatch_shift (doesn't make sense to add to obs_labu)
   if (NsubBatchEffects > 0) {
@@ -575,8 +574,8 @@ model {
       obj_batch_effect_unscaled_other ~ std_normal();
     }
     if (Nsubobjects > 0) {
-      suo_shift_sigma ~ cauchy(0, 1);
-      suo_shift_unscaled ~ std_normal();
+      //suo_shift_sigma ~ std_normal();
+      suo_shift ~ std_normal();
       if (NsubBatchEffects > 0) {
         suo_subbatch_effect_lambda_t ~ inv_gamma(0.5 * 4.0, 0.5 * 4.0);
         suo_subbatch_effect_lambda_a ~ std_normal();
@@ -586,7 +585,7 @@ model {
       }
       // soft lower limit of relative subojbect abundance
       // FIXME different params than obj_labu_min/obj_labu_min_scale
-      1 ~ bernoulli_logit((suo_shift - obj_labu_min) * obj_labu_min_scale);
+      //1 ~ bernoulli_logit((suo_shift - obj_labu_min) * obj_labu_min_scale);
     }
 
     // soft lower limit of protein abundance for each observation

@@ -351,6 +351,18 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
     return (res.df)
 }
 
+#' @export
+prepare_contrast_quantiles <- function(contrastXmetacondition) {
+  sel_contrasts.df <- filter(contrastXmetacondition, !is.na(quantile_min) & !is.na(quantile_max))
+  sel_contrasts_lhs.df <- filter(sel_contrasts.df, weight > 0)
+  sel_contrasts_rhs.df <- filter(sel_contrasts.df, weight < 0)
+
+  list(lhs = rlang::set_names(lapply(seq_along(sel_contrasts_lhs.df$contrast), function(i) c(sel_contrasts_lhs.df$quantile_min[[i]], sel_contrasts_lhs.df$quantile_max[[i]])),
+                              as_character(sel_contrasts_lhs.df$contrast)),
+       rhs = rlang::set_names(lapply(seq_along(sel_contrasts_rhs.df$contrast), function(i) c(sel_contrasts_rhs.df$quantile_min[[i]], sel_contrasts_rhs.df$quantile_max[[i]])),
+                              as_character(sel_contrasts_rhs.df$contrast)))
+}
+
 calc_contrasts <- function(vars_results, vars_info, dims_info,
                            contrastXmetacondition, conditionXmetacondition.df, contrasts.df,
                            contrastXcondition.df = NULL,

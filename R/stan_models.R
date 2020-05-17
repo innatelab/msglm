@@ -1,6 +1,6 @@
 # variables description for msglm_local model
 msglm.vars_info <- list(
-  global = list(names=c('effect_slab_c', 'batch_effect_slab_c'),#'suo_shift_sigma', 
+  global = list(names=c('effect_slab_c'),# 'batch_effect_slab_c'),#'suo_shift_sigma', 
                 dims=c()),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
   #batch_effects = list(names = c('batch_effect_sigma'),
   #                     dims = c('batch_effect')),
@@ -18,7 +18,7 @@ msglm.vars_info <- list(
                  dims=c('object')),
   object_effects = list(names=c('obj_effect_sigma', 'obj_effect', 'obj_effect_replCI'),# 'obj_effect_repl_shift_sigma'),
                         dims=c('object_effect')),
-  object_batch_effects = list(names=c('obj_batch_effect', 'obj_batch_effect_sigma'), #'obj_batch_effect_unscaled',
+  object_batch_effects = list(names=c('obj_batch_effect'),#, 'obj_batch_effect_sigma'), #'obj_batch_effect_unscaled',
                               dims=c('object_batch_effect'))
 )
 
@@ -49,8 +49,8 @@ stan.prepare_data <- function(base_input_data, model_data,
                               effect_slab_df = 4, effect_slab_scale = 2.5,
                               obj_labu_min = -10, obj_labu_min_scale = 1,
                               iact_repl_shift_tau=0.03, iact_repl_shift_df=4.0,
-                              batch_tau=0.3, batch_slab_df = 4, batch_slab_scale = 2.5, batch_df = 1.0, batch_df2 = 4.0,
-                              subbatch_tau=batch_tau)
+                              batch_effect_sigma=0.5,
+                              subbatch_tau=0.3)
 {
   message('Converting MSGLM model data to Stan-readable format...')
   is_glmm <- "mixeffects" %in% names(model_data)
@@ -112,10 +112,7 @@ stan.prepare_data <- function(base_input_data, model_data,
     obj_labu_min = obj_labu_min, obj_labu_min_scale = obj_labu_min_scale,
     obj_base_labu_sigma = 15.0,
     iact_repl_shift_tau = iact_repl_shift_tau, iact_repl_shift_df = iact_repl_shift_df,
-    obj_batch_effect_tau = batch_tau,
-    batch_effect_df = batch_df, batch_effect_df2 = batch_df2,
-    batch_effect_slab_df =  batch_slab_df, batch_effect_slab_scale = batch_slab_scale,
-    #obj_batch_effect_sigma = 0.25,
+    batch_effect_sigma = batch_effect_sigma,
     underdef_obj_shift = -8.0#,
     #zShift = mean(log(msdata$protgroup_intensities$intensity), na.rm = TRUE),
     #zScale = 1.0/sd(log(msdata$protgroup_intensities$intensity), na.rm = TRUE)

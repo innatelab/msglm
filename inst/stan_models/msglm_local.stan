@@ -142,11 +142,7 @@ data {
   real<lower=0> obj_base_labu_sigma; // sigma of average abundance distribution
   real<lower=0> iact_repl_shift_tau;
   real<lower=0> iact_repl_shift_df;
-  real<lower=0> obj_batch_effect_tau;
-  real<lower=0> batch_effect_df;
-  real<lower=0> batch_effect_df2;
-  real<lower=0> batch_effect_slab_df;
-  real<lower=0> batch_effect_slab_scale;
+  real<lower=0> batch_effect_sigma;
   real<upper=0> underdef_obj_shift;
 
   // instrument calibrated parameters (FIXME: msproto-dependent)
@@ -337,11 +333,6 @@ parameters {
   vector[Nobservations0] obs_shift0;
 
   //real<lower=0> obj_batch_effect_sigma;
-  real<lower=0.0> batch_effect_slab_c_t;
-  vector<lower=0>[NobjBatchEffects] obj_batch_effect_lambda_t;
-  vector<lower=0>[NobjBatchEffects] obj_batch_effect_lambda_a;
-  vector<lower=0.0>[NobjBatchEffects] obj_batch_effect_eta_t;
-  vector<lower=0.0>[NobjBatchEffects] obj_batch_effect_eta_a;
   vector<lower=0.0>[NobjBatchEffectsPos] obj_batch_effect_unscaled_pos;
   vector[NobjBatchEffectsOther] obj_batch_effect_unscaled_other;
 }
@@ -352,12 +343,11 @@ transformed parameters {
   real<lower=0> effect_slab_c;
   vector<lower=0>[NobjEffects] obj_effect_sigma; // AKA lambda_tilde*tau in rstanarm
   vector[NobjBatchEffects] obj_batch_effect;
-  real<lower=0> batch_effect_slab_c;
-  vector<lower=0>[NobjBatchEffects] obj_batch_effect_sigma;
+  //vector<lower=0>[NobjBatchEffects] obj_batch_effect_sigma;
 
   vector[Niactions] iaction_labu;
-
   vector<lower=0>[Nobservations0 > 0 ? Niactions : 0] iact_repl_shift_sigma;
+
   vector[Nobservations] obs_labu; // iaction_labu + objXexp_repl_shift * obj_repl_shift_sigma
   vector[Nobservations0 > 0 ? Nobservations : 0] obs_repl_shift; // replicate shifts for all potential observations (including missing)
   vector[NobjBatchEffects > 0 ? Nobservations : 0] obs_batch_shift;
@@ -392,15 +382,8 @@ transformed parameters {
   }
   // calculate obs_batch_shift (doesn't make sense to add to obs_labu)
   if (NbatchEffects > 0) {
-    vector[NobjBatchEffects] obj_batch_effect_sigma_pre; // AKA lambda_eta2 in rstanarm
-    real batch_effect_slab_c2 = square(batch_effect_slab_scale) * batch_effect_slab_c_t; // AKA c2 in rstanarm
-    batch_effect_slab_c = batch_effect_slab_scale * sqrt(batch_effect_slab_c_t);
-    obj_batch_effect_sigma_pre = square(obj_batch_effect_lambda_a .* obj_batch_effect_eta_a) .* obj_batch_effect_lambda_t .* obj_batch_effect_eta_t;
-    obj_batch_effect_sigma = sqrt(batch_effect_slab_c2 * obj_batch_effect_sigma_pre ./ (batch_effect_slab_c2 + square(obj_batch_effect_tau) * obj_batch_effect_sigma_pre)) * obj_batch_effect_tau;
-    obj_batch_effect = append_row(obj_batch_effect_unscaled_pos, obj_batch_effect_unscaled_other)[obj_batch_effect_reshuffle] .* obj_batch_effect_sigma;
+    obj_batch_effect = append_row(obj_batch_effect_unscaled_pos, obj_batch_effect_unscaled_other)[obj_batch_effect_reshuffle] * batch_effect_sigma;
     obs_batch_shift = csr_matrix_times_vector(Nobservations, NobjBatchEffects, obsXobjbatcheff_w, obsXobjbatcheff_v, obsXobjbatcheff_u, obj_batch_effect);
-  } else {
-    batch_effect_slab_c = 0.0;
   }
 }
 
@@ -442,12 +425,6 @@ model {
 
     //obj_batch_effect_lambda ~ student_t(2, 0.0, obj_batch_effect_tau);
     if (NbatchEffects > 0) {
-      obj_batch_effect_lambda_t ~ inv_gamma(0.5 * batch_effect_df, 0.5 * batch_effect_df);
-      obj_batch_effect_lambda_a ~ std_normal(); // 1.0 = 2/2
-      obj_batch_effect_eta_t ~ inv_gamma(0.5 * batch_effect_df2, 0.5 * batch_effect_df2);
-      obj_batch_effect_eta_a ~ std_normal(); // 1.0 = 2/2
-      batch_effect_slab_c_t ~ inv_gamma(0.5 * batch_effect_slab_df, 0.5 * batch_effect_slab_df);
-      //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
       obj_batch_effect_unscaled_pos ~ std_normal();
       obj_batch_effect_unscaled_other ~ std_normal();
     }

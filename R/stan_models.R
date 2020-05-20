@@ -50,7 +50,7 @@ stan.prepare_data <- function(base_input_data, model_data,
                               obj_labu_min = -10, obj_labu_min_scale = 1,
                               iact_repl_shift_tau=0.03, iact_repl_shift_df=4.0,
                               batch_effect_sigma=0.5,
-                              subbatch_tau=0.3)
+                              subbatch_tau=0.3, suo_shift_sigma=1.0)
 {
   message('Converting MSGLM model data to Stan-readable format...')
   is_glmm <- "mixeffects" %in% names(model_data)
@@ -113,6 +113,7 @@ stan.prepare_data <- function(base_input_data, model_data,
     obj_base_labu_sigma = 15.0,
     iact_repl_shift_tau = iact_repl_shift_tau, iact_repl_shift_df = iact_repl_shift_df,
     batch_effect_sigma = batch_effect_sigma,
+    suo_shift_sigma = suo_shift_sigma,
     underdef_obj_shift = -8.0#,
     #zShift = mean(log(msdata$protgroup_intensities$intensity), na.rm = TRUE),
     #zScale = 1.0/sd(log(msdata$protgroup_intensities$intensity), na.rm = TRUE)

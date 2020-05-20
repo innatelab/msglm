@@ -160,6 +160,7 @@ data {
   real<lower=0> iact_repl_shift_tau;
   real<lower=0> iact_repl_shift_df;
   real<lower=0> batch_effect_sigma;
+  real<lower=0> suo_shift_sigma;
   real<lower=0> suo_subbatch_effect_tau;
   real<upper=0> underdef_obj_shift;
 
@@ -411,8 +412,7 @@ parameters {
 
   vector[Nobjects] obj_base_labu0; // baseline object abundance without underdefinedness adjustment
 
-  //real<lower=1.0> suo_shift_sigma;
-  vector[Nsubobjects > 0 ? Nsubobjects-Nobjects : 0] suo_shift0_unscaled; // subobject shift within object
+  vector<lower=-10,upper=10>[Nsubobjects > 0 ? Nsubobjects-Nobjects : 0] suo_shift0_unscaled; // subobject shift within object
 
   //real<lower=0.0> obj_effect_tau;
   real<lower=0.0> effect_slab_c_t;
@@ -552,7 +552,7 @@ model {
     }
     if (Nsubobjects > 0) {
       //suo_shift_sigma ~ std_normal();
-      suo_shift ~ std_normal();
+      suo_shift ~ normal(0, suo_shift_sigma);
       if (NsubBatchEffects > 0) {
         suo_subbatch_effect_lambda_t ~ inv_gamma(0.5 * 4.0, 0.5 * 4.0);
         suo_subbatch_effect_lambda_a ~ std_normal();

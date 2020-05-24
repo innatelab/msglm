@@ -1,6 +1,6 @@
 # variables description for msglm_local model
 msglm.vars_info <- list(
-  global = list(names=c('effect_slab_c'),# 'batch_effect_slab_c'),#'suo_shift_sigma', 
+  global = list(names=c('suo_shift_sigma', 'effect_slab_c'),# 'batch_effect_slab_c'),#'suo_shift_sigma', 
                 dims=c()),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
   #batch_effects = list(names = c('batch_effect_sigma'),
   #                     dims = c('batch_effect')),

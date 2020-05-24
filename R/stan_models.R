@@ -50,7 +50,8 @@ stan.prepare_data <- function(base_input_data, model_data,
                               obj_labu_min = -10, obj_labu_min_scale = 1,
                               iact_repl_shift_tau=0.03, iact_repl_shift_df=4.0,
                               batch_effect_sigma=0.5,
-                              subbatch_tau=0.3, suo_shift_sigma=1.0)
+                              subbatch_tau=0.3, suo_shift_sigma=1.0,
+                              suo_fdr=0.05, reliable_obs_fdr=0.001)
 {
   message('Converting MSGLM model data to Stan-readable format...')
   is_glmm <- "mixeffects" %in% names(model_data)
@@ -152,6 +153,15 @@ stan.prepare_data <- function(base_input_data, model_data,
     res$suo2obj <- as.array(as.integer(model_data$subobjects$glm_object_ix))
     res$quant2suo <- as.array(as.integer(model_data$msdata$glm_subobject_ix[!is.na(model_data$msdata$qdata_ix)]))
     res$miss2suo <- as.array(as.integer(model_data$msdata$glm_subobject_ix[!is.na(model_data$msdata$mdata_ix)]))
+    # calculate probabilities that all quantitations of subobjects in a given observation are false discoveries
+    obs_stats.df <- dplyr::group_by(model_data$msdata, glm_observation_ix) %>%
+                    dplyr::summarise(nsuo_observed = n_distinct(glm_subobject_ix[!is.na(qdata_ix)]),
+                                     nsuo_missed = n_distinct(glm_subobject_ix[!is.na(mdata_ix)])) %>%
+      dplyr::ungroup() %>% dplyr::arrange(glm_observation_ix) %>%
+      dplyr::mutate(obj_exists_pvalue = pbinom(nsuo_observed - 1L, nsuo_observed + nsuo_missed, suo_fdr, lower.tail = FALSE)) %>%
+      ungroup()
+
+    res$observation_reliable <- as.array(obs_stats.df$obj_exists_pvalue <= reliable_obs_fdr)
     res$Nmsprotocols <- 0L
     res$experiment2msproto <- integer(0)
     # subobject-specific batch effects
@@ -171,7 +181,7 @@ stan.prepare_data <- function(base_input_data, model_data,
   if ("Nsubobjects" %in% names(res)) {
     message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s) with ",
             res$Nsubobjects, " subobject(s), ",
-            res$Nquanted, " quantitation(s), ",
+            res$Nquanted, " quantitation(s) (", sum(res$observation_reliable[res$quant2observation]), " reliable), ",
             res$Nmissed, " missed")
   } else {
     message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s), ",

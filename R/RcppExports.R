@@ -13,8 +13,8 @@ DifferenceStatistics <- function(X, Y, Deltas, nsteps = 100L, maxBandwidth = NA_
     .Call('_msglm_DifferenceStatistics', PACKAGE = 'msglm', X, Y, Deltas, nsteps, maxBandwidth, matchIterations)
 }
 
-ContrastStatistics <- function(X, experiments2conditions_experiment, experiments2conditions_condition, contrastXcondition, nsteps = 100L, maxBandwidth = NA_real_, quant_probs = as.numeric( c(0.025, 0.25, 0.50, 0.75, 0.975))) {
-    .Call('_msglm_ContrastStatistics', PACKAGE = 'msglm', X, experiments2conditions_experiment, experiments2conditions_condition, contrastXcondition, nsteps, maxBandwidth, quant_probs)
+ContrastStatistics <- function(X, experiments2conditions_experiment, experiments2conditions_condition, contrastXcondition, contrast_offsets, nsteps = 100L, maxBandwidth = NA_real_, quant_probs = as.numeric( c(0.025, 0.25, 0.50, 0.75, 0.975))) {
+    .Call('_msglm_ContrastStatistics', PACKAGE = 'msglm', X, experiments2conditions_experiment, experiments2conditions_condition, contrastXcondition, contrast_offsets, nsteps, maxBandwidth, quant_probs)
 }
 
 CloudsOverlap <- function(X, Y, maxBandwidth = NA_real_, nsteps = 100L, quant_probs = as.numeric( c(0.025, 0.25, 0.50, 0.75, 0.975))) {

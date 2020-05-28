@@ -264,6 +264,7 @@ Rcpp::List DifferenceStatistics(
 //??? @experiments2conditions_experiment index of experiment in many-to-many map
 //??? @experiments2conditions_condition index of condition in many-to-many map
 //??? @contrastXcondition contrast matrix, rows are contrasts, columns are conditions
+//??? @contrast_offsets vector of contrast offsets, i.e. the reported difference is not X-Y, it's X-Y+offset
 //??? @X matrix of samples of X random variable, columns are different experiments, rows are MCMC iterations
 //??? @nsteps the number of segments to divide the range of X values into
 //??? @maxBandwidth the maximum gaussian smoothing kernel bandwidth, 0 disables smoothing
@@ -274,6 +275,7 @@ Rcpp::List ContrastStatistics(
     const Rcpp::IntegerVector&  experiments2conditions_experiment,
     const Rcpp::IntegerVector&  experiments2conditions_condition,
     const Rcpp::NumericMatrix&  contrastXcondition,
+    const Rcpp::NumericVector&  contrast_offsets,
     int   nsteps = 100,
     double maxBandwidth = NA_REAL,
     const Rcpp::NumericVector&  quant_probs = Rcpp::NumericVector::create(0.025, 0.25, 0.50, 0.75, 0.975)
@@ -292,6 +294,9 @@ Rcpp::List ContrastStatistics(
     }
     if ( !R_IsNA( maxBandwidth ) && (maxBandwidth < 0.0) ) {
         THROW_EXCEPTION(std::invalid_argument, "maxBandwidth cannot be negative" );
+    }
+    if ( contrast_offsets.size() != ncontrasts ) {
+        THROW_EXCEPTION( std::invalid_argument, "contrast_offsets size doesn't match the number of contrasts in contrastXcondition matrix" );
     }
 
     std::size_t nsamples = X.nrow();
@@ -341,6 +346,7 @@ Rcpp::List ContrastStatistics(
         // calculate how many conditions are associated with current contrast
         std::vector<std::size_t> cond_ixs;
         std::size_t cur_ncombn = 1;
+
         for ( std::size_t cond_ix = 0; cond_ix < nconditions; ++cond_ix ) {
             if (contrastXcondition.at(contr_ix, cond_ix) != 0.0) {
                 LOG_DEBUG2("contrastXcondition["<<contr_ix<<", "<<cond_ix<<"]="<<contrastXcondition.at(contr_ix, cond_ix));
@@ -362,7 +368,7 @@ Rcpp::List ContrastStatistics(
         for (std::size_t comb_i = 0; comb_i < cur_ncombn; ++comb_i) {
             // generate contrast samples for all experiment combinations
             // relevant to a given contrast
-            std::fill(experiment_contrast_samples.begin(), experiment_contrast_samples.end(), 0.0);
+            std::fill(experiment_contrast_samples.begin(), experiment_contrast_samples.end(), contrast_offsets[contr_ix]);
             for ( std::size_t cond_i = 0; cond_i < cond_ixs.size(); ++cond_i ) {
                 std::size_t cond_ix = cond_ixs[cond_i];
                 std::size_t exper_ix = condition2experiments.find(cond_ix)->second[next_exper_i[cond_i]];

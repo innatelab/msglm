@@ -49,8 +49,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // ContrastStatistics
-Rcpp::List ContrastStatistics(const Rcpp::NumericMatrix& X, const Rcpp::IntegerVector& experiments2conditions_experiment, const Rcpp::IntegerVector& experiments2conditions_condition, const Rcpp::NumericMatrix& contrastXcondition, int nsteps, double maxBandwidth, const Rcpp::NumericVector& quant_probs);
-RcppExport SEXP _msglm_ContrastStatistics(SEXP XSEXP, SEXP experiments2conditions_experimentSEXP, SEXP experiments2conditions_conditionSEXP, SEXP contrastXconditionSEXP, SEXP nstepsSEXP, SEXP maxBandwidthSEXP, SEXP quant_probsSEXP) {
+Rcpp::List ContrastStatistics(const Rcpp::NumericMatrix& X, const Rcpp::IntegerVector& experiments2conditions_experiment, const Rcpp::IntegerVector& experiments2conditions_condition, const Rcpp::NumericMatrix& contrastXcondition, const Rcpp::NumericVector& contrast_offsets, int nsteps, double maxBandwidth, const Rcpp::NumericVector& quant_probs);
+RcppExport SEXP _msglm_ContrastStatistics(SEXP XSEXP, SEXP experiments2conditions_experimentSEXP, SEXP experiments2conditions_conditionSEXP, SEXP contrastXconditionSEXP, SEXP contrast_offsetsSEXP, SEXP nstepsSEXP, SEXP maxBandwidthSEXP, SEXP quant_probsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -58,10 +58,11 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type experiments2conditions_experiment(experiments2conditions_experimentSEXP);
     Rcpp::traits::input_parameter< const Rcpp::IntegerVector& >::type experiments2conditions_condition(experiments2conditions_conditionSEXP);
     Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type contrastXcondition(contrastXconditionSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type contrast_offsets(contrast_offsetsSEXP);
     Rcpp::traits::input_parameter< int >::type nsteps(nstepsSEXP);
     Rcpp::traits::input_parameter< double >::type maxBandwidth(maxBandwidthSEXP);
     Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type quant_probs(quant_probsSEXP);
-    rcpp_result_gen = Rcpp::wrap(ContrastStatistics(X, experiments2conditions_experiment, experiments2conditions_condition, contrastXcondition, nsteps, maxBandwidth, quant_probs));
+    rcpp_result_gen = Rcpp::wrap(ContrastStatistics(X, experiments2conditions_experiment, experiments2conditions_condition, contrastXcondition, contrast_offsets, nsteps, maxBandwidth, quant_probs));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -97,7 +98,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_msglm_ProbabilityLessZeroSmoothed", (DL_FUNC) &_msglm_ProbabilityLessZeroSmoothed, 3},
     {"_msglm_ProbabilityLessSmoothed", (DL_FUNC) &_msglm_ProbabilityLessSmoothed, 4},
     {"_msglm_DifferenceStatistics", (DL_FUNC) &_msglm_DifferenceStatistics, 6},
-    {"_msglm_ContrastStatistics", (DL_FUNC) &_msglm_ContrastStatistics, 7},
+    {"_msglm_ContrastStatistics", (DL_FUNC) &_msglm_ContrastStatistics, 8},
     {"_msglm_CloudsOverlap", (DL_FUNC) &_msglm_CloudsOverlap, 5},
     {"_msglm_GammaMethodPValuesCombine", (DL_FUNC) &_msglm_GammaMethodPValuesCombine, 2},
     {NULL, NULL, 0}

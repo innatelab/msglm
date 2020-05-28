@@ -175,11 +175,19 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
       }
       samples.arr <- matrix(sample_vals, nrow=n_min_samples, ncol=nrow(samples_stats))
 
+      if (rownames(contrastXcondition) != "identity" && exists("contrasts.df") && rlang::has_name(contrasts.df, "offset")) {
+        contrast_offsets <- set_names(contrasts.df$offset,
+                                      contrasts.df$contrast)
+        contrast_offsets <- contrast_offsets[rownames(cur_contrastXcondition)]
+      } else {
+        contrast_offsets <- rep.int(0.0, nrow(cur_contrastXcondition))
+      }
       #print(str(samples.arr))
       res <- ContrastStatistics(
         samples.arr, as.integer(cur_cond2expr.df[[experiment_col]]),
         as.integer(cur_cond2expr.df[[condition_col]]),
         cur_contrastXcondition,
+        contrast_offsets,
         nsteps = nsteps, maxBandwidth = maxBandwidth,
         quant_probs = quant.probs) %>%
         as_tibble() %>%

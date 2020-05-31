@@ -1,5 +1,5 @@
 #' @useDynLib msglm
-#' @importFrom dplyr %>% tibble as_tibble mutate mutate_at select select_at
+#' @importFrom dplyr %>% tibble as_tibble filter mutate mutate_at transmute select select_at
 #' @importFrom dplyr summarise summarise_at rename rename_at arrange arrange_at group_by group_by_at
 #' @importFrom dplyr row_number coalesce case_when if_else n n_distinct cume_dist
 #' @importFrom tidyselect any_of

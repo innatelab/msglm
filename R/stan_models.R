@@ -51,7 +51,7 @@ stan.prepare_data <- function(base_input_data, model_data,
                               iact_repl_shift_tau=0.03, iact_repl_shift_df=4.0,
                               batch_effect_sigma=0.5,
                               subbatch_tau=0.3,
-                              suo_fdr=0.05, reliable_obs_fdr=0.001, specific_iaction_fdr=reliable_obs_fdr)
+                              suo_fdr=0.02, reliable_obs_fdr=0.001, specific_iaction_fdr=reliable_obs_fdr)
 {
   message('Converting MSGLM model data to Stan-readable format...')
   is_glmm <- "mixeffects" %in% names(model_data)

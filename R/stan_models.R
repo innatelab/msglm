@@ -51,7 +51,7 @@ stan.prepare_data <- function(base_input_data, model_data,
                               iact_repl_shift_tau=0.03, iact_repl_shift_df=4.0,
                               batch_effect_sigma=0.5,
                               subbatch_tau=0.3,
-                              suo_fdr=0.05, reliable_obs_fdr=0.001)
+                              suo_fdr=0.05, reliable_obs_fdr=0.001, specific_iaction_fdr=reliable_obs_fdr)
 {
   message('Converting MSGLM model data to Stan-readable format...')
   is_glmm <- "mixeffects" %in% names(model_data)
@@ -153,14 +153,27 @@ stan.prepare_data <- function(base_input_data, model_data,
     res$quant2suo <- as.array(as.integer(model_data$msdata$glm_subobject_ix[!is.na(model_data$msdata$qdata_ix)]))
     res$miss2suo <- as.array(as.integer(model_data$msdata$glm_subobject_ix[!is.na(model_data$msdata$mdata_ix)]))
     # calculate probabilities that all quantitations of subobjects in a given observation are false discoveries
-    obs_stats.df <- dplyr::group_by(model_data$msdata, glm_observation_ix) %>%
+    # TODO this could be applied to the protgroup-level model if there's external quality measure (e.g. protein identification q-value)
+    obs_stats.df <- dplyr::group_by(model_data$msdata, glm_iaction_ix, glm_observation_ix) %>%
                     dplyr::summarise(nsuo_observed = n_distinct(glm_subobject_ix[!is.na(qdata_ix)]),
                                      nsuo_missed = n_distinct(glm_subobject_ix[!is.na(mdata_ix)])) %>%
       dplyr::ungroup() %>% dplyr::arrange(glm_observation_ix) %>%
       dplyr::mutate(obj_exists_pvalue = pbinom(nsuo_observed - 1L, nsuo_observed + nsuo_missed, suo_fdr, lower.tail = FALSE)) %>%
       ungroup()
-
-    res$observation_reliable <- as.array(obs_stats.df$obj_exists_pvalue <= reliable_obs_fdr)
+    # calculate probabilities that observations of an object are specific to the given interaction
+    # TODO this could be applied to the protgroup-level model
+    iact_stats.df <- dplyr::group_by(model_data$msdata, glm_object_ix, glm_iaction_ix) %>%
+                    dplyr::summarise(nexp_observed = n_distinct(mschannel_ix[!is.na(qdata_ix)]),
+                                     nexp_iaction = n_distinct(mschannel_ix)) %>%
+                    dplyr::group_by(glm_object_ix) %>%
+                    dplyr::mutate(nexp_observed_total = sum(nexp_observed)) %>%
+                    dplyr::group_by(glm_object_ix, glm_iaction_ix) %>%
+                    dplyr::mutate(iaction_specific_pvalue = phyper(nexp_observed-1, nexp_observed_total, res$Nexperiments, nexp_iaction, lower.tail=FALSE)) %>%
+                    dplyr::ungroup()
+    obs_stats.df <- left_join(obs_stats.df, iact_stats.df) %>%
+      arrange(glm_observation_ix)
+    res$observation_reliable <- as.array(obs_stats.df$obj_exists_pvalue <= reliable_obs_fdr |
+                                         obs_stats.df$iaction_specific_pvalue <= specific_iaction_fdr)
     res$Nmsprotocols <- 0L
     res$experiment2msproto <- integer(0)
     # subobject-specific batch effects

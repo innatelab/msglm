@@ -97,7 +97,7 @@ vars_effect_pvalue <- function(samples.df, vars_cat_info, dim_info,
 
 #' @export
 vars_contrast_stats <- function(samples.df, var_names, group_cols,
-                                condition_col, contrastXcondition,
+                                condition_col, contrastXcondition, contrasts,
                                 experiment_col = condition_col, condition2experiments.df = NULL,
                                 nsteps = 100, maxBandwidth = NA,
                                 quant.probs = c(0.025, 0.25, 0.50, 0.75, 0.975),
@@ -175,9 +175,8 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
       }
       samples.arr <- matrix(sample_vals, nrow=n_min_samples, ncol=nrow(samples_stats))
 
-      if (rownames(contrastXcondition) != "identity" && exists("contrasts.df") && rlang::has_name(contrasts.df, "offset")) {
-        contrast_offsets <- set_names(contrasts.df$offset,
-                                      contrasts.df$contrast)
+      if (rownames(contrastXcondition) != "identity") {
+        contrast_offsets <- set_names(contrasts$offset, contrasts$contrast)
         contrast_offsets <- contrast_offsets[rownames(cur_contrastXcondition)]
       } else {
         contrast_offsets <- rep.int(0.0, nrow(cur_contrastXcondition))
@@ -476,7 +475,9 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
                                                  group_cols = obj_id_cols, condition_col = metacondition_col,
                                                  experiment_col = experiment_col,
                                                  condition2experiments.df = metacondition2experiments.df,
-                                                 contrastXcondition = contrastXmetacondition, val_trans = val_trans)
+                                                 contrastXcondition = contrastXmetacondition,
+                                                 contrasts = contrasts.df,
+                                                 val_trans = val_trans)
         var_info.df <- vars_results[[vars_category]]$stats %>%
           dplyr::inner_join(conditionXmetacondition.df) %>%
           dplyr::select(!!!setdiff(var_info_cols,
@@ -574,6 +575,8 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                 vars_info, dims_info)
   names(res) <- names(vars_info)
 
+  contrasts.df <- rlang::env_get(nm="contrasts.df", default=dplyr::distinct(dplyr::transmute(contrastXmetacondition.df, contrast, contrast_type, offset=0)), inherit=TRUE)
+
   # add interaction CI with respect to observations variability
   is_glmm <- "supactions" %in% names(res)
   if (is_glmm) {
@@ -582,7 +585,8 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
     res$iactions_obsCI <- list(stats = vars_contrast_stats(res$observations$samples,
                                                            c('obs_labu'),
                                                            c('glm_iaction_ix', 'glm_iaction_ix', 'condition'),
-                                                           condition_col = NA, contrastXcondition = NULL, mschannel_col) %>%
+                                                           condition_col = NA, contrastXcondition = NULL,
+                                                           contrasts = contrasts.df, mschannel_col) %>%
                                       dplyr::ungroup() %>%
                                       dplyr::select(-index_contrast, -contrast))
   }
@@ -612,8 +616,8 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   message("Calculating contrasts...")
   res <- calc_contrasts(res, vars_info, dims_info,
                         contrastXmetacondition.mtx, conditionXmetacondition.df,
-                        dplyr::distinct(dplyr::select(contrastXmetacondition.df, contrast, contrast_type)),
-                        contrastXcondition.df = if(exists('contrastXcondition.df')){contrastXcondition.df}else{NULL},
+                        contrasts.df,
+                        contrastXcondition.df = rlang::env_get(nm='contrastXcondition.df', default=NULL, inherit=TRUE),
                         var_names = contrast_vars,
                         mschannel_col = mschannel_col,
                         condition.quantiles_lhs = condition.quantiles_lhs,

@@ -399,7 +399,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
     vars_cat_subset_info$names <- intersect(vars_cat_subset_info$names, var_names)
     if (length(vars_cat_subset_info$names) > 0) {
       message('Filtering ', vars_category, ' to use for contrasts...')
-      if (!rlang::has_name(vars_results[[vars_category]]$stats, "condition")) {
+      if (!rlang::has_name(vars_results[[vars_category]]$stats, condition_col)) {
         next # FIXME skipping supcondition-related vars
       }
       cond_stats.df <- dplyr::inner_join(vars_results[[vars_category]]$stats,
@@ -484,6 +484,12 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
                                    c("index_observation", "iaction_id",
                                      condition_col, condition_agg_col, experiment_col))) %>%
           dplyr::distinct()
+        if (rlang::is_empty(var_info_cols)) {
+          warning("var_info_cols is empty")
+          var_info.df$`__tmp__` <- TRUE
+          contrast_stats.df$`__tmp__` <- TRUE
+          objs_df$`__tmp__` <- TRUE
+        }
         # inject contrast statistics into vars_results
         vars_results[[vars_category]]$contrast_stats <- dplyr::left_join(var_info.df, contrast_stats.df) %>%
           dplyr::mutate(p_value = 2*pmin(prob_nonpos, prob_nonneg),
@@ -494,7 +500,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
           ) %>%
           #dplyr::select(-index_observation, -msrun, -msrun_ix) %>% dplyr::distinct() %>%
           dplyr::left_join(group_by(cond_stats.df, contrast, is_lhs) %>%
-                           dplyr::summarise(conditions = str_c(condition, collapse=" ")) %>%
+                           dplyr::summarise(conditions = str_c(!!condition_col, collapse=" ")) %>%
                            dplyr::group_by(contrast) %>%
                            dplyr::summarise(conditions_lhs = conditions[is_lhs],
                                             conditions_rhs = conditions[!is_lhs]) %>%
@@ -509,6 +515,10 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
                         (metacondition_reported == "enriched" & contrast_weight * `50%` > 0)) %>%
           dplyr::select(-metacondition_reported, -contrast_type) %>%
           dplyr::inner_join(objs_df)
+        if (rlang::is_empty(var_info_cols)) {
+          # remove temporary column
+          vars_results[[vars_category]]$contrast_stats$`__tmp__` <- NULL
+        }
       }
     }
   }
@@ -555,6 +565,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                              mschannel_col = "msrun_ix",
                              effect_vars = unlist(lapply(vars_info, function(vi) str_subset(vi$names, "_(?:mix)?effect(?:_replCI)?$"))),
                              contrast_vars = default_contrast_vars(vars_info),
+                             condition_agg_col = "condition", obj_dim = "object", obj_id_cols = "glm_object_ix",
                              condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
                              keep.samples=FALSE, min.iteration=NA, chains=NA, verbose=FALSE)
 {
@@ -620,6 +631,8 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                         contrastXcondition.df = rlang::env_get(nm='contrastXcondition.df', default=NULL, inherit=TRUE),
                         var_names = contrast_vars,
                         mschannel_col = mschannel_col,
+                        condition_agg_col = condition_agg_col,
+                        obj_dim = obj_dim, obj_id_cols = obj_id_cols,
                         condition.quantiles_lhs = condition.quantiles_lhs,
                         condition.quantiles_rhs = condition.quantiles_rhs)
 

@@ -592,11 +592,12 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   is_glmm <- "supactions" %in% names(res)
   if (is_glmm) {
     # FIXME what to do for glmm? there's no interaction observations
-  } else {
+  } else if ('obs_labu' %in% all_pars) {
     res$iactions_obsCI <- list(stats = vars_contrast_stats(res$observations$samples,
                                                            c('obs_labu'),
                                                            c('glm_iaction_ix', 'glm_iaction_ix', 'condition'),
-                                                           condition_col = NA, contrastXcondition = NULL,
+                                                           condition_col = NA,
+                                                           contrastXcondition = NULL,
                                                            contrasts = contrasts.df, mschannel_col) %>%
                                       dplyr::ungroup() %>%
                                       dplyr::select(-index_contrast, -contrast))

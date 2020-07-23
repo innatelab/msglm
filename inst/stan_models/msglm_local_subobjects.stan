@@ -92,9 +92,6 @@ data {
   int<lower=0> Nmsprotocols;    // number of MS protocols used
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
   int<lower=0> Nobservations;   // number of observations of interactions (objectXexperiment pairs for all iactions and experiments of its condition)
-  int<lower=0> Neffects;        // number of effects (that define conditions)
-  int<lower=0> NbatchEffects;   // number of batch effects (that define assay experimental variation, but not biology)
-  int<lower=0> NsubBatchEffects;// number of subobject batch effects (that define assay experimental variation, but not biology)
   int<lower=0> NunderdefObjs;   // number of virtual interactions (the ones not detected but required for comparison)
   int<lower=1,upper=Nobjects> suo2obj[Nsubobjects];
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
@@ -114,7 +111,12 @@ data {
   int<lower=0> Nmissed;         // total number of missed subobjectsXexperiments
   int<lower=1,upper=Nobservations> miss2observation[Nmissed];
   int<lower=1,upper=Nsubobjects> miss2suo[Nsubobjects > 0 ? Nmissed : 0];
+  vector<lower=0>[Nquanted] qData; // quanted data
 
+  // linear model specification
+  int<lower=0> Neffects;        // number of effects (that define conditions)
+  int<lower=0> NbatchEffects;   // number of batch effects (that define assay experimental variation, but not biology)
+  int<lower=0> NsubBatchEffects;// number of subobject batch effects (that define assay experimental variation, but not biology)
   int<lower=0> NobjEffects;
   int<lower=1,upper=Neffects> obj_effect2effect[NobjEffects];
   int<lower=0,upper=1> effect_is_positive[Neffects];
@@ -140,13 +142,11 @@ data {
   int<lower=0, upper=obsXobjbatcheff_Nw+1> obsXobjbatcheff_u[Nobservations + 1];
   int<lower=0, upper=NobjBatchEffects> obsXobjbatcheff_v[obsXobjbatcheff_Nw];
 
-  // obsXobj_batcheff (observation X batch_effect) sparse matrix
+  // obsXobj_suobatcheff (observation X sub-object batch_effect) sparse matrix
   int<lower=0> suoxobsXsuobatcheff_Nw;
   vector[suoxobsXsuobatcheff_Nw] suoxobsXsuobatcheff_w;
   int<lower=0, upper=suoxobsXsuobatcheff_Nw+1> suoxobsXsuobatcheff_u[Nsubobjects*Nobservations + 1];
   int<lower=0, upper=NsuoBatchEffects> suoxobsXsuobatcheff_v[suoxobsXsuobatcheff_Nw];
-
-  vector<lower=0>[Nquanted] qData; // quanted data
 
   // global model constants
   real global_labu_shift;   // shift to be applied to all XXX_labu variables to get the real log intensity

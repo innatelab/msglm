@@ -375,7 +375,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
                            contrastXcondition.df = NULL,
                            mschannel_col = "mschannel_ix",
                            condition_agg_col = "condition", var_names = c('iaction_labu', 'iaction_labu_replCI', 'obs_labu'),
-                           obj_dim = "object",
+                           obj_dim = "object", group_cols = c(),
                            obj_id_cols = 'glm_object_ix', var_info_cols = obj_id_cols, val_trans = NULL,
                            condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1)) {
   contrast_col <- names(dimnames(contrastXmetacondition))[[1]]
@@ -402,19 +402,21 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
       if (!rlang::has_name(vars_results[[vars_category]]$stats, condition_col)) {
         next # FIXME skipping supcondition-related vars
       }
-      cond_stats.df <- dplyr::inner_join(vars_results[[vars_category]]$stats,
+      vars_stats <- vars_results[[vars_category]]$stats
+      extra_group_cols <- intersect(colnames(vars_stats), group_cols)
+      cond_stats.df <- dplyr::inner_join(vars_stats,
                                          dplyr::mutate(contrastXcondition.df, is_lhs = weight > 0)) %>%
         dplyr::group_by_at(c(obj_id_cols, contrast_col, metacondition_col,
-                             condition_agg_col, "is_lhs", "is_preserved_condition")) %>%
+                             condition_agg_col, extra_group_cols, "is_lhs", "is_preserved_condition")) %>%
         dplyr::summarize(cond_mean = mean(mean)) %>% dplyr::ungroup()
       cond_agg_stats.df <- dplyr::group_by_at(cond_stats.df, c(obj_id_cols, contrast_col,
-                                              metacondition_col, condition_agg_col, "is_lhs")) %>%
+                                              metacondition_col, condition_agg_col, extra_group_cols, "is_lhs")) %>%
         dplyr::summarize(cond_max_mean = max(cond_mean),
                          cond_min_mean = min(cond_mean)) %>%
-        dplyr::group_by_at(c(obj_id_cols, contrast_col, metacondition_col, "is_lhs")) %>%
+        dplyr::group_by_at(c(obj_id_cols, contrast_col, metacondition_col, extra_group_cols, "is_lhs")) %>%
         dplyr::mutate(cond_max_qtile = cume_dist(cond_max_mean) - 1/n(),
                       cond_min_qtile = cume_dist(cond_min_mean) - 1/n()) %>% dplyr::ungroup() %>%
-        dplyr::select(!!!c(obj_id_cols, contrast_col, metacondition_col, condition_agg_col),
+        dplyr::select(!!!c(obj_id_cols, contrast_col, metacondition_col, condition_agg_col, extra_group_cols),
                       is_lhs, cond_min_qtile, cond_max_qtile, cond_max_mean, cond_min_mean)
       # compose threshold dataframe
       contrast_quantile_thresholds <- function(cond_qtls, is_lhs) {
@@ -451,7 +453,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
       metacondition2experiments.df <- dplyr::inner_join(dplyr::semi_join(dplyr::select_at(conditionXmetacondition.df, c(condition_col, metacondition_col)),
                                                                          cond_stats.df),
                                                         dplyr::distinct(dplyr::select(samples.df,
-                                                                                      !!!unique(c(condition_col, experiment_col)))))
+                                                                                      !!!unique(c(condition_col, experiment_col, extra_group_cols)))))
       if (nrow(samples.df) == 0) {
         # no samples
         vars_results[[vars_category]]$contrast_stats <- NULL
@@ -472,7 +474,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
           }
         }
         contrast_stats.df <- vars_contrast_stats(samples.df, vars_cat_subset_info$names,
-                                                 group_cols = obj_id_cols, condition_col = metacondition_col,
+                                                 group_cols = c(obj_id_cols, extra_group_cols), condition_col = metacondition_col,
                                                  experiment_col = experiment_col,
                                                  condition2experiments.df = metacondition2experiments.df,
                                                  contrastXcondition = contrastXmetacondition,
@@ -530,7 +532,8 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
                                   val_trans = NULL,
                                   condition.reported = "lhs",
                                   condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
-                                  condition_agg_col = "condition")
+                                  condition_agg_col = "condition",
+                                  group_cols = c())
 {
     # FIXME do once per assembly
     sel_contrastXmetacondition <- contrastXmetacondition[contrasts, , drop=FALSE]
@@ -545,7 +548,7 @@ calc_contrasts_subset <- function(vars_results, vars_info, dims_info,
     calc_contrasts(vars_results, vars_info, dims_info,
                    sel_contrastXmetacondition, sel_conditionXmetacondition.df,
                    sel_contrasts.df, val_trans = val_trans,
-                   condition_agg_col = condition_agg_col,
+                   condition_agg_col = condition_agg_col, group_cols = group_cols,
                    condition.reported = condition.reported,
                    condition.quantiles_lhs = condition.quantiles_lhs,
                    condition.quantiles_rhs = condition.quantiles_rhs)
@@ -565,7 +568,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                              mschannel_col = "msrun_ix",
                              effect_vars = unlist(lapply(vars_info, function(vi) str_subset(vi$names, "_(?:mix)?effect(?:_replCI)?$"))),
                              contrast_vars = default_contrast_vars(vars_info),
-                             condition_agg_col = "condition", obj_dim = "object", obj_id_cols = "glm_object_ix",
+                             condition_agg_col = "condition", obj_dim = "object", obj_id_cols = "glm_object_ix", contrast_group_cols = c(),
                              condition.quantiles_lhs = c(0, 1), condition.quantiles_rhs = c(0, 1),
                              keep.samples=FALSE, min.iteration=NA, chains=NA, verbose=FALSE)
 {
@@ -632,7 +635,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                         contrastXcondition.df = rlang::env_get(nm='contrastXcondition.df', default=NULL, inherit=TRUE),
                         var_names = contrast_vars,
                         mschannel_col = mschannel_col,
-                        condition_agg_col = condition_agg_col,
+                        condition_agg_col = condition_agg_col, group_cols = contrast_group_cols,
                         obj_dim = obj_dim, obj_id_cols = obj_id_cols,
                         condition.quantiles_lhs = condition.quantiles_lhs,
                         condition.quantiles_rhs = condition.quantiles_rhs)

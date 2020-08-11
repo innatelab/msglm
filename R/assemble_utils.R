@@ -46,8 +46,8 @@ join_report_frames <- function(reports, frame_extractor=function(report) stop('n
     return ( frame )
   } ) )
   # FIXME other object types?
-  if ( !is.null(prot_info) && 'protein_ac_noiso' %in% colnames( joined_res.df ) ) {
-    joined_res.df <- dplyr::inner_join( joined_res.df, prot_info[,c('protein_ac_noiso','protein_label','description')] )
+  if (!is.null(prot_info) && rlang::has_name(joined_res.df, 'protein_ac_noiso')) {
+    joined_res.df <- dplyr::inner_join(joined_res.df, dplyr::select(prot_info, protein_ac_noiso, protein_label, description))
   }
   return ( joined_res.df )
 }

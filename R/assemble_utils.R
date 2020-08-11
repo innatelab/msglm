@@ -1,6 +1,7 @@
 #' @export
 process_msglm_chunk <- function(file_ix,
                                 strip_samples=FALSE, strip_stats=FALSE,
+                                results_tag = "msglm_results",
                                 postprocess.f = NULL) {
   fit_file <- fit_files.df[file_ix, 'filename']
   message( 'Loading ', fit_file, '...' )
@@ -10,11 +11,11 @@ process_msglm_chunk <- function(file_ix,
     postprocess.f(envir = tmp.env, fit_file)
   }
   if (strip_samples || strip_stats) {
-    tmp.env$msglm_results <- lapply( tmp.env$msglm_results, function( var_results ) {
-      if (strip_samples) { var_results$samples <- NULL }
-      if (strip_stats) { var_results$stats <- NULL }
-      return ( var_results )
-    } )
+    env_bind(tmp.env, results_tag, lapply(env_get(tmp.env, results_tag), function(res) {
+      if (strip_samples) { res$samples <- NULL }
+      if (strip_stats) { res$stats <- NULL }
+      return ( res )
+    }))
   }
   gc()
   res <- mget(ls(envir=tmp.env), envir=tmp.env)

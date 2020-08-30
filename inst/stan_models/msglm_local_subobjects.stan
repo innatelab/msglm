@@ -17,6 +17,15 @@ functions {
         return 0.5*(scaleHi+scaleLo)*(z-bend) + 0.5*(scaleHi-scaleLo)*sqrt((z-bend)*(z-bend)+smooth) + offs;
     }
 
+    // compresses x: x~0 -> logcompress(x)~x, abs(x)>>0 -> logcompress(x)~sign(x)*log(abs(x))
+    real logcompress(real x, data real s) {
+      return x * (1 + log1p(fabs(s*x))) / (1 + fabs(s*x));
+    }
+
+    vector logcompressv(vector x, data real s) {
+      return x .* (1 + log1p(fabs(s*x))) ./ (1 + fabs(s*x));
+    }
+
     // reimplementation of R contr.poly::make.poly()
     matrix contr_poly(int n) {
         vector[n] scores;
@@ -598,7 +607,7 @@ model {
         }
 
         // model quantitations and missing data
-        qDataNorm ~ double_exponential(exp(q_labu - qLogStd), 1);
+        logcompressv(exp(q_labu - qLogStd) - qDataNorm, 0.25) ~ double_exponential(0.0, 1);
         // soft-lower-limit for subobject identification of reliable observations
         // for non-reliable observations (false identifications) we rely on double exponentual to handle outliers
         1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));

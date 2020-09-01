@@ -158,12 +158,15 @@ data {
   int<lower=0, upper=NsuoBatchEffects> suoxobsXsuobatcheff_v[suoxobsXsuobatcheff_Nw];
 
   // global model constants
+  real<lower=0.0> hsprior_lambda_a_offset; // prevent lambda_a/t being too close to zero, because that negatively affects MCMC convergence
+  real<lower=0.0> hsprior_lambda_t_offset;
   real global_labu_shift;   // shift to be applied to all XXX_labu variables to get the real log intensity
   vector<lower=0>[Neffects] effect_tau;
   vector<lower=0>[Neffects] effect_df;
   vector<lower=0>[Neffects] effect_df2;
   real<lower=0> effect_slab_df;
   real<lower=0> effect_slab_scale;
+
   real obj_labu_min; // minimal average abundance of an object
   real<lower=0> obj_labu_min_scale; // scale that defines the softness of lower abundance limit
   real<lower=0> obj_base_labu_sigma; // sigma of average abundance distribution
@@ -534,13 +537,13 @@ model {
     // treatment effect parameters, horseshoe prior
     //obj_effect_tau ~ student_t(2, 0.0, 1.0);
     //obj_effect_lambda ~ student_t(2, 0.0, obj_effect_tau);
-    obj_effect_lambda_t ~ inv_gamma(0.5 * obj_effect_df, 0.5 * obj_effect_df);
-    obj_effect_lambda_a ~ std_normal(); // 1.0 = 2/2
-    obj_effect_eta_t ~ inv_gamma(0.5 * obj_effect_df2, 0.5 * obj_effect_df2);
-    obj_effect_eta_a ~ std_normal(); // 1.0 = 2/2
+    obj_effect_lambda_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * obj_effect_df, 0.5 * obj_effect_df);
+    obj_effect_lambda_a - hsprior_lambda_a_offset ~ std_normal(); // 1.0 = 2/2
+    obj_effect_eta_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * obj_effect_df2, 0.5 * obj_effect_df2);
+    obj_effect_eta_a - hsprior_lambda_a_offset ~ std_normal(); // 1.0 = 2/2
     obj_effect_unscaled_pos ~ std_normal();
     obj_effect_unscaled_other ~ std_normal();
-    effect_slab_c_t ~ inv_gamma(0.5 * effect_slab_df, 0.5 * effect_slab_df);
+    effect_slab_c_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * effect_slab_df, 0.5 * effect_slab_df);
     // batch effect parameters, cauchy prior on sigma
     //condition_repl_effect_sigma ~ inv_gamma(1.5, 1.0);
 
@@ -551,8 +554,8 @@ model {
     if (Nobservations0 > 0) {
       vector[Nobservations] obs_repl_shift_unscaled; // unscaled observations shifts
 
-      iact_repl_shift_lambda_t ~ inv_gamma(0.5 * iact_repl_shift_df, 0.5 * iact_repl_shift_df);
-      iact_repl_shift_lambda_a ~ std_normal();
+      iact_repl_shift_lambda_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * iact_repl_shift_df, 0.5 * iact_repl_shift_df);
+      iact_repl_shift_lambda_a - hsprior_lambda_a_offset ~ std_normal();
 
       //print("iact_repl_shift_sigma=", iact_repl_shift_sigma);
       //print("obsXiact=", csr_to_dense_matrix(Nobservations, Niactions,
@@ -571,8 +574,8 @@ model {
       suo_shift_sigma ~ cauchy(0, 1);
       suo_shift_unscaled ~ std_normal();
       if (NsubBatchEffects > 0) {
-        suo_subbatch_effect_lambda_t ~ inv_gamma(0.5 * 4.0, 0.5 * 4.0);
-        suo_subbatch_effect_lambda_a ~ std_normal();
+        suo_subbatch_effect_lambda_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * 4.0, 0.5 * 4.0);
+        suo_subbatch_effect_lambda_a - hsprior_lambda_a_offset ~ std_normal();
         //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
         suo_subbatch_effect_unscaled_pos ~ std_normal();
         suo_subbatch_effect_unscaled_other ~ std_normal();

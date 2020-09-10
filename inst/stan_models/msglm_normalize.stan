@@ -1,6 +1,6 @@
 functions {
-    real intensity_log_std(real z, real scaleHi, real scaleLo, real offset, real bend, real smooth) {
-        return 0.5*(scaleHi+scaleLo)*(z-bend) + 0.5*(scaleHi-scaleLo)*sqrt((z-bend)*(z-bend)+smooth) + offset;
+    real intensity_log_std(real z, real scaleHi, real scaleLo, real offs, real bend, real smooth) {
+        return 0.5*(scaleHi+scaleLo)*(z-bend) + 0.5*(scaleHi-scaleLo)*sqrt((z-bend)*(z-bend)+smooth) + offs;
     }
 }
 
@@ -101,8 +101,8 @@ transformed parameters {
     vector[Nshifts] shift_unscaled;
     vector[Nshifts] shift;
 
-    data_sigma = data_sigma_a ./ sqrt(data_sigma_t);
-    shift_sigma = shift_sigma_a ./ sqrt(shift_sigma_t);
+    data_sigma = data_sigma_a / sqrt(data_sigma_t);
+    shift_sigma = shift_sigma_a / sqrt(shift_sigma_t);
     shift_unscaled = shift_transform * shift0_unscaled;
     shift = shift_unscaled * shift_sigma;
 }

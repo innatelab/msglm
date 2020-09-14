@@ -121,6 +121,7 @@ data {
   int<lower=1,upper=Nobservations> miss2observation[Nmissed];
   int<lower=1,upper=Nsubobjects> miss2suo[Nsubobjects > 0 ? Nmissed : 0];
   vector<lower=0>[Nquanted] qData; // quanted data
+  vector<lower=0, upper=1>[Nmissed] missing_sigmoid_scale; // sigmoid scales for indiv. observations (<1 for higher uncertainty)
 
   // linear model specification
   int<lower=0> Neffects;        // number of effects (that define conditions)
@@ -614,7 +615,7 @@ model {
         // soft-lower-limit for subobject identification of reliable observations
         // for non-reliable observations (false identifications) we rely on double exponentual to handle outliers
         1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
-        0 ~ bernoulli_logit(m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
+        0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept)));
     }
 }
 
@@ -662,7 +663,7 @@ generated quantities {
               bernoulli_logit_lpmf(1 | q_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         }
         for (i in 1:Nmissed) {
-          suo_llh[miss2suo[i]] += bernoulli_logit_lpmf(0 | m_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
+          suo_llh[miss2suo[i]] += bernoulli_logit_lpmf(0 | missing_sigmoid_scale[i] * m_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         }
     }
 }

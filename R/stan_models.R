@@ -53,7 +53,8 @@ stan.prepare_data <- function(base_input_data, model_data,
                               hsprior_lambda_t_offset = 0.01,
                               batch_effect_sigma=0.5,
                               subbatch_tau=0.3,
-                              suo_fdr=0.02, reliable_obs_fdr=0.001, specific_iaction_fdr=reliable_obs_fdr)
+                              suo_fdr=0.02, reliable_obs_fdr=0.001, specific_iaction_fdr=reliable_obs_fdr,
+                              empty_observation_sigmoid_scale = 1.0)
 {
   message('Converting MSGLM model data to Stan-readable format...')
   is_glmm <- "mixeffects" %in% names(model_data)
@@ -82,6 +83,14 @@ stan.prepare_data <- function(base_input_data, model_data,
   if (is_glmm) {
     model_data$mixeffects <- maybe_rename(model_data$mixeffects, c("prior_mean" = "mean", "prior_tau" = "tau"))
   }
+  msdata_obs_flags.df <- dplyr::group_by(model_data$msdata, glm_observation_ix) %>%
+    dplyr::transmute(is_empty_observation = all(is.na(intensity))) %>%
+    dplyr::ungroup()
+  if (any(msdata_obs_flags.df$glm_observation_ix != model_data$msdata$glm_observation_ix)) {
+    stop("Rows rearranged in msdata_obs_flags.df")
+  }
+
+  missing_mask <- is.na(model_data$msdata$intensity)
   res <- base_input_data
   res <- c(res, list(
     Nobservations = nrow(obs_df),
@@ -100,11 +109,12 @@ stan.prepare_data <- function(base_input_data, model_data,
     obj_batch_effect2batch_effect = as.array(as.integer(model_data$object_batch_effects$batch_effect)),
     NunderdefObjs = sum(model_data$objects$is_underdefined),
     underdef_objs = as.array(dplyr::filter(model_data$objects, is_underdefined) %>% .$glm_object_ix),
-    Nquanted = sum(!is.na(model_data$msdata$intensity)),
-    Nmissed = sum(is.na(model_data$msdata$intensity)),
+    Nquanted = sum(!missing_mask),
+    Nmissed = sum(missing_mask),
+    missing_sigmoid_scale = if_else(msdata_obs_flags.df$is_empty_observation[missing_mask], empty_observation_sigmoid_scale, 1.0),
     quant2observation = as.array(model_data$msdata$glm_observation_ix[!is.na(model_data$msdata$qdata_ix)]),
     miss2observation = as.array(model_data$msdata$glm_observation_ix[!is.na(model_data$msdata$mdata_ix)]),
-    qData = as.array(model_data$msdata$intensity[!is.na(model_data$msdata$intensity)]),
+    qData = as.array(model_data$msdata$intensity[!missing_mask]),
     global_labu_shift = global_labu_shift,
     effect_tau = effects.df$prior_tau,
     effect_mean = effects.df$prior_mean,
@@ -198,11 +208,11 @@ stan.prepare_data <- function(base_input_data, model_data,
     message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s) with ",
             res$Nsubobjects, " subobject(s), ",
             res$Nquanted, " quantitation(s) (", sum(res$observation_reliable[res$quant2observation]), " reliable), ",
-            res$Nmissed, " missed")
+            res$Nmissed, " missed (", sum(msdata_obs_flags.df$is_empty_observation), " in empty observations)")
   } else {
     message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s), ",
             res$Nquanted, " quantitation(s), ",
-            res$Nmissed, " missed")
+            res$Nmissed, " missed (", sum(msdata_obs_flags.df$is_empty_observation), " in empty observations)")
   }
   return(res)
 }

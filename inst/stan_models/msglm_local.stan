@@ -115,6 +115,8 @@ data {
   int<lower=1,upper=Nobservations>  quant2observation[Nquanted];
   int<lower=0> Nmissed;         // total number of missed objectsXexperiments
   int<lower=1,upper=Nobservations> miss2observation[Nmissed];
+  vector<lower=0>[Nquanted] qData; // quanted data
+  vector<lower=0, upper=1>[Nmissed] missing_sigmoid_scale; // sigmoid scales for indiv. observations (<1 for higher uncertainty)
 
   int<lower=0> NobjEffects;
   int<lower=1,upper=Neffects> obj_effect2effect[NobjEffects];
@@ -136,8 +138,6 @@ data {
   vector[obsXobjbatcheff_Nw] obsXobjbatcheff_w;
   int<lower=0, upper=obsXobjbatcheff_Nw+1> obsXobjbatcheff_u[Nobservations + 1];
   int<lower=0, upper=NobjBatchEffects> obsXobjbatcheff_v[obsXobjbatcheff_Nw];
-
-  vector<lower=0>[Nquanted] qData; // quanted data
 
   // global model constants
   real<lower=0.0> hsprior_lambda_a_offset; // prevent lambda_a/t being too close to zero, because that negatively affects MCMC convergence
@@ -460,7 +460,7 @@ model {
         // model quantitations and missing data
         qDataNorm ~ double_exponential(exp(q_labu - qLogStd), 1);
         1 ~ bernoulli_logit(q_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
-        0 ~ bernoulli_logit(m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
+        0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept)));
     }
 }
 

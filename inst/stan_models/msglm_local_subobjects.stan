@@ -179,7 +179,6 @@ data {
   // instrument calibrated parameters (FIXME: msproto-dependent)
   real<lower=0> zDetectionFactor;
   real zDetectionIntercept;
-  real<lower=0, upper=1> detectionMax;
 
   real<lower=0> sigmaScaleHi;
   real<lower=0> sigmaScaleLo;

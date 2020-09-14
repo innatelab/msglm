@@ -196,7 +196,8 @@ transformed data {
   vector[Nquanted] zScore = (log(qData) - zShift) * zScale;
   vector[Nquanted] qLogStd; // log(sd(qData))-global_labu_shift
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
-  int<lower=1,upper=Nquanted> reliable_quants[sum(observation_reliable[quant2observation])];
+  int<lower=0,upper=Nquanted> NreliableQuants = sum(observation_reliable[quant2observation]);
+  int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
 
   int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2observation];
   int<lower=1,upper=Nexperiments> quant2experiment[Nquanted] = observation2experiment[quant2observation];

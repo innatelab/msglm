@@ -17,6 +17,15 @@ functions {
         return 0.5*(scaleHi+scaleLo)*(z-bend) + 0.5*(scaleHi-scaleLo)*sqrt((z-bend)*(z-bend)+smooth) + offs;
     }
 
+    // compresses x: x~0 -> logcompress(x)~x, abs(x)>>0 -> logcompress(x)~sign(x)*log(abs(x))
+    real logcompress(real x, data real s) {
+      return x * (1 + log1p(fabs(s*x))) / (1 + fabs(s*x));
+    }
+
+    vector logcompressv(vector x, data real s) {
+      return x .* (1 + log1p(fabs(s*x))) ./ (1 + fabs(s*x));
+    }
+
     // reimplementation of R contr.poly::make.poly()
     matrix contr_poly(int n) {
         vector[n] scores;

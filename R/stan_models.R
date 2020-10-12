@@ -134,6 +134,10 @@ stan.prepare_data <- function(base_input_data, model_data,
   )) %>%
     modifyList(matrix2csr("obsXobjbatcheff", model_data$obsXobjbatcheff))
 
+  iact_data <- list(Niactions = nrow(model_data$interactions),
+                    iaction2obj = as.array(model_data$interactions$glm_object_ix))
+  iact_data <- modifyList(iact_data, matrix2csr("iactXobjeff", model_data$iactXobjeff))
+
   if (is_glmm) {
     message("Setting GLMM interaction data...")
     res$Nmix <- nrow(model_data$mixcoefXeff)
@@ -142,24 +146,20 @@ stan.prepare_data <- function(base_input_data, model_data,
     res$mixeffect_tau <- as.array(model_data$mixeffects$prior_tau)
     res$mixcoefXeff <- as.matrix(model_data$mixcoefXeff)
 
-    res <- modifyList(res, matrix2csr("iactXobjeff", model_data$iactXobjeff))
-    iact_data <- list(Nsupactions = nrow(model_data$superactions),
+    iact_data <- modifyList(iact_data,
+                 list(Nsupactions = nrow(model_data$superactions),
                       observation2supaction = as.array(obs_df$glm_supaction_ix),
                       supaction2obj = as.array(model_data$superactions$glm_object_ix),
-                      Niactions = nrow(model_data$interactions),
-                      iaction2obj = as.array(model_data$interactions$glm_object_ix),
                       Nmixtions = nrow(model_data$mixtions),
                       mixt2iact = as.array(model_data$mixtions$glm_iaction_ix),
-                      mixt2mix = as.array(model_data$mixtions$mixcoef_ix))
-    res <- modifyList(res, iact_data)
-    res <- modifyList(res, matrix2csr("supactXmixt", model_data$supactXmixt))
+                      mixt2mix = as.array(model_data$mixtions$mixcoef_ix)))
+    iact_data <- modifyList(iact_data, matrix2csr("supactXmixt", model_data$supactXmixt))
   } else {
-    res <- modifyList(res, matrix2csr("iactXobjeff", model_data$iactXobjeff))
-    iact_data <- list(Niactions = nrow(model_data$interactions),
-                      observation2iaction = as.array(obs_df$glm_iaction_ix),
-                      iaction2obj = as.array(model_data$interactions$glm_object_ix))
-    res <- modifyList(res, iact_data)
+    iact_data <- modifyList(iact_data, matrix2csr("obsXobjeff", model_data$obsXobjeff))
+    iact_data$observation2iaction <- as.array(obs_df$glm_iaction_ix)
   }
+  res <- modifyList(res, iact_data)
+
   if ("subobjects" %in% names(model_data)) {
     # data have subobjects
     res$Nsubobjects <- nrow(model_data$subobjects)

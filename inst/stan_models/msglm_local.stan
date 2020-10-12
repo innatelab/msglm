@@ -99,8 +99,6 @@ data {
   int<lower=0> Nobjects;        // number of objects (proteins/peptides/sites etc)
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
   int<lower=0> Nobservations;   // number of observations of interactions (objectXexperiment pairs for all iactions and experiments of its condition)
-  int<lower=0> Neffects;        // number of effects (that define conditions)
-  int<lower=0> NbatchEffects;   // number of batch effects (that define assay experimental variation, but not biology)
   int<lower=0> NunderdefObjs;   // number of virtual interactions (the ones not detected but required for comparison)
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
   int<lower=1,upper=Nobjects> underdef_objs[NunderdefObjs];
@@ -118,6 +116,9 @@ data {
   vector<lower=0>[Nquanted] qData; // quanted data
   vector<lower=0, upper=1>[Nmissed] missing_sigmoid_scale; // sigmoid scales for indiv. observations (<1 for higher uncertainty)
 
+  // linear model specification
+  int<lower=0> Neffects;        // number of effects (that define conditions)
+  int<lower=0> NbatchEffects;   // number of batch effects (that define assay experimental variation, but not biology)
   int<lower=0> NobjEffects;
   int<lower=1,upper=Neffects> obj_effect2effect[NobjEffects];
   int<lower=0,upper=1> effect_is_positive[Neffects];
@@ -132,6 +133,11 @@ data {
   vector[iactXobjeff_Nw] iactXobjeff_w;
   int<lower=0, upper=iactXobjeff_Nw+1> iactXobjeff_u[Niactions+1];
   int<lower=0, upper=NobjEffects> iactXobjeff_v[iactXobjeff_Nw];
+
+  int<lower=0> obsXobjeff_Nw;
+  vector[obsXobjeff_Nw] obsXobjeff_w;
+  int<lower=0, upper=obsXobjeff_Nw+1> obsXobjeff_u[Nobservations+1];
+  int<lower=0, upper=NobjEffects> obsXobjeff_v[obsXobjeff_Nw];
 
   // obsXobj_batcheff (observation X batch_effect) sparse matrix
   int<lower=0> obsXobjbatcheff_Nw;
@@ -172,9 +178,9 @@ data {
 }
 
 transformed data {
-  real mzShift; // zShift for the missing observation intensity (zShift shifted by obj_base)
-  vector[Nquanted] zScore; // log(qData) transformed in zScore
-  vector[Nquanted] qLogStd; // log(sd(qData))-obj_base
+  real mzShift = zShift - global_labu_shift; // zShift for the missing observation intensity
+  vector[Nquanted] zScore = (log(qData) - zShift) * zScale;
+  vector[Nquanted] qLogStd; // log(sd(qData))-global_labu_shift
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
 
   int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2observation];
@@ -194,11 +200,15 @@ transformed data {
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsOther = NobjBatchEffects - NobjBatchEffectsPos;
   int<lower=1,upper=NobjBatchEffects> obj_batch_effect_reshuffle[NobjBatchEffects];
 
-  vector[Niactions] iactXobjbase_w;
+  vector[Niactions] iactXobjbase_w = rep_vector(1.0, Niactions);
   int<lower=0> iactXobjbase_u[Niactions + 1];
 
-  vector[Nobservations] obsXiact_w;
+  vector[Nobservations] obsXiact_w = rep_vector(1.0, Nobservations);
   int<lower=0> obsXiact_u[Nobservations + 1];
+
+  vector[Nobservations] obsXobjbase_w = rep_vector(1.0, Nobservations);
+  int<lower=1> obsXobjbase_u[Nobservations + 1];
+  int<lower=1, upper=Nobjects> obs2obj[Nobservations] = iaction2obj[observation2iaction];
 
   int<lower=0> NrealIactions = ndistinct(observation2iaction, Niactions);
   int<lower=0> Nobservations0 = Nobservations - NrealIactions; // number of observations degrees of freedom ()
@@ -213,17 +223,11 @@ transformed data {
   obj_effect_reshuffle = objeffects_reshuffle(obj_effect2effect, effect_is_positive);
   obj_batch_effect_reshuffle = objeffects_reshuffle(obj_batch_effect2batch_effect, batch_effect_is_positive);
 
-  // preprocess signals (MS noise)
+  // process the intensity data to optimize likelihood calculation
   {
-    vector[Nquanted] qLogData;
-    qLogData = log(qData);
-    zScore = (qLogData - zShift) * zScale;
-    mzShift = zShift - global_labu_shift;
-
-    // process the intensity data to optimize likelihood calculation
     for (i in 1:Nquanted) {
       qLogStd[i] = intensity_log_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
-      qDataNorm[i] = exp(qLogData[i] - qLogStd[i]);
+      qDataNorm[i] = exp(log(qData[i]) - qLogStd[i]);
       qLogStd[i] -= global_labu_shift; // obs_labu is modeled without obj_base
     }
   }
@@ -284,8 +288,8 @@ transformed data {
   }
   //print("obsXobs_shift0=", csr_to_dense_matrix(Nobservations, Nobservations0, obsXobs_shift0_w, obsXobs_shift0_v, obsXobs_shift0_u));
 
-  iactXobjbase_w = rep_vector(1.0, Niactions);
   for (i in 1:(Niactions+1)) iactXobjbase_u[i] = i;
+  for (i in 1:(Nobservations+1)) obsXobjbase_u[i] = i;
 
   {
     matrix[Niactions, Nobjects+NobjEffects] objeffx2iaction_op;
@@ -356,7 +360,6 @@ transformed parameters {
   vector[NobjBatchEffects] obj_batch_effect;
   //vector<lower=0>[NobjBatchEffects] obj_batch_effect_sigma;
 
-  vector[Niactions] iaction_labu;
   vector<lower=0>[Nobservations0 > 0 ? Niactions : 0] iact_repl_shift_sigma;
 
   vector[Nobservations] obs_labu; // iaction_labu + objXexp_repl_shift * obj_repl_shift_sigma
@@ -379,11 +382,10 @@ transformed parameters {
   }
   obj_effect = obj_effect_mean + append_row(obj_effect_unscaled_pos, obj_effect_unscaled_other)[obj_effect_reshuffle] .* obj_effect_sigma;
 
-  // calculate iaction_labu
-  iaction_labu = csr_matrix_times_vector(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u, obj_base_labu) +
-                 csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect);
+  // calculate observations log abundance
+  obs_labu = csr_matrix_times_vector(Nobservations, Nobjects, obsXobjbase_w, obs2obj, obsXobjbase_u, obj_base_labu) +
+             csr_matrix_times_vector(Nobservations, NobjEffects, obsXobjeff_w, obsXobjeff_v, obsXobjeff_u, obj_effect);
 
-  obs_labu = csr_matrix_times_vector(Nobservations, Niactions, obsXiact_w, observation2iaction, obsXiact_u, iaction_labu);
   // calculate obs_shift and obs_labu
   if (Nobservations0 > 0) {
     iact_repl_shift_sigma = iact_repl_shift_lambda_a .* sqrt(iact_repl_shift_lambda_t) * iact_repl_shift_tau;
@@ -467,8 +469,12 @@ model {
 generated quantities {
     vector[Nobjects] obj_base_labu_replCI;
     vector[NobjEffects] obj_effect_replCI;
+    vector[Niactions] iaction_labu;
     vector[Niactions] iaction_labu_replCI;
 
+    // calculate interactions log abundance
+    iaction_labu = csr_matrix_times_vector(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u, obj_base_labu) +
+                   csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect);
     for (i in 1:Niactions) {
       iaction_labu_replCI[i] = normal_rng(iaction_labu[i], iact_repl_shift_sigma[i]);
     }

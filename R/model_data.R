@@ -113,10 +113,18 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
                                              mixtion = model_data$mixtions$mixtion)
   } else {
     iaction_ids <- unique(model_data$interaction$iaction_id)
+    obs_ids <- unique(model_data$observation$observation_id)
   }
 
   iactXobjeff <- iactXeffect(conditionXeffect.mtx, model_data$interactions$glm_object_ix,
                              model_data$interactions$condition_ix)
+  if (exists("msrunXeffect.mtx")) {
+    obsXobjeff <- iactXeffect(msrunXeffect.mtx, model_data$observations$glm_object_ix,
+                              model_data$observations$msrun_ix)
+  } else {
+    obsXobjeff <- iactXeffect(conditionXeffect.mtx, model_data$observations$glm_object_ix,
+                              model_data$observations$condition_ix)
+  }
   model_data$object_effects <- iactXobjeff$objeff_df %>%
     dplyr::rename(glm_object_ix = obj,
                   effect = eff, object_effect = objeff) %>%
@@ -124,6 +132,9 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
   model_data$iactXobjeff <- iactXobjeff$mtx
   dimnames(model_data$iactXobjeff) <- list(interaction = iaction_ids,
                                            objeff = dimnames(model_data$iactXobjeff)[[2]])
+  model_data$obsXobjeff <- obsXobjeff$mtx
+  dimnames(model_data$obsXobjeff) <- list(observation = obs_ids,
+                                          objeff = dimnames(model_data$obsXobjeff)[[2]])
   model_data$effects <- effects.df %>%
       dplyr::mutate(effect = factor(effect, levels=levels(model_data$object_effects$effect))) %>%
       dplyr::arrange(effect)

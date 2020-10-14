@@ -320,7 +320,6 @@ transformed data {
     //print("iaction2objeffx_op=", iaction2objeffx_op);
   }
 
-  obsXiact_w = rep_vector(1.0, Nobservations);
   for (i in 1:(Nobservations+1)) obsXiact_u[i] = i;
 }
 

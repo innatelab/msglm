@@ -116,15 +116,24 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
     obs_ids <- unique(model_data$observation$observation_id)
   }
 
-  iactXobjeff <- iactXeffect(conditionXeffect.mtx, model_data$interactions$glm_object_ix,
+  conds_ordered.df <- dplyr::select(model_data$interactions, condition, condition_ix) %>%
+        dplyr::distinct() %>% dplyr::arrange(condition_ix)
+  msruns_ordered.df <- dplyr::select(model_data$observations, msrun, msrun_ix) %>%
+        dplyr::distinct() %>% dplyr::arrange(msrun_ix)
+
+  iactXobjeff <- iactXeffect(conditionXeffect.mtx[conds_ordered.df$condition, , drop=FALSE],
+                             model_data$interactions$glm_object_ix,
                              model_data$interactions$condition_ix)
   if (exists("msrunXeffect.mtx")) {
-    obsXobjeff <- iactXeffect(msrunXeffect.mtx, model_data$observations$glm_object_ix,
+    obsXobjeff <- iactXeffect(msrunXeffect.mtx[msruns_ordered.df$msrun, , drop=FALSE],
+                              model_data$observations$glm_object_ix,
                               model_data$observations$msrun_ix)
   } else {
-    obsXobjeff <- iactXeffect(conditionXeffect.mtx, model_data$observations$glm_object_ix,
+    obsXobjeff <- iactXeffect(conditionXeffect.mtx[conds_ordered.df$condition, , drop=FALSE],
+                              model_data$observations$glm_object_ix,
                               model_data$observations$condition_ix)
   }
+  obsXobjeff$mtx <- obsXobjeff$mtx[, colnames(iactXobjeff$mtx), drop=FALSE]
   model_data$object_effects <- iactXobjeff$objeff_df %>%
     dplyr::rename(glm_object_ix = obj,
                   effect = eff, object_effect = objeff) %>%
@@ -139,7 +148,7 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
       dplyr::mutate(effect = factor(effect, levels=levels(model_data$object_effects$effect))) %>%
       dplyr::arrange(effect)
 
-  obsXobjbatcheff <- iactXeffect(msrunXbatchEffect.mtx[unique(model_data$mschannels$msrun), , drop=FALSE],
+  obsXobjbatcheff <- iactXeffect(msrunXbatchEffect.mtx[msruns_ordered.df$msrun, , drop=FALSE],
                                  model_data$observations$glm_object_ix,
                                  model_data$observations$msrun_ix)
   model_data$object_batch_effects <- obsXobjbatcheff$objeff_df %>%
@@ -155,7 +164,7 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
     suoXobs = tidyr::crossing(glm_observation_ix = model_data$observations$glm_observation_ix,
                               glm_subobject_ix = model_data$subobjects$glm_subobject_ix) %>%
       dplyr::left_join(select(model_data$observations, glm_observation_ix, msrun_ix))
-    suoxobsXsuobatcheff <- iactXeffect(msrunXsubbatchEffect.mtx[unique(model_data$mschannels$msrun), , drop=FALSE],
+    suoxobsXsuobatcheff <- iactXeffect(msrunXsubbatchEffect.mtx[msruns_ordered.df$msrun, , drop=FALSE],
                                        suoXobs$glm_subobject_ix,
                                        suoXobs$msrun_ix)
     model_data$suo_subbatch_effects <- suoxobsXsuobatcheff$objeff_df %>%

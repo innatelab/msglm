@@ -319,11 +319,11 @@ transformed data {
             // add 2npass-th row of iact_obsXobs0 to the obsXobs0
             for (j in 1:cols(iact_obsXobs0)) {
               real w = iact_obsXobs0[iaction2nobs_2ndpass[iact_ix], j];
-              if (w != 0) {
+              //if (w != 0) { // don't skip non-structural zeros for contr_poly (otherwise there's mismatch with contr_poly_Nw)
                 nW += 1;
                 obsXobs_shift0_v[obsXobs_shift0_offset + nW] = iaction2obs_shift0_offset[iact_ix] + j;
                 obsXobs_shift0_w[obsXobs_shift0_offset + nW] = w;
-              }
+              //}
             }
             obsXobs_shift0_u[i+1] = obsXobs_shift0_u[i] + nW;
             obsXobs_shift0_offset += nW;

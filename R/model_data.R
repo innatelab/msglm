@@ -112,8 +112,8 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
     dimnames(model_data$supactXmixt) <- list(superaction = model_data$superactions$supaction_id,
                                              mixtion = model_data$mixtions$mixtion)
   } else {
-    iaction_ids <- unique(model_data$interaction$iaction_id)
-    obs_ids <- unique(model_data$observation$observation_id)
+    iaction_ids <- unique(model_data$interactions$iaction_id)
+    obs_ids <- unique(model_data$observations$observation_id)
   }
 
   conds_ordered.df <- dplyr::select(model_data$interactions, condition, condition_ix) %>%

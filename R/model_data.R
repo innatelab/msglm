@@ -121,15 +121,15 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
   msruns_ordered.df <- dplyr::select(model_data$observations, msrun, msrun_ix) %>%
         dplyr::distinct() %>% dplyr::arrange(msrun_ix)
 
-  iactXobjeff <- iactXeffect(conditionXeffect.mtx[conds_ordered.df$condition, , drop=FALSE],
+  iactXobjeff <- iactXeffect(conditionXeffect.mtx[as.character(conds_ordered.df$condition), , drop=FALSE],
                              model_data$interactions$glm_object_ix,
                              model_data$interactions$condition_ix)
   if (exists("msrunXeffect.mtx")) {
-    obsXobjeff <- iactXeffect(msrunXeffect.mtx[msruns_ordered.df$msrun, , drop=FALSE],
+    obsXobjeff <- iactXeffect(msrunXeffect.mtx[as.character(msruns_ordered.df$msrun), , drop=FALSE],
                               model_data$observations$glm_object_ix,
                               model_data$observations$msrun_ix)
   } else {
-    obsXobjeff <- iactXeffect(conditionXeffect.mtx[conds_ordered.df$condition, , drop=FALSE],
+    obsXobjeff <- iactXeffect(conditionXeffect.mtx[as.character(conds_ordered.df$condition), , drop=FALSE],
                               model_data$observations$glm_object_ix,
                               model_data$observations$condition_ix)
   }

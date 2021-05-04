@@ -79,19 +79,45 @@ extract_var <- function(var_names) {
   stringr::str_remove(var_names, '\\[(?:\\d+\\,)*\\d+\\]$')
 }
 
-pvalue_not_zero <- function(samples, tail = c("both", "negative", "positive"))
+# compresses -log10(p_value) so that very significant p-values (mlog10(pvalue) >= threshold) are constrained
+mlog10pvalue_compress_scalar <- function(x, threshold = 10) {
+  if (x < threshold) {
+    return (x)
+  } else if (is.finite(x)) {
+    t <- x - threshold
+    return (threshold + sqrt(t))
+  } else {
+    return (3*threshold)
+  }
+}
+
+mlog10pvalue_compress <- function(x, threshold = 10) {
+  if (is_scalar_vector(x)) {
+    mlog10pvalue_compress_scalar(x, threshold=threshold)
+  } else {
+    vapply(x, mlog10pvalue_compress_scalar, 0.0, threshold=threshold)
+  }
+}
+
+pvalue_not_zero <- function(samples, tail = c("both", "negative", "positive"),
+                            mlog10_threshold = 10)
 {
   tail = match.arg(tail)
   if (length(samples) == 0L) {
     warning("No samples provided, returning P-value=NA")
     return(NA_real_)
   } else if (tail == "negative") {
-    return(ProbabilityLessZeroSmoothed(samples, nsteps = 100, bandwidth = NA))
+    res <- ProbabilityLessZeroSmoothed(samples, nsteps = 100, bandwidth = NA)
   } else if (tail == "positive") {
-    return(ProbabilityLessZeroSmoothed(-samples, nsteps = 100, bandwidth = NA))
+    res <- ProbabilityLessZeroSmoothed(-samples, nsteps = 100, bandwidth = NA)
   } else if (tail == "both") {
     # 2x correction as both tails are tested
-    2 * min(c(0.5,ProbabilityLessZeroSmoothed(samples, nsteps = 100, bandwidth = NA),
-                  ProbabilityLessZeroSmoothed(-samples, nsteps = 100, bandwidth = NA)))
+    res <- 2 * min(c(0.5,ProbabilityLessZeroSmoothed(samples, nsteps = 100, bandwidth = NA),
+                     ProbabilityLessZeroSmoothed(-samples, nsteps = 100, bandwidth = NA)))
   }
+  # compress too significant p-values
+  if (!is.na(mlog10_threshold)) {
+    res = 10^(-mlog10pvalue_compress_scalar(res, threshold = mlog10_threshold))
+  }
+  return(res)
 }

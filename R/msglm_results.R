@@ -206,8 +206,8 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
                   sd_log2 = sd/log(2),
                   # compress probabilities that contrast is positive/negative since
                   # too small probabilities indicate the bandwidth might be too small
-                  prob_nonpos = 10^(-mlog10_pvalue_compress(-log10(prob_nonpos))),
-                  prob_nonneg = 10^(-mlog10_pvalue_compress(-log10(prob_nonneg))))
+                  prob_nonpos = 10^(-mlog10pvalue_compress(-log10(prob_nonpos))),
+                  prob_nonneg = 10^(-mlog10pvalue_compress(-log10(prob_nonneg))))
   if ('fraction' %in% group_cols) {
     contrast_stats.df$fraction <- as.integer(contrast_stats.df$fraction)
   }

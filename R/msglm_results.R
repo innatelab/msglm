@@ -597,6 +597,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   if (is_glmm) {
     # FIXME what to do for glmm? there's no interaction observations
   } else if ('obs_labu' %in% all_pars) {
+    message("Calculating contrasts for obs_labu...")
     res$iactions_obsCI <- list(stats = vars_contrast_stats(res$observations$samples,
                                                            c('obs_labu'),
                                                            c('glm_iaction_ix', 'glm_iaction_ix', 'condition'),

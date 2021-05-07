@@ -99,21 +99,21 @@ mlog10pvalue_compress <- function(x, threshold = 10) {
   }
 }
 
-pvalue_not_zero <- function(samples, tail = c("both", "negative", "positive"),
-                            mlog10_threshold = 10)
+pvalue_compare <- function(xsamples, y=0, tail = c("both", "negative", "positive"),
+                          mlog10_threshold = 10)
 {
   tail = match.arg(tail)
-  if (length(samples) == 0L) {
+  if (length(xsamples) == 0L) {
     warning("No samples provided, returning P-value=NA")
     return(NA_real_)
   } else if (tail == "negative") {
-    res <- ProbabilityLessZeroSmoothed(samples, nsteps = 100, bandwidth = NA)
+    res <- ProbabilityLessZeroSmoothed(xsamples - y, nsteps = 100, bandwidth = NA)
   } else if (tail == "positive") {
-    res <- ProbabilityLessZeroSmoothed(-samples, nsteps = 100, bandwidth = NA)
+    res <- ProbabilityLessZeroSmoothed(-xsamples + y, nsteps = 100, bandwidth = NA)
   } else if (tail == "both") {
     # 2x correction as both tails are tested
-    res <- 2 * min(c(0.5,ProbabilityLessZeroSmoothed(samples, nsteps = 100, bandwidth = NA),
-                     ProbabilityLessZeroSmoothed(-samples, nsteps = 100, bandwidth = NA)))
+    res <- 2 * min(c(0.5,ProbabilityLessZeroSmoothed(xsamples - y, nsteps = 100, bandwidth = NA),
+                     ProbabilityLessZeroSmoothed(-xsamples + y, nsteps = 100, bandwidth = NA)))
   }
   # compress too significant p-values
   if (!is.na(mlog10_threshold)) {

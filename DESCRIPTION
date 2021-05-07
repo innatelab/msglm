@@ -11,4 +11,4 @@ Encoding: UTF-8
 LazyData: true
 Imports: Rcpp (>= 1.0), BH, rstan, dplyr, tidyr, tidyselect, stringr, purrr
 LinkingTo: Rcpp, BH
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.1

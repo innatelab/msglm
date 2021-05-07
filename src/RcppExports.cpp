@@ -5,19 +5,6 @@
 
 using namespace Rcpp;
 
-// ProbabilityLessZeroSmoothed
-double ProbabilityLessZeroSmoothed(const Rcpp::NumericVector& X, int nsteps, double bandwidth);
-RcppExport SEXP _msglm_ProbabilityLessZeroSmoothed(SEXP XSEXP, SEXP nstepsSEXP, SEXP bandwidthSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type X(XSEXP);
-    Rcpp::traits::input_parameter< int >::type nsteps(nstepsSEXP);
-    Rcpp::traits::input_parameter< double >::type bandwidth(bandwidthSEXP);
-    rcpp_result_gen = Rcpp::wrap(ProbabilityLessZeroSmoothed(X, nsteps, bandwidth));
-    return rcpp_result_gen;
-END_RCPP
-}
 // ProbabilityLessSmoothed
 double ProbabilityLessSmoothed(const Rcpp::NumericVector& X, const Rcpp::NumericVector& Y, int nsteps, double bandwidth);
 RcppExport SEXP _msglm_ProbabilityLessSmoothed(SEXP XSEXP, SEXP YSEXP, SEXP nstepsSEXP, SEXP bandwidthSEXP) {
@@ -95,7 +82,6 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_msglm_ProbabilityLessZeroSmoothed", (DL_FUNC) &_msglm_ProbabilityLessZeroSmoothed, 3},
     {"_msglm_ProbabilityLessSmoothed", (DL_FUNC) &_msglm_ProbabilityLessSmoothed, 4},
     {"_msglm_DifferenceStatistics", (DL_FUNC) &_msglm_DifferenceStatistics, 6},
     {"_msglm_ContrastStatistics", (DL_FUNC) &_msglm_ContrastStatistics, 8},

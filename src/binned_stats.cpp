@@ -22,17 +22,18 @@ typedef std::vector<int> experiment_set_t;
 namespace bacc = boost::accumulators;
 
 //??? Probability that random X-distributed variable would
-//??? be less or equal than zero.
+//??? be less or equal than the given value.
 //??? Gaussian kernel smoothing is used to represent the
-//??? distribution of X-Y variable.
+//??? distribution of X variable.
 //???
 //??? @X samples of X random variable
+//??? @y value to compare with
 //??? @nsteps the number of segments to divide the range of X value into
 //??? @bandwidth the gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
-//??? @return P(X<=0)
-// [[Rcpp::export]]
-double ProbabilityLessZeroSmoothed(
+//??? @return P(X<=y)
+double ProbabilityLessSmoothed(
     const Rcpp::NumericVector& X,
+    double y,
     int   nsteps = 100,
     double bandwidth = NA_REAL
 ){
@@ -41,19 +42,19 @@ double ProbabilityLessZeroSmoothed(
     }
     ImportedValues xvals( X );
     if ( ( xvals.val_max - xvals.val_min ) > nsteps * std::numeric_limits<double>::epsilon() ) {
-        return BinnedValues( xvals, xvals.defaultBinWidth( nsteps ), true ).probabilityNonPositive( bandwidth );
+        return BinnedValues( xvals, xvals.defaultBinWidth( nsteps ), true ).probabilityLessOrEqual( y, bandwidth );
     } else {
         // degenerated
         LOG_DEBUG1( "Degenerated distribution" );
         if ( R_IsNA( bandwidth ) ) {
-            if ( fabs( xvals.val_max ) <= nsteps * std::numeric_limits<double>::epsilon() ) {
+            if ( fabs( xvals.val_max - y ) <= nsteps * std::numeric_limits<double>::epsilon() ) {
                 LOG_DEBUG1( "Near zero" );
                 return ( 0.5 );
             } else {
-                return ( xvals.val_max <= 0.0 ? 1.0 : 0.0 );
+                return ( xvals.val_max <= y ? 1.0 : 0.0 );
             }
         } else {
-            return ( R::pnorm( 0.0, xvals.val_max, bandwidth, 1, 0 ) );
+            return ( R::pnorm( y, xvals.val_max, bandwidth, 1, 0 ) );
         }
     }
 }
@@ -80,12 +81,14 @@ double ProbabilityLessSmoothed(
     }
     if ( Y.size() == 0 ) {
         throw Rcpp::exception( "Y is empty" );
+    } else if ( Y.size() == 1 ) { // compare X samples against single Y value
+        return ProbabilityLessSmoothed(X, Y[0], nsteps, bandwidth);
     }
     ImportedValues xvals( X );
     ImportedValues yvals( Y );
     BinnedValues diffBins = BinnedValues::difference( xvals, yvals, nsteps );
 
-    return ( diffBins.probabilityNonPositive( bandwidth ) );
+    return ( diffBins.probabilityLessOrEqual( 0.0, bandwidth ) );
 }
 
 typedef std::map<std::string, std::size_t> name_index_map_t;
@@ -201,7 +204,7 @@ Rcpp::List DifferenceStatistics(
         if ( !R_IsNA( maxBandwidth ) && (bw > maxBandwidth) ) {
             bw = maxBandwidth;
         }
-        prob = diffBins.probabilityNonPositive( bw );
+        prob = diffBins.probabilityLessOrEqual( 0.0, bw );
         diff_mean = diffBins.average();
         diff_var = diffBins.variance();
     } else {
@@ -225,7 +228,7 @@ Rcpp::List DifferenceStatistics(
                                                                               xvals_merged.begin() + (i+1) * chunk_size ) ),
                                                  ImportedValues( std::vector<double>( yvals_adj_merged.begin() + i * chunk_size,
                                                                               yvals_adj_merged.begin() + (i+1) * chunk_size ) ), nsteps );
-            probs.push_back( diffBins.probabilityNonPositive( bw ) );
+            probs.push_back( diffBins.probabilityLessOrEqual( 0.0, bw ) );
             if ( probs.size() == 1 || max_prob < probs.back() ) {
                 max_prob = probs.back();
             }
@@ -368,7 +371,7 @@ Rcpp::List ContrastStatistics(
         for (std::size_t comb_i = 0; comb_i < cur_ncombn; ++comb_i) {
             // generate contrast samples for all experiment combinations
             // relevant to a given contrast
-            std::fill(experiment_contrast_samples.begin(), experiment_contrast_samples.end(), contrast_offsets[contr_ix]);
+            std::fill(experiment_contrast_samples.begin(), experiment_contrast_samples.end(), 0.0);
             for ( std::size_t cond_i = 0; cond_i < cond_ixs.size(); ++cond_i ) {
                 std::size_t cond_ix = cond_ixs[cond_i];
                 std::size_t exper_ix = condition2experiments.find(cond_ix)->second[next_exper_i[cond_i]];
@@ -401,13 +404,14 @@ Rcpp::List ContrastStatistics(
         ImportedValues contrast_vals( all_contrast_samples );
         BinnedValues contrast_bins( contrast_vals, contrast_vals.defaultBinWidth( nsteps ) );
 
+        double contr_offset = contrast_offsets[contr_ix];
         double cur_bw = maxBandwidth == 0.0 ? 0.0 : contrast_bins.bw_nrd();
         if ( !R_IsNA( maxBandwidth ) && (cur_bw > maxBandwidth) ) {
             cur_bw = maxBandwidth;
         }
         index_contrast[contr_ix] = contr_ix + 1;
-        prob_nonpos[contr_ix] = contrast_bins.probabilityNonPositive( cur_bw );
-        prob_nonneg[contr_ix] = contrast_bins.probabilityNonNegative( cur_bw );
+        prob_nonpos[contr_ix] = contrast_bins.probabilityLessOrEqual( contr_offset, cur_bw );
+        prob_nonneg[contr_ix] = contrast_bins.probabilityGreaterOrEqual( contr_offset, cur_bw );
         contrast_mean[contr_ix] = contrast_bins.average();
         contrast_sd[contr_ix] = sqrt(contrast_bins.variance());
         bw[contr_ix] = cur_bw;

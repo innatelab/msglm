@@ -63,14 +63,12 @@ BinnedValues::BinnedValues(const bins_t& bins, double binWidth, double val_min, 
 }
 
 // Probability that random variable
-// would be less or equal than zero using the
+// would be less or equal than the given value using the
 // Gaussian kernel smoothing.
-// @bins binned samples of random variable
-// @start value corresponding to the first bin
-// @step value step between the bins
+// @y value to compare with
 // @bandwidth the Gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
-// @return P(X<=0) if negative, P(X>=0) if !negative
-double BinnedValues::compareWithZero(double bandwidth, bool negative) const
+// @return P(X<=y) if negative, P(X>=y) if !negative
+double BinnedValues::probabilityCompareWith(double y, double bandwidth, bool negative) const
 {
     LOG_DEBUG2( "val_min=" << val_min << " val_max=" << val_max <<
                 " step=" << step << " size=" << size() );
@@ -79,11 +77,11 @@ double BinnedValues::compareWithZero(double bandwidth, bool negative) const
         LOG_DEBUG1( "Degenerated distribution" );
         LOG_DEBUG1( "val_min=" << val_min << " val_max=" << val_max );
         return ( R_IsNA( bandwidth )
-                ? ( val_max <= 0 ? 1.0 : 0.0 )
-                : R::pnorm( 0.0, val_max, bandwidth, negative, 0 ) );
+                ? ( val_max <= y ? 1.0 : 0.0 )
+                : R::pnorm( y, val_max, bandwidth, negative, 0 ) );
     }
-    else if ( (negative && ( ( val_max < -5.0*step*size() ) || ( val_min > 30.0*step*size() ) ))
-           || (!negative && ( ( val_max < -30.0*step*size() ) || ( val_min > 5.0*step*size() ) ))
+    else if ( (negative && ( ( val_max - y < -5.0*step*size() ) || ( val_min - y > 30.0*step*size() ) ))
+           || (!negative && ( ( val_max - y < -30.0*step*size() ) || ( val_min - y > 5.0*step*size() ) ))
     ){
         // distribution is almost degenerated w.r.t. distance to zero
         // (30 times the value range)
@@ -94,7 +92,7 @@ double BinnedValues::compareWithZero(double bandwidth, bool negative) const
             bandwidth /= step;
         }
         LOG_DEBUG1( "Normalized bandwidth=" << bandwidth );
-        return ( R::pnorm( 0.0, val_min / step + norm_average(), bandwidth, negative, 0 ) );
+        return ( R::pnorm( 0.0, (val_min - y + norm_average()) / step, bandwidth, negative, 0 ) );
     }
     if ( bins_sum == 0 ) return ( 0.5 );
 
@@ -107,7 +105,7 @@ double BinnedValues::compareWithZero(double bandwidth, bool negative) const
     LOG_DEBUG2( "Normalized bandwidth=" << bandwidth );
 
     double res = 0.0;
-    double offset = val_min / step + 0.5;
+    const double offset = (val_min - y) / step + 0.5;
     if ( bandwidth > 0.0 ) {
         // integrate the Gaussian kernel probability across all bins
         for ( std::size_t i = 0; i < bins.size(); ++i ) {
@@ -121,7 +119,7 @@ double BinnedValues::compareWithZero(double bandwidth, bool negative) const
         }
         if ( !negative ) res = bins_sum - res;
     }
-    LOG_DEBUG2((negative ? "P(X<=0)" : "P(X>=0)") << "=" << res / bins_sum);
+    LOG_DEBUG2("P(X" << (negative ? "<=" : ">=") << y << ")=" << res / bins_sum);
     return res / bins_sum;
 }
 

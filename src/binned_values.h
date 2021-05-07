@@ -43,20 +43,18 @@ struct BinnedValues {
     std::size_t size() const { return bins.size(); }
 
     // Probability that random variable
-    // would be less or equal than zero using the
+    // would be less or equal than the given value using the
     // Gaussian kernel smoothing.
-    // @bins binned samples of random variable
-    // @start value corresponding to the first bin
-    // @step value step between the bins
+    // @x value to compare with
     // @bandwidth the Gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
-    // @return P(X<=0) if negative, P(X>=0) if !negative
-    double compareWithZero(double bandwidth = NA_REAL, bool negative = true) const;
+    // @return P(X<=y) if negative, P(X>=y) if !negative
+    double probabilityCompareWith(double y, double bandwidth = NA_REAL, bool negative = true) const;
 
-    double probabilityNonPositive(double bandwidth = NA_REAL) const {
-        return compareWithZero(bandwidth, true);
+    double probabilityLessOrEqual(double y, double bandwidth = NA_REAL, double offset = 0.0) const {
+        return probabilityCompareWith(y, bandwidth, true);
     }
-    double probabilityNonNegative(double bandwidth = NA_REAL) const {
-        return compareWithZero(bandwidth, false);
+    double probabilityGreaterOrEqual(double y, double bandwidth = NA_REAL, double offset = 0.0) const {
+        return probabilityCompareWith(y, bandwidth, false);
     }
 
     double norm_average() const;

@@ -201,7 +201,11 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
     dplyr::do(contrast_stats_all_samples(.)) %>%
     dplyr::mutate(mean_log2 = mean/log(2),
                   median_log2 = `50%`/log(2),
-                  sd_log2 = sd/log(2))
+                  sd_log2 = sd/log(2),
+                  # compress probabilities that contrast is positive/negative since
+                  # too small probabilities indicate the bandwidth might be too small
+                  prob_nonpos = 10^(-mlog10_pvalue_compress(-log10(prob_nonpos))),
+                  prob_nonneg = 10^(-mlog10_pvalue_compress(-log10(prob_nonneg))))
   if ('fraction' %in% group_cols) {
     contrast_stats.df$fraction <- as.integer(contrast_stats.df$fraction)
   }
@@ -494,12 +498,7 @@ calc_contrasts <- function(vars_results, vars_info, dims_info,
         }
         # inject contrast statistics into vars_results
         vars_results[[vars_category]]$contrast_stats <- dplyr::left_join(var_info.df, contrast_stats.df) %>%
-          dplyr::mutate(p_value = 2*pmin(prob_nonpos, prob_nonneg),
-                        # fake P-values to fit in the plot
-                        #prob_nonpos_fake = pmax(if_else(mean < 0, 1E-300, 1E-100), rgamma(n(), shape=1E-2, scale=1E-150), prob_nonpos),
-                        #prob_nonneg_fake = pmax(if_else(mean > 0, 1E-300, 1E-100), rgamma(n(), shape=1E-2, scale=1E-150), prob_nonneg),
-                        #p_value_fake = 2*pmin(prob_nonpos_fake, prob_nonneg_fake)
-          ) %>%
+          dplyr::mutate(p_value = 2*pmin(0.5, prob_nonpos, prob_nonneg)) %>%
           #dplyr::select(-index_observation, -msrun, -msrun_ix) %>% dplyr::distinct() %>%
           dplyr::left_join(group_by(cond_stats.df, contrast, is_lhs) %>%
                            dplyr::summarise(conditions = str_c(!!condition_col, collapse=" ")) %>%

@@ -117,7 +117,7 @@ pvalue_not_zero <- function(samples, tail = c("both", "negative", "positive"),
   }
   # compress too significant p-values
   if (!is.na(mlog10_threshold)) {
-    res = 10^(-mlog10pvalue_compress_scalar(res, threshold = mlog10_threshold))
+    res = 10^(-mlog10pvalue_compress_scalar(-log10(res), threshold = mlog10_threshold))
   }
   return(res)
 }

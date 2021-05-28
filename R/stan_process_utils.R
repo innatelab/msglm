@@ -92,7 +92,7 @@ mlog10pvalue_compress_scalar <- function(x, threshold = 10) {
 }
 
 mlog10pvalue_compress <- function(x, threshold = 10) {
-  if (is_scalar_vector(x)) {
+  if (rlang::is_scalar_vector(x)) {
     mlog10pvalue_compress_scalar(x, threshold=threshold)
   } else {
     vapply(x, mlog10pvalue_compress_scalar, 0.0, threshold=threshold)

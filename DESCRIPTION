@@ -9,6 +9,6 @@ Description: Bayesian Generalized Linear Models for Protein- and
 License: BSD?
 Encoding: UTF-8
 LazyData: true
-Imports: Rcpp (>= 1.0), BH, rstan, dplyr, tidyr, tidyselect, stringr, purrr
+Imports: rlang, Rcpp (>= 1.0), BH, rstan, dplyr, tidyr, tidyselect, stringr, purrr
 LinkingTo: Rcpp, BH
 RoxygenNote: 7.1.1

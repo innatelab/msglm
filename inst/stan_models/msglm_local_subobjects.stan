@@ -422,10 +422,10 @@ transformed data {
     if ((NsubBatchEffects > 0) && (Nsubobjects > 0)) {
       // all references to the 1st protocol are redirected to index 1 (this shift is always 0)
       for (i in 1:Nquanted) {
-        quant2suoxobs[i] = (quant2observation[i]-1)*Nsubobjects + quant2suo[i] + 1;
+        quant2suoxobs[i] = (quant2observation[i]-1)*Nsubobjects + quant2suo[i];
       }
       for (i in 1:Nmissed) {
-        miss2suoxobs[i] = (miss2observation[i]-1)*Nsubobjects + miss2suo[i] + 1;
+        miss2suoxobs[i] = (miss2observation[i]-1)*Nsubobjects + miss2suo[i];
       }
     }
   }

@@ -180,6 +180,7 @@ data {
   real<lower=0> iact_repl_shift_df;
   real<lower=0> batch_effect_sigma;
   real<lower=0> suo_subbatch_effect_tau;
+  real<lower=0> suo_subbatch_effect_df;
   real<upper=0> underdef_obj_shift;
 
   // instrument calibrated parameters (FIXME: msproto-dependent)
@@ -581,7 +582,7 @@ model {
       suo_shift_sigma ~ cauchy(0, 1);
       suo_shift_unscaled ~ std_normal();
       if (NsubBatchEffects > 0) {
-        suo_subbatch_effect_lambda_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * 4.0, 0.5 * 4.0);
+        suo_subbatch_effect_lambda_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * suo_subbatch_effect_df, 0.5 * suo_subbatch_effect_df);
         suo_subbatch_effect_lambda_a - hsprior_lambda_a_offset ~ std_normal();
         //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
         suo_subbatch_effect_unscaled_pos ~ std_normal();

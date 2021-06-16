@@ -52,7 +52,7 @@ stan.prepare_data <- function(base_input_data, model_data,
                               hsprior_lambda_a_offset = 0.01,
                               hsprior_lambda_t_offset = 0.01,
                               batch_effect_sigma=0.5,
-                              subbatch_tau=0.3,
+                              subbatch_tau=0.3, subbatch_df=4,
                               suo_fdr=0.02, reliable_obs_fdr=0.001, specific_iaction_fdr=reliable_obs_fdr,
                               empty_observation_sigmoid_scale = 1.0)
 {
@@ -195,6 +195,7 @@ stan.prepare_data <- function(base_input_data, model_data,
       res$NsubBatchEffects <- ncol(msrunXsubbatchEffect.mtx)
       res$NsuoBatchEffects <- nrow(model_data$suo_subbatch_effects)
       res$suo_subbatch_effect_tau <- subbatch_tau
+      res$suo_subbatch_effect_df <- subbatch_df
       res$suo_subbatch_effect2subbatch_effect <- as.array(as.integer(model_data$suo_subbatch_effects$subbatch_effect))
       res$subbatch_effect_is_positive = as.array(as.integer(model_data$subbatch_effects$is_positive))
       res <- modifyList(res, matrix2csr("suoxobsXsuobatcheff", model_data$suoxobsXsuobatcheff))

@@ -181,6 +181,7 @@ data {
   real<lower=0> batch_effect_sigma;
   real<lower=0> suo_subbatch_effect_tau;
   real<lower=0> suo_subbatch_effect_df;
+  real<lower=0> suo_subbatch_effect_c;
   real<upper=0> underdef_obj_shift;
 
   // instrument calibrated parameters (FIXME: msproto-dependent)
@@ -227,6 +228,7 @@ transformed data {
   int<lower=1,upper=NsuoBatchEffects> suo_subbatch_effect_reshuffle[NsuoBatchEffects];
   int<lower=1,upper=Nobservations*Nsubobjects> quant2suoxobs[((NsubBatchEffects > 0) && (Nsubobjects > 0)) ? Nquanted : 0];
   int<lower=1,upper=Nobservations*Nsubobjects> miss2suoxobs[((NsubBatchEffects > 0) && (Nsubobjects > 0)) ? Nmissed : 0];
+  real<lower=0> suo_subbatch_effect_c2 = square(suo_subbatch_effect_c);
 
   vector[Niactions] iactXobjbase_w = rep_vector(1.0, Niactions);
   int<lower=0> iactXobjbase_u[Niactions + 1];
@@ -530,7 +532,9 @@ transformed parameters {
 
   // calculate suoXobs_subbatch_shift (doesn't make sense to add to obs_labu)
   if (NsubBatchEffects > 0) {
-    suo_subbatch_effect_sigma = suo_subbatch_effect_lambda_a .* sqrt(suo_subbatch_effect_lambda_t) * suo_subbatch_effect_tau;
+    vector[NsuoBatchEffects] suo_subbatch_effect_sigma_pre; // AKA lambda_eta2 in rstanarm
+    suo_subbatch_effect_sigma_pre = square(suo_subbatch_effect_lambda_a) .* suo_subbatch_effect_lambda_t;
+    suo_subbatch_effect_sigma = sqrt(suo_subbatch_effect_c2 * suo_subbatch_effect_sigma_pre ./ (suo_subbatch_effect_c2 + square(suo_subbatch_effect_tau) * suo_subbatch_effect_sigma_pre)) * suo_subbatch_effect_tau;
     suo_subbatch_effect = append_row(suo_subbatch_effect_unscaled_pos, suo_subbatch_effect_unscaled_other)[suo_subbatch_effect_reshuffle] .* suo_subbatch_effect_sigma;
     suoxobs_subbatch_shift = csr_matrix_times_vector(Nobservations*Nsubobjects, NsuoBatchEffects, suoxobsXsuobatcheff_w, suoxobsXsuobatcheff_v, suoxobsXsuobatcheff_u,
                                                      suo_subbatch_effect);

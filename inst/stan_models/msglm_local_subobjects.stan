@@ -226,8 +226,8 @@ transformed data {
   int<lower=0,upper=NsuoBatchEffects> NsuoBatchEffectsPos = sum(subbatch_effect_is_positive[suo_subbatch_effect2subbatch_effect]);
   int<lower=0,upper=NsuoBatchEffects> NsuoBatchEffectsOther = NsuoBatchEffects - NsuoBatchEffectsPos;
   int<lower=1,upper=NsuoBatchEffects> suo_subbatch_effect_reshuffle[NsuoBatchEffects];
-  int<lower=1,upper=Nobservations*Nsubobjects> quant2suoxobs[((NsubBatchEffects > 0) && (Nsubobjects > 0)) ? Nquanted : 0];
-  int<lower=1,upper=Nobservations*Nsubobjects> miss2suoxobs[((NsubBatchEffects > 0) && (Nsubobjects > 0)) ? Nmissed : 0];
+  int<lower=1,upper=Nobservations*Nsubobjects> quant2suoxobs[NsuoBatchEffects > 0 ? Nquanted : 0];
+  int<lower=1,upper=Nobservations*Nsubobjects> miss2suoxobs[NsuoBatchEffects > 0 ? Nmissed : 0];
   real<lower=0> suo_subbatch_effect_c2 = square(suo_subbatch_effect_c);
 
   vector[Niactions] iactXobjbase_w = rep_vector(1.0, Niactions);
@@ -422,7 +422,7 @@ transformed data {
         }
     }
 
-    if ((NsubBatchEffects > 0) && (Nsubobjects > 0)) {
+    if (NsuoBatchEffects > 0) {
       // all references to the 1st protocol are redirected to index 1 (this shift is always 0)
       for (i in 1:Nquanted) {
         quant2suoxobs[i] = (quant2observation[i]-1)*Nsubobjects + quant2suo[i];
@@ -531,7 +531,7 @@ transformed parameters {
   suo_shift = suo_shift_unscaled * suo_shift_sigma;
 
   // calculate suoXobs_subbatch_shift (doesn't make sense to add to obs_labu)
-  if (NsubBatchEffects > 0) {
+  if (NsuoBatchEffects > 0) {
     vector[NsuoBatchEffects] suo_subbatch_effect_sigma_pre; // AKA lambda_eta2 in rstanarm
     suo_subbatch_effect_sigma_pre = square(suo_subbatch_effect_lambda_a) .* suo_subbatch_effect_lambda_t;
     suo_subbatch_effect_sigma = sqrt(suo_subbatch_effect_c2 * suo_subbatch_effect_sigma_pre ./ (suo_subbatch_effect_c2 + square(suo_subbatch_effect_tau) * suo_subbatch_effect_sigma_pre)) * suo_subbatch_effect_tau;
@@ -585,7 +585,7 @@ model {
     if (Nsubobjects > 0) {
       suo_shift_sigma ~ cauchy(0, 1);
       suo_shift_unscaled ~ std_normal();
-      if (NsubBatchEffects > 0) {
+      if (NsuoBatchEffects > 0) {
         suo_subbatch_effect_lambda_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * suo_subbatch_effect_df, 0.5 * suo_subbatch_effect_df);
         suo_subbatch_effect_lambda_a - hsprior_lambda_a_offset ~ std_normal();
         //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
@@ -611,7 +611,7 @@ model {
             q_labu += suo_shift[quant2suo];
             m_labu += suo_shift[miss2suo];
 
-            if (NsubBatchEffects > 0) {
+            if (NsuoBatchEffects > 0) {
                 q_labu += suoxobs_subbatch_shift[quant2suoxobs];
                 m_labu += suoxobs_subbatch_shift[miss2suoxobs];
             }
@@ -662,7 +662,7 @@ generated quantities {
         q_labu = obs_labu[quant2observation] + experiment_shift[quant2experiment] + suo_shift[quant2suo];
         m_labu = obs_labu[miss2observation] + experiment_shift[miss2experiment] + suo_shift[miss2suo];
 
-        if (NsubBatchEffects > 0) {
+        if (NsuoBatchEffects > 0) {
             q_labu += suoxobs_subbatch_shift[quant2suoxobs];
             m_labu += suoxobs_subbatch_shift[miss2suoxobs];
         }

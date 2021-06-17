@@ -582,8 +582,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   message('Computing parameters statistics...')
   msglm.stan_stats <- msglm.stan_fit %>%
     stan.extract_samples(pars = all_pars, min.iteration = min.iteration, chains=chains) %>%
-    monitor(print = FALSE) %>% as.data.frame
-  msglm.stan_stats$var_name <- rownames(msglm.stan_stats)
+    monitor(print = FALSE) %>% tibble::as_tibble(rownames = "var_name")
 
   message('Composing results...')
   res <- lapply(names(vars_info), vars_statistics, msglm.stan_stats, msglm.stan_samples,

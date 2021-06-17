@@ -170,12 +170,12 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
     model_data$suo_subbatch_effects <- suoxobsXsuobatcheff$objeff_df %>%
       dplyr::rename(glm_subobject_ix = obj,
                     subbatch_effect = eff,
-                    suo_subbatch_effect = objeff) %>%
-      dplyr::arrange(suo_subbatch_effect)
+                    subobject_subbatch_effect = objeff) %>%
+      dplyr::arrange(subobject_subbatch_effect)
     # remove reference subobject from subbatch effects (FIXME 1st subobject for EACH object in the model)
     model_data$suoxobsXsuobatcheff <- suoxobsXsuobatcheff$mtx[, model_data$suo_subbatch_effects$glm_subobject_ix != 1L, drop=FALSE]
     model_data$suo_subbatch_effects <- dplyr::filter(model_data$suo_subbatch_effects, glm_subobject_ix != 1L) %>%
-      dplyr::mutate(suo_subbatch_effect = factor(suo_subbatch_effect, levels=as.character(suo_subbatch_effect)))
+      dplyr::mutate(subobject_subbatch_effect = factor(subobject_subbatch_effect, levels=as.character(subobject_subbatch_effect)))
     model_data$subbatch_effects <- dplyr::select(subbatch_effects.df, subbatch_effect, is_positive) %>%
       dplyr::mutate(subbatch_effect = factor(subbatch_effect, levels=levels(model_data$suo_subbatch_effects$subbatch_effect))) %>%
       dplyr::arrange(subbatch_effect)

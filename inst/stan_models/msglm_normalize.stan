@@ -101,8 +101,8 @@ transformed parameters {
     vector[Nshifts] shift_unscaled;
     vector[Nshifts] shift;
 
-    data_sigma = data_sigma_a / sqrt(data_sigma_t);
-    shift_sigma = shift_sigma_a / sqrt(shift_sigma_t);
+    data_sigma = data_sigma_a * sqrt(data_sigma_t);
+    shift_sigma = shift_sigma_a * sqrt(shift_sigma_t);
     shift_unscaled = shift_transform * shift0_unscaled;
     shift = shift_unscaled * shift_sigma;
 }
@@ -111,11 +111,11 @@ model {
     vector[Nmschannels] total_mschan_shift;
     matrix[Nmschannels, Nmschannels] sum_mschans;
 
-    data_sigma_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
-    data_sigma_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+    data_sigma_t - 1E-3 ~ inv_gamma(1.0, 1.0); // 1.0 = 2/2
+    data_sigma_a - 1E-3 ~ normal(0.0, 1.0); // 1.0 = 2/2
     //data_sigma ~ student_t(2, 0.0, 1.0);
-    shift_sigma_t ~ gamma(1.0, 1.0); // 1.0 = 2/2
-    shift_sigma_a ~ normal(0.0, 1.0); // 1.0 = 2/2
+    shift_sigma_t - 1E-3 ~ inv_gamma(1.0, 1.0); // 1.0 = 2/2
+    shift_sigma_a - 1E-3 ~ normal(0.0, 1.0); // 1.0 = 2/2
     //shift_sigma ~ student_t(2, 0.0, 1.0);
     shift_unscaled ~ normal(0.0, 1.0);
 

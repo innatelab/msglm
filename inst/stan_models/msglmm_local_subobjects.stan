@@ -137,9 +137,9 @@ data {
 }
 
 transformed data {
-  real mzShift; // zShift for the missing observation intensity (zShift shifted by obj_base)
-  vector[Nquanted] zScore; // log(qData) transformed in zScore
-  vector[Nquanted] qLogStd; // log(sd(qData))-obj_base
+  real mzShift = zShift - global_labu_shift; // zShift for the missing observation intensity
+  vector[Nquanted] zScore = (log(qData) - zShift) * zScale;
+  vector[Nquanted] qLogStd; // log(sd(qData))-global_labu_shift
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
 
   int<lower=1,upper=Nsupactions> quant2supaction[Nquanted];
@@ -230,19 +230,11 @@ transformed data {
     }
   }
 
-  // preprocess signals (MS noise)
-  {
-    vector[Nquanted] qLogData;
-    qLogData = log(qData);
-    zScore = (qLogData - zShift) * zScale;
-    mzShift = zShift - global_labu_shift;
-
-    // process the intensity data to optimize likelihood calculation
-    for (i in 1:Nquanted) {
-      qLogStd[i] = intensity_log_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
-      qDataNorm[i] = exp(qLogData[i] - qLogStd[i]);
-      qLogStd[i] -= global_labu_shift; // obs_labu is modeled without obj_base
-    }
+  // process the MS intensity data to optimize likelihood calculation
+  for (i in 1:Nquanted) {
+    qLogStd[i] = intensity_log_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
+    qDataNorm[i] = exp(log(qData[i]) - qLogStd[i]);
+    qLogStd[i] -= global_labu_shift; // obs_labu is modeled without obj_base
   }
   quant2experiment = observation2experiment[quant2observation];
   quant2supaction = observation2supaction[quant2observation];

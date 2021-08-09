@@ -667,7 +667,7 @@ generated quantities {
         // calculate log-likelihood per subobject
         suo_llh = rep_vector(0.0, Nsubobjects);
         for (i in 1:Nquanted) {
-          suo_llh[quant2suo[i]] += double_exponential_lpdf(qDataNorm[i] | exp(q_labu[i] - qLogStd[i]), 1) +
+          suo_llh[quant2suo[i]] += double_exponential_lpdf(logcompress(exp(q_labu[i] - qLogStd[i]) - qDataNorm[i], 0.25) | 0, 1) +
               bernoulli_logit_lpmf(1 | q_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         }
         for (i in 1:Nmissed) {

@@ -61,7 +61,7 @@ functions {
         for (i in 1:ngroups) nobjs[i] = 0;
         for (i in 1:num_elements(obj2group)) nobjs[obj2group[i]] += 1;
         nw = 0;
-        for (i in 1:ngroups) nw += (nobjs[i]-1)*nobjs[i];
+        for (i in 1:ngroups) nw += nobjs[i] > 0 ? (nobjs[i]-1)*nobjs[i] : 0;
         return nw;
     }
 
@@ -72,7 +72,7 @@ functions {
         for (i in 1:ngroups) nobjs[i] = 0;
         for (i in 1:num_elements(obj2group)) nobjs[obj2group[i]] += 1;
         nw = 0;
-        for (i in 1:ngroups) nw += (nobjs[i]-1);
+        for (i in 1:ngroups) nw += nobjs[i] > 0 ? nobjs[i]-1 : 0;
         return nw;
     }
 
@@ -242,7 +242,7 @@ transformed data {
 
   int<lower=0> NrealIactions = ndistinct(observation2iaction, Niactions);
   int<lower=0> Nobservations0 = Nobservations - NrealIactions; // number of observations degrees of freedom ()
-  int<lower=0> obsXobs0_Nw = contr_poly_Nw(NrealIactions, observation2iaction);
+  int<lower=0> obsXobs0_Nw = contr_poly_Nw(Niactions, observation2iaction);
   vector[obsXobs0_Nw] obsXobs_shift0_w;
   int<lower=1, upper=obsXobs0_Nw + 1> obsXobs_shift0_u[Nobservations + 1];
   int<lower=1, upper=Nobservations0> obsXobs_shift0_v[obsXobs0_Nw];

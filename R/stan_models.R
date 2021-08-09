@@ -233,7 +233,7 @@ msglm_stan_model <- function(model_name) {
 }
 
 #' @export
-stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=4,
+stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=1L,
                           max_treedepth=12L, stepsize_jitter=0.1, ...)
 {
     message("Running Stan MCMC...")

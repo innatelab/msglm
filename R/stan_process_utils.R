@@ -3,16 +3,17 @@
 # Author: astukalov
 ###############################################################################
 
-# converts matrix to compressed row storage (CSR)
-# wrapper for extract_sparse_parts that uses the specified matrix name
+# converts matrix to compressed row storage (CSR) and
+# return a list of <mtx_name>_Nw, <mtx_name>_u, <mtx_name>_v, <mtx_name>_w
 matrix2csr <- function(mtx_name, mtx) {
-    mtx_sparse <- rstan::extract_sparse_parts(mtx)
-    mtx_sparse$Nw <- length(mtx_sparse$w)
-    mtx_sparse$u <- as.array(mtx_sparse$u)
-    mtx_sparse$v <- as.array(mtx_sparse$v)
-    mtx_sparse$w <- as.array(mtx_sparse$w)
-    names(mtx_sparse) <- paste0(mtx_name, "_", names(mtx_sparse))
-    return(mtx_sparse)
+    spmtx <- Matrix::Matrix(t(mtx), sparse=TRUE, doDiag=FALSE)
+    mtx_csr <- list(
+      Nw = length(spmtx@x),
+      u = as.array(spmtx@p + 1L),
+      v = as.array(spmtx@i + 1L),
+      w = as.array(spmtx@x))
+    names(mtx_csr) <- paste0(mtx_name, "_", names(mtx_csr))
+    return(mtx_csr)
 }
 
 stan.iterations_frame <- function(stan_result)

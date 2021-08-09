@@ -253,6 +253,8 @@ transformed data {
   int<lower=0, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[suoXsuo0_Nw];
 
   matrix[Nobjects + NobjEffects, Niactions] iaction2objeffx_op;
+  //matrix[Niactions, Nobjects] iactXobjbase = csr_to_dense_matrix(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u);
+  //matrix[Niactions, NobjEffects] iactXobjeff = csr_to_dense_matrix(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u);
 
   // prepare reshuffling of positive/other effects
   obj_effect_reshuffle = objeffects_reshuffle(obj_effect2effect, effect_is_positive);
@@ -337,9 +339,7 @@ transformed data {
 
   {
     matrix[Niactions, Nobjects+NobjEffects] objeffx2iaction_op;
-    // = append_col(
-    //  csr_to_dense_matrix(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u),
-    //  csr_to_dense_matrix(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u));
+    // = append_col(iactXobjbase, iactXobjeff);
     // wierd way of convertion
     for (i in 1:Nobjects) {
       vector[Nobjects] obj = rep_vector(0.0, Nobjects);

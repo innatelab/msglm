@@ -1,16 +1,10 @@
 functions {
     int ndistinct(int[] ixs, int maxix) {
-      int ix2nused[maxix] = rep_array(0, maxix);
-      int res = 0;
+      int ix2used[maxix] = rep_array(0, maxix);
       for (ix in ixs) {
-        ix2nused[ix] += 1;
+        ix2used[ix] = 1;
       }
-      for (n in ix2nused) {
-        if (n > 0) {
-          res += 1;
-        }
-      }
-      return res;
+      return sum(ix2used);
     }
 
     real intensity_log_std(real z, real scaleHi, real scaleLo, real offs, real bend, real smooth) {

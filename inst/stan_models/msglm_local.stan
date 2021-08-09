@@ -461,17 +461,16 @@ model {
 }
 
 generated quantities {
+    // calculate interactions log abundance
+    vector[Niactions] iaction_labu =
+        csr_matrix_times_vector(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u, obj_base_labu) +
+        csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect);
+        //obj_base_labu[iaction2obj] + iactXobjeff * obj_effect;
+    vector[Niactions] iaction_labu_replCI = to_vector(normal_rng(iaction_labu, iact_repl_shift_sigma));
     vector[Nobjects] obj_base_labu_replCI;
     vector[NobjEffects] obj_effect_replCI;
-    vector[Niactions] iaction_labu;
-    vector[Niactions] iaction_labu_replCI;
+    vector[Nsubobjects] suo_llh;
 
-    // calculate interactions log abundance
-    iaction_labu = csr_matrix_times_vector(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u, obj_base_labu) +
-                   csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect);
-    for (i in 1:Niactions) {
-      iaction_labu_replCI[i] = normal_rng(iaction_labu[i], iact_repl_shift_sigma[i]);
-    }
     {
       vector[Nobjects + NobjEffects] obj_effx = iaction2objeffx_op * iaction_labu_replCI;
       for (i in 1:Nobjects) {

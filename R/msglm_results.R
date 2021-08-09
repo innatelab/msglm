@@ -249,7 +249,7 @@ vars_contrast_stats <- function(samples.df, var_names, group_cols,
 .attach_dim_info.by_var_name <- function(data.df, dim_info)
 {
     res.df <- data.df
-    res_index <- extract_index(res.df$var_name, ndim=length(dim_info))
+    res_index <- extract_index(res.df$var_spec, ndim=length(dim_info))
     dims.df <- tibble(ix = seq_along(dim_info),
                       name = names(dim_info)) %>%
       dplyr::group_by(name) %>%
@@ -316,11 +316,8 @@ vars_statistics <- function(vars_category, stan_stats, stan_samples, vars_info, 
     vars_cat_info <- vars_info[[vars_category]]
     samples.df <- stan_samples_frame(stan_samples, vars_cat_info$names, dim_info[vars_cat_info$dims])
     # process convergence information
-    stats.df <- dplyr::filter(stan_stats, str_detect(var_name,
-                                                     paste0('^(', paste0(vars_cat_info$names, collapse='|'), ')(\\[|$)')))
-    stats.df$var <- extract_var(stats.df$var_name)
-    stats.df <- dplyr::mutate(stats.df,
-                              mean_log2 = mean/log(2),
+    stats.df <- dplyr::filter(stan_stats, var %in% vars_cat_info$names) %>%
+                dplyr::mutate(mean_log2 = mean/log(2),
                               median_log2 = `50%`/log(2),
                               sd_log2 = sd/log(2))
     if (length(vars_cat_info$dims) > 0) {
@@ -348,9 +345,9 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
           return (tibble())
         }
     }
-    res.df <- tibble(var_name = names(opt_results$par)[res_mask],
+    res.df <- tibble(var_spec = names(opt_results$par)[res_mask],
                      mean = opt_results$par[res_mask]) %>%
-        dplyr::mutate(var = extract_var(var_name))
+        dplyr::mutate(var = extract_var(var_spec))
 
     # add additional dimension information
     if (length(vars_cat_info$dims) > 0) {
@@ -582,7 +579,9 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
   message('Computing parameters statistics...')
   msglm.stan_stats <- msglm.stan_fit %>%
     stan.extract_samples(pars = all_pars, min.iteration = min.iteration, chains=chains) %>%
-    monitor(print = FALSE) %>% tibble::as_tibble(rownames = "var_name")
+    monitor(print = FALSE) %>%
+    tibble::as_tibble(rownames = "var_spec") %>%
+    dplyr::mutate(var = extract_var(var_spec))
 
   message('Composing results...')
   res <- lapply(names(vars_info), vars_statistics, msglm.stan_stats, msglm.stan_samples,

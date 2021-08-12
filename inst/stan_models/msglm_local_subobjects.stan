@@ -7,6 +7,12 @@ functions {
       return sum(ix2used);
     }
 
+    int[] one_to(int n) {
+      int res[n];
+      for (i in 1:n) res[i] = i;
+      return res;
+    }
+
     real intensity_log_std(real z, real scaleHi, real scaleLo, real offs, real bend, real smooth) {
         return 0.5*(scaleHi+scaleLo)*(z-bend) + 0.5*(scaleHi-scaleLo)*sqrt((z-bend)*(z-bend)+smooth) + offs;
     }
@@ -225,13 +231,13 @@ transformed data {
   real<lower=0> suo_subbatch_effect_c2 = square(suo_subbatch_effect_c);
 
   vector[Niactions] iactXobjbase_w = rep_vector(1.0, Niactions);
-  int<lower=0> iactXobjbase_u[Niactions + 1];
+  int<lower=0> iactXobjbase_u[Niactions + 1] = one_to(Niactions + 1);
 
   vector[Nobservations] obsXiact_w = rep_vector(1.0, Nobservations);
-  int<lower=0> obsXiact_u[Nobservations + 1];
+  int<lower=0> obsXiact_u[Nobservations + 1] = one_to(Nobservations + 1);
 
   vector[Nobservations] obsXobjbase_w = rep_vector(1.0, Nobservations);
-  int<lower=1> obsXobjbase_u[Nobservations + 1];
+  int<lower=1> obsXobjbase_u[Nobservations + 1] = one_to(Nobservations + 1);
   int<lower=1, upper=Nobjects> obs2obj[Nobservations] = iaction2obj[observation2iaction];
 
   int<lower=0> NrealIactions = ndistinct(observation2iaction, Niactions);
@@ -329,9 +335,6 @@ transformed data {
   }
   //print("obsXobs_shift0=", csr_to_dense_matrix(Nobservations, Nobservations0, obsXobs_shift0_w, obsXobs_shift0_v, obsXobs_shift0_u));
 
-  for (i in 1:(Niactions+1)) iactXobjbase_u[i] = i;
-  for (i in 1:(Nobservations+1)) obsXobjbase_u[i] = i;
-
   {
     matrix[Niactions, Nobjects+NobjEffects] objeffx2iaction_op;
     // = append_col(
@@ -360,8 +363,6 @@ transformed data {
     iaction2objeffx_op = crossprod(objeffx2iaction_op)\(objeffx2iaction_op');
     //print("iaction2objeffx_op=", iaction2objeffx_op);
   }
-
-  for (i in 1:(Nobservations+1)) obsXiact_u[i] = i;
 
   suoXsuo_shift0_u = rep_array(0, Nsubobjects+1);
   if (Nsubobjects > 0) {

@@ -43,6 +43,29 @@ nrows_cumsum <- function(df, group_col) {
   }
 }
 
+#' Coverts the data and experimental design into Stan format.
+#'
+#' @param base_input_data input data already in Stan format (e.g. MS noise model parameters)
+#' @param model_data the list with MS data an experimental design
+#'
+#' @param global_labu_shift the average log-abundance of model objects
+#' @param effect_slab_df the *degrees of freedom* for the prior of object effect *slab* regularization parameter
+#' @param effect_slab_scale the *scale* parameter for the prior of object effect *slab* regularization parameter
+#' @param obj_labu_min minimal object log-abundance
+#' @param obj_labu_min_scale how strongly the estimates below *obj_labu_min* would be penalized (smaller = more stringent)
+#' @param iact_repl_shift_tau the *tau* parameter for the prior of biochemical log-abundance variation between the replicates
+#' @param iact_repl_shift_df the *degrees of freedom* parameter for the prior of biochemical log-abundance variation between the replicates
+#' @param hsprior_lambda_a_offset offset from zero for the "a" parameter of horseshoe priors. Helps NUTS integration step
+#' @param hsprior_lambda_t_offset offset from zero for the "a" parameter of horseshoe priors. Helps NUTS integration step
+#' @param batch_effect_sigma sigma parameter for the normal distribution prior of batch effects
+#' @param subbatch_tau
+#' @param subbatch_df
+#' @param subbatch_c
+#' @param suo_fdr
+#' @param reliable_obs_fdr
+#' @param specific_iaction_fdr
+#' @param empty_observation_sigmoid_scale
+#'
 #' @export
 stan.prepare_data <- function(base_input_data, model_data,
                               global_labu_shift = global_protgroup_labu_shift,

@@ -1,3 +1,16 @@
+#' Generate the dimensions information for the MSGLM report.
+#'
+#' @param model_data MSGLM model data that is used to get the dimensions info.
+#' @param object_cols Non-standard object information columns to
+#'                    include in the reports.
+#' @returns The named list of data frames with the dimension information.
+#'          The element names are the names of the dimensions,
+#'          Each data frame has `index_<dimname>` key,
+#'          which matches the index along the corresponding dimension in
+#'          the MSGLM model.
+#'
+#' @seealso process.stan_fit
+#'
 #' @export
 msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
 {

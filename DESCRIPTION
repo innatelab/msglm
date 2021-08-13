@@ -9,7 +9,7 @@ Description: Bayesian Generalized Linear Models for Protein- and
 License: BSD?
 Encoding: UTF-8
 LazyData: true
-Imports: rlang, Matrix, cpp11, BH, rstan, dplyr, tidyr, tidyselect, stringr, purrr
+Imports: rlang, Matrix, cpp11, BH, posterior, cmdstanr, dplyr, tidyr, tidyselect, stringr, purrr
 LinkingTo: cpp11, BH
 SystemRequirements: C++11
 RoxygenNote: 7.1.1

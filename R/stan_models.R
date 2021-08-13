@@ -251,13 +251,12 @@ msglm_model_names <- function() {
 msglm_stan_model <- function(model_name) {
   stan_models_path <- system.file('stan_models', package="msglm", mustWork=FALSE)
   message("Loading ", model_name, " Stan model")
-  return (rstan::stan_model(file.path(stan_models_path, paste0(model_name, ".stan")),
-                            model_name, save_dso = TRUE, auto_write = TRUE))
+  return (cmdstanr::cmdstan_model(file.path(stan_models_path, paste0(model_name, ".stan"))))
 }
 
 #' @export
-stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=1L,
-                          max_treedepth=12L, stepsize_jitter=0.1, ...)
+stan.sampling <- function(stan_input_data, iter=4000L, refresh=100L, chains=8L,
+                          max_treedepth=12L, ...)
 {
     message("Running Stan MCMC...")
     if ("Nsubobjects" %in% names(stan_input_data)) {
@@ -282,13 +281,13 @@ stan.sampling <- function(stan_input_data, iter=4000, chains=8, thin=1L,
       vars_info$global$names <- setdiff(vars_info$global$names,
                                         c('suo_shift_sigma'))
     }
-    control_params <- list(..., max_treedepth=max_treedepth, stepsize_jitter=stepsize_jitter)
-    res <- rstan::sampling(stanmodel,
-             pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,
-             data = stan_input_data,
-             #init = function() { pcp_peaks_glm.generate_init_params(pcp_peaks_glm.model_data) },
-             iter = iter, chains = chains, thin = thin,
-             control = control_params)
+    res <- stanmodel$sample(
+              data = stan_input_data,
+              #pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,
+              #init = function() { pcp_peaks_glm.generate_init_params(pcp_peaks_glm.model_data) },
+              iter_warmup=0.5*iter, iter_sampling=0.5*iter,
+              refresh=refresh, chains=chains, parallel_chains=chains,
+              max_treedepth=max_treedepth, ...)
     attr(res, "msglm_vars_info") <- vars_info
     return(res)
 }

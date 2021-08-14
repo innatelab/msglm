@@ -447,11 +447,11 @@ data_frame ContrastStatistics(
             }
             if ((LOG_LEVEL >= 3) && (var_its.size() > 1)) {
                 std::ostringstream permout;
-                permout << "perm #" << perm_i << ":";
+                permout << "perm #%i:";
                 for (const auto var_it : var_its) {
                     permout << " " << (*var_it);
                 }
-                cpp11::message(permout.str().c_str());
+                cpp11::message(permout.str().c_str(), perm_i);
             }
         }
 

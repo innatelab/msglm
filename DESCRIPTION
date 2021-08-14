@@ -1,7 +1,7 @@
 Package: msglm
 Type: Package
 Title: GLM models for Mass Spectrometry Data
-Version: 0.1.0
+Version: 0.2.0
 Author: Alexey Stukalov
 Maintainer: Alexey Stukalov <alexey.stukalov@tum.de>
 Description: Bayesian Generalized Linear Models for Protein- and
@@ -9,6 +9,7 @@ Description: Bayesian Generalized Linear Models for Protein- and
 License: BSD?
 Encoding: UTF-8
 LazyData: true
-Imports: rlang, Matrix, Rcpp (>= 1.0), BH, rstan, dplyr, tidyr, tidyselect, stringr, purrr
-LinkingTo: Rcpp, BH
+Imports: rlang, Matrix, cpp11, BH, rstan, dplyr, tidyr, tidyselect, stringr, purrr
+LinkingTo: cpp11, BH
+SystemRequirements: C++11
 RoxygenNote: 7.1.1

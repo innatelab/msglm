@@ -6,21 +6,33 @@
 
 #include <algorithm>
 #include <cmath>
-#include <Rcpp.h>
 #include <boost/math/distributions/normal.hpp>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/extended_p_square.hpp>
 
-using boost::math::normal; // typedef provides default type is double.
+#include <cpp11.hpp>
 
-// [[Rcpp::export]]
-Rcpp::DataFrame CloudsOverlap(
-    const Rcpp::NumericMatrix&  X,
-    const Rcpp::NumericMatrix&  Y,
-    double maxBandwidth = NA_REAL,
-    int   nsteps = 100,
-    const Rcpp::NumericVector&  quant_probs = Rcpp::NumericVector::create(0.025, 0.25, 0.50, 0.75, 0.975)
+using boost::math::normal; // typedef provides default type is double.
+using namespace cpp11;
+
+#if 0 // unsupported default params
+writable::data_frame CloudsOverlap(
+        doubles_matrix  X,
+        doubles_matrix  Y,
+        double maxBandwidth = na<double>(),
+        int   nsteps = 100,
+        doubles quant_probs = writable::doubles{0.025, 0.25, 0.50, 0.75, 0.975}
+)
+#endif
+
+[[cpp11::register]]
+writable::data_frame CloudsOverlap(
+    doubles_matrix  X,
+    doubles_matrix  Y,
+    double maxBandwidth,
+    int   nsteps,
+    doubles quant_probs
 ){
     //LOG_DEBUG0("CloudsOverlap");
     if (X.ncol() == 0 || X.nrow() == 0) {
@@ -43,10 +55,10 @@ Rcpp::DataFrame CloudsOverlap(
     std::vector<double> X_bw(ndims);
     std::vector<double> X_bw_inv(ndims);
     for (std::size_t k = 0; k < ndims; ++k) {
-        const ImportedValues X_col(X.column(k));
+        const ImportedValues X_col(X.column_at(k));
         const BinnedValues X_bins(X_col, X_col.defaultBinWidth(nsteps));
         double bw = maxBandwidth == 0.0 ? 0.0 : X_bins.bw_nrd();
-        if (!R_IsNA(maxBandwidth) && (bw > maxBandwidth)) {
+        if (!is_na(maxBandwidth) && (bw > maxBandwidth)) {
             bw = maxBandwidth;
         }
         X_bw[k] = bw;
@@ -95,9 +107,8 @@ Rcpp::DataFrame CloudsOverlap(
     //LOG_DEBUG0("prob_avg=" << prob_sum/nsamples);
     //LOG_DEBUG0("offset_avg=" << offset_sum/nsamples);
     //LOG_DEBUG0("scale_avg=" << scale_sum/nsamples);
-    return ( Rcpp::DataFrame::create(
-            Rcpp::Named("offset", Rcpp::NumericVector(1, offset_sum/nsamples)),
-            Rcpp::Named("scale", Rcpp::NumericVector(1, scale_sum/nsamples)),
-            Rcpp::Named("prob_further", Rcpp::NumericVector(1, prob_sum/nsamples))
-    ) );
+    return ( writable::data_frame{
+              "offset"_nm = writable::doubles{offset_sum/nsamples},
+              "scale"_nm = writable::doubles{scale_sum/nsamples},
+              "prob_further"_nm = writable::doubles{prob_sum/nsamples} } );
 }

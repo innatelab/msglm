@@ -1,7 +1,8 @@
 #pragma once
 
 #include <sstream>
-#include <Rcpp.h>
+#include <cpp11/R.hpp>
+#include <cpp11/function.hpp>
 
 #ifndef NDEBUG
 //#define DYNLOAD_DEBUG
@@ -15,7 +16,11 @@
 
 #define LOG_LEVEL 0
 
-#define LOG_RCOUT( msg ) Rcpp::Rcout << msg << "\n"
+#define LOG_RCOUT( msg ) { \
+  std::ostringstream __msg__;       \
+  __msg__ << msg;                   \
+  cpp11::message(__msg__.str().c_str()); \
+}
 
 #if LOG_LEVEL >= 0
 #define LOG_DEBUG0( msg ) LOG_RCOUT( msg )

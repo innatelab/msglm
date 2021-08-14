@@ -1,23 +1,26 @@
-// [[Rcpp::depends(BH)]]
-
 #include "binned_values.h"
 
-#include <Rcpp.h>
+#include <stdexcept>
+#include <unordered_map>
+#include <map>
+#include <vector>
 
-typedef std::vector<int> experiment_set_t;
-#if __has_include(<unordered_map>)
-    #include <unordered_map>
-    typedef std::unordered_map<std::size_t, experiment_set_t> experiment_map_t;
-#elif __has_include(<tr1/unordered_map>)
-    #include <tr1/unordered_map>
-    typedef std::tr1::unordered_map<std::size_t, experiment_set_t> experiment_map_t;
-#endif
+#include <cpp11.hpp>
+#include <Rmath.h>
 
+#include <boost/functional/hash.hpp>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/extended_p_square.hpp>
 
 #include "logging.h"
+
+typedef std::vector<int> var_set_t;
+typedef int r_index_t;
+typedef std::pair<r_index_t, r_index_t> vargroup_id_t;
+typedef std::unordered_map<vargroup_id_t, var_set_t, boost::hash<vargroup_id_t>> vargroup_map_t;
+
+using namespace cpp11;
 
 namespace bacc = boost::accumulators;
 
@@ -32,21 +35,22 @@ namespace bacc = boost::accumulators;
 //??? @bandwidth the gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
 //??? @return P(X<=y)
 double ProbabilityLessSmoothed(
-    const Rcpp::NumericVector& X,
+    doubles X,
     double y,
     int   nsteps = 100,
-    double bandwidth = NA_REAL
+    double bandwidth = na<double>()
 ){
     if ( X.size() == 0 ) {
-        throw Rcpp::exception( "X is empty" );
+        throw std::length_error( "X is empty" );
     }
     ImportedValues xvals( X );
+
     if ( ( xvals.val_max - xvals.val_min ) > nsteps * std::numeric_limits<double>::epsilon() ) {
         return BinnedValues( xvals, xvals.defaultBinWidth( nsteps ), true ).probabilityLessOrEqual( y, bandwidth );
     } else {
         // degenerated
         LOG_DEBUG1( "Degenerated distribution" );
-        if ( R_IsNA( bandwidth ) ) {
+        if ( is_na( bandwidth ) ) {
             if ( fabs( xvals.val_max - y ) <= nsteps * std::numeric_limits<double>::epsilon() ) {
                 LOG_DEBUG1( "Near zero" );
                 return ( 0.5 );
@@ -54,7 +58,7 @@ double ProbabilityLessSmoothed(
                 return ( xvals.val_max <= y ? 1.0 : 0.0 );
             }
         } else {
-            return ( R::pnorm( y, xvals.val_max, bandwidth, 1, 0 ) );
+            return ( Rf_pnorm5( y, xvals.val_max, bandwidth, 1, 0 ) );
         }
     }
 }
@@ -69,18 +73,18 @@ double ProbabilityLessSmoothed(
 //??? @nsteps the number of segments to divide the range of X-Y value into
 //??? @bandwidth the gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
 //??? @return P(X<Y)
-// [[Rcpp::export]]
+[[cpp11::register]]
 double ProbabilityLessSmoothed(
-    const Rcpp::NumericVector&  X,
-    const Rcpp::NumericVector&  Y,
-    int   nsteps = 100,
-    double bandwidth = NA_REAL
+    doubles  X,
+    doubles  Y,
+    int   nsteps,
+    double bandwidth
 ){
     if ( X.size() == 0 ) {
-        throw Rcpp::exception( "X is empty" );
+        throw std::length_error( "X is empty" );
     }
     if ( Y.size() == 0 ) {
-        throw Rcpp::exception( "Y is empty" );
+        throw std::length_error( "Y is empty" );
     } else if ( Y.size() == 1 ) { // compare X samples against single Y value
         return ProbabilityLessSmoothed(X, Y[0], nsteps, bandwidth);
     }
@@ -91,13 +95,13 @@ double ProbabilityLessSmoothed(
     return ( diffBins.probabilityLessOrEqual( 0.0, bandwidth ) );
 }
 
-typedef std::map<std::string, std::size_t> name_index_map_t;
+typedef std::map<r_string, std::size_t> name_index_map_t;
 
-name_index_map_t nameToIndexMap( const Rcpp::CharacterVector& strings )
+name_index_map_t nameToIndexMap( const strings& strs )
 {
     name_index_map_t res;
-    for ( std::size_t i = 0; i < (std::size_t)strings.size(); i++ ) {
-        res.insert( std::make_pair( Rcpp::as<std::string>( strings[i] ), i ) );
+    for ( std::size_t i = 0; i < (std::size_t)strs.size(); i++ ) {
+        res.insert( std::make_pair( strs[i], i ) );
     }
     return ( res );
 }
@@ -115,59 +119,59 @@ name_index_map_t nameToIndexMap( const Rcpp::CharacterVector& strings )
 //??? @maxBandwidth the maximum gaussian smoothing kernel bandwidth, 0 disables smoothing
 //??? @matchIterations if true, X[i]-Y[i] is used, otherwise X[i]-X[j], where i and j are independent iterations
 //??? @return E(X-Y), D(X-Y), P(X<Y)
-// [[Rcpp::export]]
-Rcpp::List DifferenceStatistics(
-    Rcpp::NumericMatrix&  X,
-    Rcpp::NumericMatrix&  Y,
-    const Rcpp::NumericVector&  Deltas,
-    int   nsteps = 100,
-    double maxBandwidth = NA_REAL,
-    bool  matchIterations = true
+[[cpp11::register]]
+writable::data_frame DifferenceStatistics(
+    doubles_matrix  X,
+    doubles_matrix  Y,
+    doubles  Deltas,
+    int   nsteps,
+    double maxBandwidth,
+    bool  matchIterations
 ){
     if ( X.ncol() == 0 || X.nrow() == 0 ) {
-        throw Rcpp::exception( "X matrix is empty" );
+        throw std::length_error( "X matrix is empty" );
     }
     if ( Y.ncol() == 0 || Y.nrow() == 0 ) {
-        throw Rcpp::exception( "Y matrix is empty" );
+        throw std::length_error( "Y matrix is empty" );
     }
-    if ( !R_IsNA( maxBandwidth ) && (maxBandwidth < 0.0) ) {
-        throw Rcpp::exception( "maxBandwidth cannot be negative" );
+    if ( !is_na( maxBandwidth ) && (maxBandwidth < 0.0) ) {
+        throw std::invalid_argument( "maxBandwidth cannot be negative" );
     }
 
-    Rcpp::Dimension deltaDims = Deltas.attr("dim");
+    integers deltaDims(Deltas.attr("dim"));
     if ( deltaDims.size() != 3 ) {
-        throw Rcpp::exception( "Deltas is not 3D array" );
+        throw std::invalid_argument( "Deltas is not 3D array" );
     }
     if ( deltaDims[2] != X.nrow() ) {
-        throw Rcpp::exception( "Number of rows in X and 3rd dimension in Deltas does not match" );
+        throw std::length_error( "Number of rows in X and 3rd dimension in Deltas does not match" );
     }
     if ( deltaDims[2] != Y.nrow() ) {
-        throw Rcpp::exception( "Number of rows in Y and 3rd dimension in Deltas does not match" );
+        throw std::length_error( "Number of rows in Y and 3rd dimension in Deltas does not match" );
     }
-    Rcpp::List deltaDimNames = Deltas.attr("dimnames");
+    list_of<strings> deltaDimNames(list(Deltas.attr("dimnames")));
     LOG_DEBUG2( "Loading delta 1st dimension names" );
     name_index_map_t deltaXNames = nameToIndexMap( deltaDimNames[0] );
     LOG_DEBUG2( "Loading delta 2nd dimension names" );
     name_index_map_t deltaYNames = nameToIndexMap( deltaDimNames[1] );
     std::size_t deltaStride = deltaDims[0] * deltaDims[1]; // stride of vectors in the 3rd dimension
-    std::size_t nsamples = deltaDims[2];
+    std::size_t ndraws = deltaDims[2];
 
     LOG_DEBUG2( "Loading X column names" );
-    name_vec_t xColNames = Rcpp::as<name_vec_t>( Rcpp::as<Rcpp::List>( X.attr("dimnames") )[1] );
+    strings xColNames(list_of<strings>(list(X.attr("dimnames"))[1]));
     LOG_DEBUG2( "Loading Y column names" );
-    name_vec_t yColNames = Rcpp::as<name_vec_t>( Rcpp::as<Rcpp::List>( Y.attr("dimnames") )[1] );
+    strings yColNames(list_of<strings>(list(Y.attr("dimnames"))[1]));
 
     std::vector<double> xvals_merged;
     std::vector<double> yvals_adj_merged;
-    xvals_merged.reserve( X.ncol() * Y.ncol() * nsamples );
-    yvals_adj_merged.reserve( X.ncol() * Y.ncol() * nsamples );
+    xvals_merged.reserve( X.ncol() * Y.ncol() * ndraws );
+    yvals_adj_merged.reserve( X.ncol() * Y.ncol() * ndraws );
 
     for ( int i = 0; i < X.ncol(); i++ ) {
-        ImportedValues xvals( X.column(i) );
+        ImportedValues xvals( X.column_at(i) );
 
         name_index_map_t::const_iterator iColIt = deltaXNames.find( xColNames[i] );
         if ( iColIt == deltaXNames.end() ) {
-            THROW_EXCEPTION( Rcpp::exception,
+            THROW_EXCEPTION( std::domain_error,
                              "Column '" << xColNames[i] << "' not found in Deltas 1st dimension" );
         }
 
@@ -175,19 +179,19 @@ Rcpp::List DifferenceStatistics(
             LOG_DEBUG2( "Processing distribution of " << xColNames[i] << " vs " << yColNames[j] );
             name_index_map_t::const_iterator jColIt = deltaYNames.find( yColNames[j] );
             if ( jColIt == deltaYNames.end() ) {
-                THROW_EXCEPTION( Rcpp::exception,
+                THROW_EXCEPTION( std::domain_error,
                                  "Column '" << yColNames[j] << "' not found in Deltas 2nd dimension" );
             }
-            xvals_merged.insert( xvals_merged.end(), xvals.values.begin(), xvals.values.end() );
+            xvals_merged.insert( xvals_merged.end(), xvals.values.cbegin(), xvals.values.cend() );
 
-            Rcpp::MatrixColumn<REALSXP> yCol = Y.column(j);
+            doubles_matrix::column yCol(Y.column_at(j));
             std::size_t deltaOffset = iColIt->second + jColIt->second * deltaDims[0];
-            for ( std::size_t k = 0; k < nsamples; k++ ) {
+            for ( std::size_t k = 0; k < ndraws; k++ ) {
                 yvals_adj_merged.push_back( yCol[k] + Deltas[ deltaOffset + k * deltaStride ] );
             }
         }
     }
-    LOG_DEBUG2( "Calculating probability that difference is non-positive" );
+    LOG_DEBUG1( "Calculating probability that difference is non-positive" );
     double prob;
     double diff_mean;
     double diff_var;
@@ -201,7 +205,7 @@ Rcpp::List DifferenceStatistics(
         ImportedValues diff_vals( diffs );
         BinnedValues diffBins( diff_vals, diff_vals.defaultBinWidth( nsteps ) );
         bw = maxBandwidth == 0.0 ? 0.0 : diffBins.bw_nrd();
-        if ( !R_IsNA( maxBandwidth ) && (bw > maxBandwidth) ) {
+        if ( !is_na( maxBandwidth ) && (bw > maxBandwidth) ) {
             bw = maxBandwidth;
         }
         prob = diffBins.probabilityLessOrEqual( 0.0, bw );
@@ -212,13 +216,13 @@ Rcpp::List DifferenceStatistics(
         BinnedValues globalDiffBins = BinnedValues::difference( ImportedValues( xvals_merged ),
                                                                 ImportedValues( yvals_adj_merged ), nsteps );
         bw = maxBandwidth == 0.0 ? 0.0 : globalDiffBins.bw_nrd();
-        if ( !R_IsNA( maxBandwidth ) && (bw > maxBandwidth) ) {
+        if ( !is_na( maxBandwidth ) && (bw > maxBandwidth) ) {
             bw = maxBandwidth;
         }
         // calculate probability for every X column and all Y columns
         // NOTE it's not correct to calculate the probability using globalDiffBins,
         // because every X-Y column pair has its own adjustment
-        std::size_t chunk_size = Y.ncol() * nsamples;
+        std::size_t chunk_size = Y.ncol() * ndraws;
         std::vector<double> probs;
         double max_prob = 0;
         double sum_mean = 0;
@@ -250,177 +254,226 @@ Rcpp::List DifferenceStatistics(
         diff_var = sum_var / X.ncol();
     }
     LOG_DEBUG( "P=" << prob );
-    return ( Rcpp::List::create(
-        Rcpp::Named( "mean", diff_mean ),
-        Rcpp::Named( "sd", sqrt( diff_var ) ),
-        Rcpp::Named( "prob_less", prob ),
-        Rcpp::Named( "bw", bw )
-        ) );
+    return ( writable::data_frame{
+        "mean"_nm = diff_mean,
+        "sd"_nm = sqrt( diff_var ),
+        "prob_less"_nm = prob,
+        "bw"_nm = bw});
 }
+
+#if 0 // unsupported default params
+writable::data_frame ContrastStatistics(
+        doubles_matrix  X,
+        integers  col2group_col,
+        integers  col2group_group,
+        doubles_matrix  contrastXvargroup,
+        doubles  contrast_offsets,
+        int   nsteps = 100,
+        double maxBandwidth = na<double>(),
+        doubles  quant_probs = writable::doubles{0.025, 0.25, 0.50, 0.75, 0.975}
+#endif
 
 //??? Calculates average probabilities that given contrasts would be
 //??? be less or equal than zero.
 //??? Gaussian kernel smoothing is used to represent the contrast distribution.
 //??? The probability is averaged across all possible combinations of
-//??? the experiments of the relevant conditions.
+//??? the columns of the relevant groups.
 //???
-//??? @experiments2conditions_experiment index of experiment in many-to-many map
-//??? @experiments2conditions_condition index of condition in many-to-many map
-//??? @contrastXcondition contrast matrix, rows are contrasts, columns are conditions
+//??? @var2group_var index of the variable (X column) in many-to-many var <-> group map
+//??? @var2group_group index of the group in many-to-many var <-> group map
+//??? @var2group_contrast index of the contrast in many-to-many var <-> group map (group contents could be contrast-specific)
+//??? @contrastXvargroup contrast matrix, rows are contrasts, columns are variable groups
 //??? @contrast_offsets vector of contrast offsets, i.e. the reported difference is not X-Y, it's X-Y+offset
-//??? @X matrix of samples of X random variable, columns are different experiments, rows are MCMC iterations
+//??? @X matrix of samples of X random variable, columns are different variables, rows are MCMC draws
 //??? @nsteps the number of segments to divide the range of X values into
-//??? @maxBandwidth the maximum gaussian smoothing kernel bandwidth, 0 disables smoothing
+//??? @maxBandwidth the maximum Gaussian smoothing kernel bandwidth, 0 disables smoothing
 //??? @return E(X), D(X), P(X>=0), P(X<=0)
-// [[Rcpp::export]]
-Rcpp::List ContrastStatistics(
-    const Rcpp::NumericMatrix&  X,
-    const Rcpp::IntegerVector&  experiments2conditions_experiment,
-    const Rcpp::IntegerVector&  experiments2conditions_condition,
-    const Rcpp::NumericMatrix&  contrastXcondition,
-    const Rcpp::NumericVector&  contrast_offsets,
-    int   nsteps = 100,
-    double maxBandwidth = NA_REAL,
-    const Rcpp::NumericVector&  quant_probs = Rcpp::NumericVector::create(0.025, 0.25, 0.50, 0.75, 0.975)
+[[cpp11::register]]
+data_frame ContrastStatistics(
+    doubles   X,
+    integers  var2group_var,
+    integers  var2group_group,
+    integers  var2group_contrast,
+    doubles_matrix  contrastXvargroup,
+    doubles  contrast_offsets,
+    int   nsteps,
+    double maxBandwidth,
+    function summaryfun
 ){
-    std::size_t ncontrasts = contrastXcondition.nrow();
-    std::size_t nconditions = contrastXcondition.ncol();
-    LOG_DEBUG2("ncontrasts=" << ncontrasts << " nconditions=" << nconditions);
-    if ( contrastXcondition.ncol() == 0 || contrastXcondition.nrow() == 0 ) {
-        THROW_EXCEPTION( std::invalid_argument, "contrastXcondition matrix is empty" );
+    R_xlen_t ncontrasts = contrastXvargroup.nrow();
+    R_xlen_t ngroups = contrastXvargroup.ncol();
+    LOG_DEBUG1("ncontrasts=" << ncontrasts << " ngroups=" << ngroups);
+    if ( contrastXvargroup.ncol() == 0 || contrastXvargroup.nrow() == 0 ) {
+        THROW_EXCEPTION( std::length_error, "contrastXvargroup matrix is empty" );
     }
-    if ( X.ncol() == 0 || X.nrow() == 0 ) {
-        THROW_EXCEPTION( std::invalid_argument, "X matrix is empty" );
+    if ( X.size() == 0 ) {
+        THROW_EXCEPTION( std::length_error, "X draws are empty" );
     }
-    if ( experiments2conditions_experiment.size() != experiments2conditions_condition.size() ) {
-        THROW_EXCEPTION(std::invalid_argument, "experiments2conditions: experiment and condition vectors have different number of elements" );
+    if ( var2group_var.size() != var2group_group.size() ) {
+        THROW_EXCEPTION(std::length_error, "var2group var and group vectors have different number of elements" );
     }
-    if ( !R_IsNA( maxBandwidth ) && (maxBandwidth < 0.0) ) {
-        THROW_EXCEPTION(std::invalid_argument, "maxBandwidth cannot be negative" );
+    if ( var2group_var.size() != var2group_contrast.size() ) {
+        THROW_EXCEPTION(std::length_error, "var2group var and contrast vectors have different number of elements" );
+    }
+    if ( !is_na( maxBandwidth ) && (maxBandwidth < 0.0) ) {
+        THROW_EXCEPTION(std::domain_error, "maxBandwidth cannot be negative" );
     }
     if ( contrast_offsets.size() != ncontrasts ) {
-        THROW_EXCEPTION( std::invalid_argument, "contrast_offsets size doesn't match the number of contrasts in contrastXcondition matrix" );
+        THROW_EXCEPTION( std::length_error, "contrast_offsets size doesn't match the number of contrasts in contrastXvargroup matrix" );
     }
 
-    std::size_t nsamples = X.nrow();
-    std::size_t nexperiments = X.ncol();
-    LOG_DEBUG2("nmcmc_samples=" << nsamples << " nexperiments=" << nexperiments);
+    integers Xdims(X.attr("dim"));
+    if ( Xdims.size() != 3 ) {
+        THROW_EXCEPTION(std::length_error, "X is not a 3D (draws x chains x variables) array" );
+    }
+    R_xlen_t niters = Xdims[0];
+    R_xlen_t nchains = Xdims[1];
+    R_xlen_t nvars = Xdims[2];
+    R_xlen_t ndraws = niters * nchains;
+    LOG_DEBUG1("nmcmc_iters=" << niters << " nchains=" << nchains << " nvars=" << nvars);
 
-    experiment_map_t condition2experiments;
-
-    for ( int i = 0; i < experiments2conditions_condition.size(); i++ ) {
-        std::size_t cond_ix = experiments2conditions_condition[i];
-        std::size_t exper_ix = experiments2conditions_experiment[i];
-        if ( cond_ix == 0 ) {
-            THROW_EXCEPTION(std::invalid_argument, "Condition index should be positive and <=" << nconditions <<", " << cond_ix << " found");
+    LOG_DEBUG1("Initializing vargroup map");
+    vargroup_map_t vargroups;
+    for ( std::size_t i = 0; i < var2group_group.size(); i++ ) {
+        r_index_t group_ix = var2group_group[i];
+        if ( group_ix == 0 ) {
+            THROW_EXCEPTION(std::domain_error, "Group index should be positive and <=" << ngroups <<", " << group_ix << " found");
         } else {
-            --cond_ix;
+            --group_ix;
         }
-        if ( exper_ix == 0 || exper_ix > nexperiments ) {
-          THROW_EXCEPTION(std::invalid_argument, "Experiment index should be positive and <=" << nexperiments << ", " << exper_ix << " found");
+        r_index_t contrast_ix = var2group_contrast[i];
+        if ( contrast_ix == 0 ) {
+            THROW_EXCEPTION(std::domain_error, "Contrast index should be positive and <=" << ncontrasts <<", " << contrast_ix << " found");
         } else {
-          --exper_ix;
+            --contrast_ix;
         }
-        experiment_map_t::iterator condIt = condition2experiments.find( cond_ix );
-        if ( condIt == condition2experiments.end() ) {
-            condition2experiments.insert( condIt, std::make_pair( cond_ix, experiment_set_t(1, exper_ix) ) );
+        r_index_t var_ix = var2group_var[i];
+        if ( var_ix == 0 || var_ix > nvars ) {
+          THROW_EXCEPTION(std::domain_error, "Variable index should be positive and <=" << nvars << ", " << var_ix << " found");
         } else {
-            condIt->second.push_back(exper_ix);
+          --var_ix;
+        }
+        const auto cXg = std::make_pair(contrast_ix, group_ix);
+        vargroup_map_t::iterator groupIt = vargroups.find(cXg);
+        if (groupIt == vargroups.end()) {
+            vargroups.insert(groupIt, std::make_pair(cXg, var_set_t(1, var_ix)));
+        } else {
+            groupIt->second.push_back(var_ix);
         }
     }
 
-    std::vector<std::size_t> index_contrast(ncontrasts, 0);
-    std::vector<double> prob_nonpos(ncontrasts, NAN);
-    std::vector<double> prob_nonneg(ncontrasts, NAN);
-    std::vector<double> contrast_mean(ncontrasts, NAN);
-    std::vector<double> contrast_sd(ncontrasts, NAN);
-    std::vector<double> bw(ncontrasts, NAN);
-    std::vector<double> bin_width(ncontrasts, NAN);
-    std::vector<std::size_t> ncombn(ncontrasts, 0);
-    std::vector<std::size_t> nsamp(ncontrasts, 0);
-    std::vector<std::vector<double> > quantiles(quant_probs.size(), std::vector<double>(ncontrasts, NAN));
+    writable::integers index_contrast;
+    writable::doubles prob_nonpos;
+    writable::doubles prob_nonneg;
+    writable::doubles bw;
+    writable::doubles bin_width;
+    writable::doubles nperms;
+    writable::doubles niterations;
 
-    // generate constrast samples for all relevant experiments combinations
-    std::vector<double> all_contrast_samples;
-    std::vector<double> experiment_contrast_samples(nsamples, 0.0);
+    sexp postsummary_df;
+    auto rbind = package("base")["rbind"];
 
-    LOG_DEBUG2( "Calculating the probabilities that contrast is non-positive and non-negative" );
-    for ( std::size_t contr_ix = 0; contr_ix < ncontrasts; ++contr_ix ) {
+    // generate contrast samples for all relevant columns combinations
+    LOG_DEBUG1( "Calculating the probabilities that contrast is non-positive and non-negative" );
+    writable::doubles contrast_draws{na<double>()}; // init to something as otherwise it is null
+    writable::integers contrast_draws_dims{(int)niters, (int)nchains, 1};
+    contrast_draws.attr("class") = writable::strings{"array"};
+    for ( R_xlen_t contr_ix = 0; contr_ix < ncontrasts; ++contr_ix ) {
         // calculate how many conditions are associated with current contrast
-        std::vector<std::size_t> cond_ixs;
-        std::size_t cur_ncombn = 1;
+        LOG_DEBUG1( "Calculating contrast #" << contr_ix );
+        std::vector<vargroup_map_t::const_iterator> contr_groups;
+        std::size_t nperm = 1;
 
-        for ( std::size_t cond_ix = 0; cond_ix < nconditions; ++cond_ix ) {
-            if (contrastXcondition.at(contr_ix, cond_ix) != 0.0) {
-                LOG_DEBUG2("contrastXcondition["<<contr_ix<<", "<<cond_ix<<"]="<<contrastXcondition.at(contr_ix, cond_ix));
-                cond_ixs.push_back( cond_ix );
-                experiment_map_t::const_iterator condIt = condition2experiments.find(cond_ix);
-                if ( condIt != condition2experiments.end() ) {
-                    cur_ncombn *= condIt->second.size();
+        bool empty_groups = false;
+        for ( R_xlen_t group_ix = 0; group_ix < ngroups; ++group_ix ) {
+            const double w = contrastXvargroup.at(contr_ix, group_ix);
+            if (w != 0.0) {
+                LOG_DEBUG2("contrastXvargroup["<<contr_ix<<", "<<group_ix<<"]="<<w);
+                const auto cXg = vargroup_id_t(contr_ix, group_ix);
+                vargroup_map_t::const_iterator groupIt = vargroups.find(cXg);
+                if ( groupIt != vargroups.end() ) {
+                    contr_groups.push_back(groupIt);
+                    nperm *= groupIt->second.size();
                 } else {
-                    THROW_EXCEPTION(std::invalid_argument, "No experiments for condition #" << (cond_ix+1) << " found");
-                }
-            }
-        }
-        if (cur_ncombn == 0) { // should not happen as checked before
-            THROW_EXCEPTION(Rcpp::exception, "No experiment combinations for contrast #" << contr_ix);
-        }
-        std::vector<std::size_t> next_exper_i(cond_ixs.size(), 0); // counter of experiments for each condition
-        all_contrast_samples.resize(0);
-        all_contrast_samples.reserve(nsamples * cur_ncombn);
-        for (std::size_t comb_i = 0; comb_i < cur_ncombn; ++comb_i) {
-            // generate contrast samples for all experiment combinations
-            // relevant to a given contrast
-            std::fill(experiment_contrast_samples.begin(), experiment_contrast_samples.end(), 0.0);
-            for ( std::size_t cond_i = 0; cond_i < cond_ixs.size(); ++cond_i ) {
-                std::size_t cond_ix = cond_ixs[cond_i];
-                std::size_t exper_ix = condition2experiments.find(cond_ix)->second[next_exper_i[cond_i]];
-                double cond_w = contrastXcondition.at(contr_ix, cond_ix);
-                for ( std::size_t i  = 0; i < nsamples; ++i ) {
-                    experiment_contrast_samples[i] += cond_w * X.at(i, exper_ix);
-                }
-            }
-            // push the contrasts for current experiments into global vector
-            all_contrast_samples.insert(all_contrast_samples.end(),
-                experiment_contrast_samples.begin(), experiment_contrast_samples.end());
-            // increment experiments enumeration
-            for ( std::size_t cond_i = 0; cond_i < cond_ixs.size(); ++cond_i ) {
-                if (next_exper_i[cond_i] + 1 < condition2experiments.find(cond_ixs[cond_i])->second.size()) {
-                    next_exper_i[cond_i]++;
+                    empty_groups = true;
                     break;
-                } else {
-                    next_exper_i[cond_i] = 0;
+                    //THROW_EXCEPTION(std::invalid_argument, "No variables for group #" << (group_ix+1) << " found");
                 }
             }
         }
-        // calculate the quantiles
-        bacc::accumulator_set<double, bacc::stats<bacc::tag::extended_p_square> >
-            quant_acc( bacc::tag::extended_p_square::probabilities = Rcpp::as<std::vector<double> >(quant_probs) );
-        for ( std::size_t i = 0; i < all_contrast_samples.size(); ++i ) {
-            quant_acc( all_contrast_samples[i] );
+        if (empty_groups) {
+            LOG_DEBUG1( " skipping contrast #" << contr_ix << " computation since some groups were empty" );
+            continue;
+        }
+        LOG_DEBUG1( "  " << nperm << " permutations" );
+        if (nperm == 0) { // should not happen as checked before
+            THROW_EXCEPTION(std::invalid_argument, "No variable combinations for contrast #" << contr_ix);
+        }
+        std::vector<var_set_t::const_iterator> var_its;
+        std::transform(contr_groups.begin(), contr_groups.end(), std::back_inserter(var_its),
+                       [](const vargroup_map_t::const_iterator& it){ return it->second.cbegin(); });
+        contrast_draws.attr("dim") = R_NilValue; // temporary unset before resizing
+        contrast_draws.resize(ndraws * nperm);
+        contrast_draws_dims[0] = niters * nperm;
+        contrast_draws.attr("dim") = contrast_draws_dims; // set back the updated dims
+        std::fill(contrast_draws.begin(), contrast_draws.end(), 0.0);
+        for (std::size_t perm_i = 0; perm_i < nperm; ++perm_i) {
+            LOG_DEBUG2("Processing contrast permutation #" << perm_i << " of " << nperm);
+            // generate contrast samples for the next permutation of current contrast
+            const auto perm_begin = contrast_draws.begin() + perm_i;
+            const auto perm_end = contrast_draws.begin() + perm_i + ndraws * nperm;
+            for (std::size_t group_i = 0; group_i < contr_groups.size(); ++group_i) {
+                const auto groupIt = contr_groups[group_i];
+                const auto group_ix = groupIt->first.second;
+                const double w = contrastXvargroup.at(contr_ix, group_ix);
+                const r_index_t var_ix = *(var_its[group_i]);
+                auto srcit = X.cbegin() + var_ix * ndraws;
+                LOG_DEBUG2("Processing var #" << var_ix << " of group #" << (group_ix+1));
+                for (auto dstit = perm_begin;
+                     dstit != perm_end; ++srcit, (dstit += nperm)) {
+                    (*dstit) += w * (*srcit);
+                }
+            }
+            // increment vars-in-groups enumeration
+            for ( std::size_t group_i = 0; group_i < contr_groups.size(); ++group_i ) {
+                auto&& it = var_its[group_i];
+                const auto& vars = contr_groups[group_i]->second;
+                it++;
+                if (it == vars.cend()) {
+                    it = vars.cbegin(); // start over
+                } else {
+                    break; // inc done
+                }
+            }
+            if ((LOG_LEVEL >= 3) && (var_its.size() > 1)) {
+                std::ostringstream permout;
+                permout << "perm #" << perm_i << ":";
+                for (const auto var_it : var_its) {
+                    permout << " " << (*var_it);
+                }
+                cpp11::message(permout.str().c_str());
+            }
         }
 
         // calculate the contrast
-        ImportedValues contrast_vals( all_contrast_samples );
+        ImportedValues contrast_vals( contrast_draws );
         BinnedValues contrast_bins( contrast_vals, contrast_vals.defaultBinWidth( nsteps ) );
 
         double contr_offset = contrast_offsets[contr_ix];
         double cur_bw = maxBandwidth == 0.0 ? 0.0 : contrast_bins.bw_nrd();
-        if ( !R_IsNA( maxBandwidth ) && (cur_bw > maxBandwidth) ) {
+        if ( !is_na( maxBandwidth ) && (cur_bw > maxBandwidth) ) {
             cur_bw = maxBandwidth;
         }
-        index_contrast[contr_ix] = contr_ix + 1;
-        prob_nonpos[contr_ix] = contrast_bins.probabilityLessOrEqual( contr_offset, cur_bw );
-        prob_nonneg[contr_ix] = contrast_bins.probabilityGreaterOrEqual( contr_offset, cur_bw );
-        contrast_mean[contr_ix] = contrast_bins.average();
-        contrast_sd[contr_ix] = sqrt(contrast_bins.variance());
-        bw[contr_ix] = cur_bw;
-        bin_width[contr_ix] = contrast_bins.step;
-        ncombn[contr_ix] = cur_ncombn;
-        nsamp[contr_ix] = all_contrast_samples.size();
-        for ( int i = 0; i < quant_probs.size(); ++i ) {
-            quantiles[i][contr_ix] = bacc::extended_p_square(quant_acc)[i];
-        }
+        index_contrast.push_back(contr_ix + 1);
+        prob_nonpos.push_back(contrast_bins.probabilityLessOrEqual(contr_offset, cur_bw));
+        prob_nonneg.push_back(contrast_bins.probabilityGreaterOrEqual(contr_offset, cur_bw));
+        bw.push_back(cur_bw);
+        bin_width.push_back(contrast_bins.step);
+        nperms.push_back(nperm);
+        niterations.push_back(niters);
+
+        const auto cur_summary_df = summaryfun(contrast_draws);
+        postsummary_df = SEXP(postsummary_df) != R_NilValue ? rbind(postsummary_df, cur_summary_df) : cur_summary_df;
         //LOG_RCOUT("step=" << contrast_bins.step << " min=" << contrast_bins.val_min << " max=" << contrast_bins.val_max);
         //Rcpp::Rcout << "bins=";
         //for ( int i = 0; i < contrast_bins.bins.size(); i++ ) {
@@ -434,21 +487,17 @@ Rcpp::List ContrastStatistics(
         //           " P[<=0]=" << prob_nonpos );
         LOG_DEBUG2(contr_ix << "-th contrast done");
     }
-    Rcpp::List res = Rcpp::List::create(
-        Rcpp::Named( "index_contrast", index_contrast ),
-        Rcpp::Named( "mean", contrast_mean ),
-        Rcpp::Named( "sd", contrast_sd ),
-        Rcpp::Named( "prob_nonneg", prob_nonneg ),
-        Rcpp::Named( "prob_nonpos", prob_nonpos ),
-        Rcpp::Named( "bin_width", bin_width ),
-        Rcpp::Named( "bw", bw ),
-        Rcpp::Named( "ncombn", ncombn ),
-        Rcpp::Named( "nsamples", nsamp )
-        );
-    for ( int i = 0; i < quant_probs.size(); ++i ) {
-        std::stringstream ss;
-        ss << quant_probs[i]*100 << "%";
-        res[ss.str()] = quantiles[i];
-    }
-    return res;
+
+    return as_cpp<data_frame>(package("base")["cbind"](writable::data_frame{
+           "__contrast_ix__"_nm = index_contrast
+        },
+        postsummary_df,
+        writable::data_frame{
+            "prob_nonneg"_nm = prob_nonneg,
+            "prob_nonpos"_nm = prob_nonpos,
+            "bin_width"_nm = bin_width,
+            "bw"_nm = bw,
+            "nperms"_nm = nperms,
+            "niters"_nm = niterations
+        }));
 }

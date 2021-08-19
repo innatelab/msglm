@@ -18,8 +18,8 @@ using namespace cpp11;
 
 #if 0 // unsupported default params
 writable::data_frame CloudsOverlap(
-        doubles_matrix  X,
-        doubles_matrix  Y,
+        doubles_matrix<by_column>  X,
+        doubles_matrix<by_column>  Y,
         double maxBandwidth = na<double>(),
         int   nsteps = 100,
         doubles quant_probs = writable::doubles{0.025, 0.25, 0.50, 0.75, 0.975}
@@ -28,8 +28,8 @@ writable::data_frame CloudsOverlap(
 
 [[cpp11::register]]
 writable::data_frame CloudsOverlap(
-    doubles_matrix  X,
-    doubles_matrix  Y,
+    doubles_matrix<by_column>  X,
+    doubles_matrix<by_column>  Y,
     double maxBandwidth,
     int   nsteps,
     doubles quant_probs
@@ -55,7 +55,7 @@ writable::data_frame CloudsOverlap(
     std::vector<double> X_bw(ndims);
     std::vector<double> X_bw_inv(ndims);
     for (std::size_t k = 0; k < ndims; ++k) {
-        const ImportedValues X_col(X.column_at(k));
+        const ImportedValues X_col(X[k]);
         const BinnedValues X_bins(X_col, X_col.defaultBinWidth(nsteps));
         double bw = maxBandwidth == 0.0 ? 0.0 : X_bins.bw_nrd();
         if (!is_na(maxBandwidth) && (bw > maxBandwidth)) {

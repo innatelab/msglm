@@ -121,8 +121,8 @@ name_index_map_t nameToIndexMap( const strings& strs )
 //??? @return E(X-Y), D(X-Y), P(X<Y)
 [[cpp11::register]]
 writable::data_frame DifferenceStatistics(
-    doubles_matrix  X,
-    doubles_matrix  Y,
+    doubles_matrix<by_column>  X,
+    doubles_matrix<by_column>  Y,
     doubles  Deltas,
     int   nsteps,
     double maxBandwidth,
@@ -167,7 +167,7 @@ writable::data_frame DifferenceStatistics(
     yvals_adj_merged.reserve( X.ncol() * Y.ncol() * ndraws );
 
     for ( int i = 0; i < X.ncol(); i++ ) {
-        ImportedValues xvals( X.column_at(i) );
+        ImportedValues xvals( X[i] );
 
         name_index_map_t::const_iterator iColIt = deltaXNames.find( xColNames[i] );
         if ( iColIt == deltaXNames.end() ) {
@@ -184,7 +184,7 @@ writable::data_frame DifferenceStatistics(
             }
             xvals_merged.insert( xvals_merged.end(), xvals.values.cbegin(), xvals.values.cend() );
 
-            doubles_matrix::column yCol(Y.column_at(j));
+            auto yCol(Y[j]);
             std::size_t deltaOffset = iColIt->second + jColIt->second * deltaDims[0];
             for ( std::size_t k = 0; k < ndraws; k++ ) {
                 yvals_adj_merged.push_back( yCol[k] + Deltas[ deltaOffset + k * deltaStride ] );
@@ -266,7 +266,7 @@ writable::data_frame ContrastStatistics(
         doubles_matrix  X,
         integers  col2group_col,
         integers  col2group_group,
-        doubles_matrix  contrastXvargroup,
+        doubles_matrix<by_row>  contrastXvargroup,
         doubles  contrast_offsets,
         int   nsteps = 100,
         double maxBandwidth = na<double>(),
@@ -294,7 +294,7 @@ data_frame ContrastStatistics(
     integers  var2group_var,
     integers  var2group_group,
     integers  var2group_contrast,
-    doubles_matrix  contrastXvargroup,
+    doubles_matrix<by_row>  contrastXvargroup,
     doubles  contrast_offsets,
     int   nsteps,
     double maxBandwidth,
@@ -378,15 +378,16 @@ data_frame ContrastStatistics(
     writable::doubles contrast_draws{na<double>()}; // init to something as otherwise it is null
     writable::integers contrast_draws_dims{(int)niters, (int)nchains, 1};
     contrast_draws.attr("class") = writable::strings{"array"};
-    for ( R_xlen_t contr_ix = 0; contr_ix < ncontrasts; ++contr_ix ) {
+    for ( int contr_ix = 0; contr_ix < ncontrasts; ++contr_ix ) {
         // calculate how many conditions are associated with current contrast
         LOG_DEBUG1( "Calculating contrast #" << contr_ix );
         std::vector<vargroup_map_t::const_iterator> contr_groups;
         std::size_t nperm = 1;
+        auto group_weights = contrastXvargroup[contr_ix];
 
         bool empty_groups = false;
         for ( R_xlen_t group_ix = 0; group_ix < ngroups; ++group_ix ) {
-            const double w = contrastXvargroup.at(contr_ix, group_ix);
+            const double w = group_weights[group_ix];
             if (w != 0.0) {
                 LOG_DEBUG2("contrastXvargroup["<<contr_ix<<", "<<group_ix<<"]="<<w);
                 const auto cXg = vargroup_id_t(contr_ix, group_ix);
@@ -425,7 +426,7 @@ data_frame ContrastStatistics(
             for (std::size_t group_i = 0; group_i < contr_groups.size(); ++group_i) {
                 const auto groupIt = contr_groups[group_i];
                 const auto group_ix = groupIt->first.second;
-                const double w = contrastXvargroup.at(contr_ix, group_ix);
+                const double w = group_weights[group_ix];
                 const r_index_t var_ix = *(var_its[group_i]);
                 auto srcit = X.cbegin() + var_ix * ndraws;
                 LOG_DEBUG2("Processing var #" << var_ix << " of group #" << (group_ix+1));

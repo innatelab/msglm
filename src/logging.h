@@ -11,7 +11,7 @@
 #define THROW_EXCEPTION( excp_class, msg ) { \
     std::ostringstream __excp__msg__; \
     __excp__msg__ << msg; \
-    throw excp_class( __excp__msg__.str().c_str() ); \
+    throw excp_class( __excp__msg__.str() ); \
 }
 
 #define LOG_LEVEL 0
@@ -19,7 +19,7 @@
 #define LOG_RCOUT( msg ) { \
   std::ostringstream __msg__;       \
   __msg__ << msg;                   \
-  cpp11::message(__msg__.str().c_str()); \
+  cpp11::message(__msg__.str()); \
 }
 
 #if LOG_LEVEL >= 0

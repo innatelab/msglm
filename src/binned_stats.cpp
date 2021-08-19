@@ -230,7 +230,7 @@ writable::data_frame DifferenceStatistics(
         for ( int i = 0; i < X.ncol(); i++ ) {
             BinnedValues diffBins = BinnedValues::difference( ImportedValues( std::vector<double>( xvals_merged.begin() + i * chunk_size,
                                                                               xvals_merged.begin() + (i+1) * chunk_size ) ),
-                                                 ImportedValues( std::vector<double>( yvals_adj_merged.begin() + i * chunk_size,
+                                                              ImportedValues( std::vector<double>( yvals_adj_merged.begin() + i * chunk_size,
                                                                               yvals_adj_merged.begin() + (i+1) * chunk_size ) ), nsteps );
             probs.push_back( diffBins.probabilityLessOrEqual( 0.0, bw ) );
             if ( probs.size() == 1 || max_prob < probs.back() ) {
@@ -263,7 +263,7 @@ writable::data_frame DifferenceStatistics(
 
 #if 0 // unsupported default params
 writable::data_frame ContrastStatistics(
-        doubles_matrix  X,
+        doubles   X,
         integers  col2group_col,
         integers  col2group_group,
         doubles_matrix<by_row>  contrastXvargroup,

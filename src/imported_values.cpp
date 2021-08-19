@@ -12,7 +12,7 @@ namespace bacc = boost::accumulators;
 void ImportedValues::init_bounds(double support_prob)
 {
     if (support_prob < 0.5 || support_prob > 1.0) THROW_EXCEPTION(std::invalid_argument,
-         "support_prob=" << support_prob << ", should be in [0.5, 1.0] range" );
+            "support_prob=%g, should be in [0.5, 1.0] range", support_prob);
     double valmin = !values.empty() ? values[0] : std::numeric_limits<value_t>::quiet_NaN();
     double valmax = !values.empty() ? values[0] : std::numeric_limits<value_t>::quiet_NaN();
     const double tail_prob = 0.5*(1.0 - support_prob);
@@ -29,6 +29,5 @@ void ImportedValues::init_bounds(double support_prob)
     val_max = valmax;
     support_min = bacc::extended_p_square(quant_acc)[0];
     support_max = bacc::extended_p_square(quant_acc)[1];
-    LOG_DEBUG2(    "minmax=[" << val_min << ", " << val_max << "] "
-                << "support=[" << support_min << ", " << support_max << "]" );
+    LOG_DEBUG2("minmax=[%g, %g] support=[%g, %g]", val_min, val_max, support_min, support_max);
 }

@@ -171,16 +171,17 @@ writable::data_frame DifferenceStatistics(
 
         name_index_map_t::const_iterator iColIt = deltaXNames.find( xColNames[i] );
         if ( iColIt == deltaXNames.end() ) {
-            THROW_EXCEPTION( std::domain_error,
-                             "Column '" << xColNames[i] << "' not found in Deltas 1st dimension" );
+            THROW_EXCEPTION(std::domain_error,
+                            "Column '%s' not found in Deltas 1st dimension", as_cpp<const char *>(xColNames[i]));
         }
 
         for ( int j = Y.ncol()-1; j >= 0; j-- ) {
-            LOG_DEBUG2( "Processing distribution of " << xColNames[i] << " vs " << yColNames[j] );
+            LOG_DEBUG2("Processing distribution of %s vs %s",
+                       as_cpp<const char *>(xColNames[i]), as_cpp<const char *>(yColNames[j]));
             name_index_map_t::const_iterator jColIt = deltaYNames.find( yColNames[j] );
             if ( jColIt == deltaYNames.end() ) {
-                THROW_EXCEPTION( std::domain_error,
-                                 "Column '" << yColNames[j] << "' not found in Deltas 2nd dimension" );
+                THROW_EXCEPTION(std::domain_error,
+                                "Column '%s' not found in Deltas 2nd dimension", as_cpp<const char *>(yColNames[j]));
             }
             xvals_merged.insert( xvals_merged.end(), xvals.values.cbegin(), xvals.values.cend() );
 
@@ -253,7 +254,7 @@ writable::data_frame DifferenceStatistics(
         diff_mean = sum_mean / X.ncol();
         diff_var = sum_var / X.ncol();
     }
-    LOG_DEBUG( "P=" << prob );
+    LOG_DEBUG("P(X <= Y) = %g", prob);
     return ( writable::data_frame{
         "mean"_nm = diff_mean,
         "sd"_nm = sqrt( diff_var ),
@@ -302,7 +303,7 @@ data_frame ContrastStatistics(
 ){
     R_xlen_t ncontrasts = contrastXvargroup.nrow();
     R_xlen_t ngroups = contrastXvargroup.ncol();
-    LOG_DEBUG1("ncontrasts=" << ncontrasts << " ngroups=" << ngroups);
+    LOG_DEBUG1("ncontrasts=%d ngroups=%d", ncontrasts, ngroups);
     if ( contrastXvargroup.ncol() == 0 || contrastXvargroup.nrow() == 0 ) {
         THROW_EXCEPTION( std::length_error, "contrastXvargroup matrix is empty" );
     }
@@ -310,16 +311,19 @@ data_frame ContrastStatistics(
         THROW_EXCEPTION( std::length_error, "X draws are empty" );
     }
     if ( var2group_var.size() != var2group_group.size() ) {
-        THROW_EXCEPTION(std::length_error, "var2group var and group vectors have different number of elements" );
+        THROW_EXCEPTION(std::length_error, "var2group vars length (%d) doesn't match the groups length (%d)",
+                        var2group_var.size(), var2group_group.size());
     }
     if ( var2group_var.size() != var2group_contrast.size() ) {
-        THROW_EXCEPTION(std::length_error, "var2group var and contrast vectors have different number of elements" );
+        THROW_EXCEPTION(std::length_error, "var2group vars length (%d) doesn't match the contrasts length (%d)",
+                        var2group_var.size(), var2group_contrast.size());
     }
     if ( !is_na( maxBandwidth ) && (maxBandwidth < 0.0) ) {
-        THROW_EXCEPTION(std::domain_error, "maxBandwidth cannot be negative" );
+        THROW_EXCEPTION(std::domain_error, "maxBandwidth cannot be negative");
     }
     if ( contrast_offsets.size() != ncontrasts ) {
-        THROW_EXCEPTION( std::length_error, "contrast_offsets size doesn't match the number of contrasts in contrastXvargroup matrix" );
+        THROW_EXCEPTION(std::length_error, "contrast_offsets size (%d) doesn't match the rows of contrastXvargroup (%d)",
+                        contrast_offsets.size(), ncontrasts);
     }
 
     integers Xdims(X.attr("dim"));
@@ -330,26 +334,26 @@ data_frame ContrastStatistics(
     R_xlen_t nchains = Xdims[1];
     R_xlen_t nvars = Xdims[2];
     R_xlen_t ndraws = niters * nchains;
-    LOG_DEBUG1("nmcmc_iters=" << niters << " nchains=" << nchains << " nvars=" << nvars);
+    LOG_DEBUG1("nmcmc_iters=%d nchains=%d nvars=%d", niters, nchains, nvars);
 
     LOG_DEBUG1("Initializing vargroup map");
     vargroup_map_t vargroups;
     for ( std::size_t i = 0; i < var2group_group.size(); i++ ) {
         r_index_t group_ix = var2group_group[i];
         if ( group_ix == 0 ) {
-            THROW_EXCEPTION(std::domain_error, "Group index should be positive and <=" << ngroups <<", " << group_ix << " found");
+            THROW_EXCEPTION(std::domain_error, "Group index should be in 1:%d range, %d found", ngroups, group_ix);
         } else {
             --group_ix;
         }
         r_index_t contrast_ix = var2group_contrast[i];
         if ( contrast_ix == 0 ) {
-            THROW_EXCEPTION(std::domain_error, "Contrast index should be positive and <=" << ncontrasts <<", " << contrast_ix << " found");
+            THROW_EXCEPTION(std::domain_error, "Contrast index should be in 1:%d range, %d found", ncontrasts, contrast_ix);
         } else {
             --contrast_ix;
         }
         r_index_t var_ix = var2group_var[i];
         if ( var_ix == 0 || var_ix > nvars ) {
-          THROW_EXCEPTION(std::domain_error, "Variable index should be positive and <=" << nvars << ", " << var_ix << " found");
+            THROW_EXCEPTION(std::domain_error, "Variable index should be in 1:%d range, %d found", nvars, var_ix);
         } else {
           --var_ix;
         }
@@ -380,7 +384,7 @@ data_frame ContrastStatistics(
     contrast_draws.attr("class") = writable::strings{"array"};
     for ( int contr_ix = 0; contr_ix < ncontrasts; ++contr_ix ) {
         // calculate how many conditions are associated with current contrast
-        LOG_DEBUG1( "Calculating contrast #" << contr_ix );
+        LOG_DEBUG1("Calculating contrast #%d", contr_ix);
         std::vector<vargroup_map_t::const_iterator> contr_groups;
         std::size_t nperm = 1;
         auto group_weights = contrastXvargroup[contr_ix];
@@ -389,7 +393,7 @@ data_frame ContrastStatistics(
         for ( R_xlen_t group_ix = 0; group_ix < ngroups; ++group_ix ) {
             const double w = group_weights[group_ix];
             if (w != 0.0) {
-                LOG_DEBUG2("contrastXvargroup["<<contr_ix<<", "<<group_ix<<"]="<<w);
+                LOG_DEBUG2("contrastXvargroup[%d, %d]=%g", contr_ix, group_ix, w);
                 const auto cXg = vargroup_id_t(contr_ix, group_ix);
                 vargroup_map_t::const_iterator groupIt = vargroups.find(cXg);
                 if ( groupIt != vargroups.end() ) {
@@ -403,12 +407,12 @@ data_frame ContrastStatistics(
             }
         }
         if (empty_groups) {
-            LOG_DEBUG1( " skipping contrast #" << contr_ix << " computation since some groups were empty" );
+            LOG_DEBUG1(" skipping contrast #%d computation since some groups were empty", contr_ix);
             continue;
         }
         LOG_DEBUG1( "  " << nperm << " permutations" );
         if (nperm == 0) { // should not happen as checked before
-            THROW_EXCEPTION(std::invalid_argument, "No variable combinations for contrast #" << contr_ix);
+            THROW_EXCEPTION(std::invalid_argument, "No variable combinations for contrast #%d", contr_ix);
         }
         std::vector<var_set_t::const_iterator> var_its;
         std::transform(contr_groups.begin(), contr_groups.end(), std::back_inserter(var_its),
@@ -419,7 +423,7 @@ data_frame ContrastStatistics(
         contrast_draws.attr("dim") = contrast_draws_dims; // set back the updated dims
         std::fill(contrast_draws.begin(), contrast_draws.end(), 0.0);
         for (std::size_t perm_i = 0; perm_i < nperm; ++perm_i) {
-            LOG_DEBUG2("Processing contrast permutation #" << perm_i << " of " << nperm);
+            LOG_DEBUG2("Processing contrast permutation #%d of %d", perm_i, nperm);
             // generate contrast samples for the next permutation of current contrast
             const auto perm_begin = contrast_draws.begin() + perm_i;
             const auto perm_end = contrast_draws.begin() + perm_i + ndraws * nperm;
@@ -429,7 +433,7 @@ data_frame ContrastStatistics(
                 const double w = group_weights[group_ix];
                 const r_index_t var_ix = *(var_its[group_i]);
                 auto srcit = X.cbegin() + var_ix * ndraws;
-                LOG_DEBUG2("Processing var #" << var_ix << " of group #" << (group_ix+1));
+                LOG_DEBUG2("Processing var #%d of group #%d", var_ix, group_ix+1);
                 for (auto dstit = perm_begin;
                      dstit != perm_end; ++srcit, (dstit += nperm)) {
                     (*dstit) += w * (*srcit);
@@ -447,12 +451,11 @@ data_frame ContrastStatistics(
                 }
             }
             if ((LOG_LEVEL >= 3) && (var_its.size() > 1)) {
-                std::ostringstream permout;
-                permout << "perm #" << perm_i << ":";
+                std::ostringstream permvars;
                 for (const auto var_it : var_its) {
-                    permout << " " << (*var_it);
+                    permvars << " " << (*var_it);
                 }
-                cpp11::message(permout.str());
+                LOG_DEBUG("perm #%d: %s", perm_i, permvars.str().c_str());
             }
         }
 
@@ -486,7 +489,7 @@ data_frame ContrastStatistics(
         //LOG_RCOUT("sd_direct=" << sqrt(Rcpp::sugar::Var(all_contrast_samples)));
         //LOG_DEBUG( "P[>=0]=" << prob_nonneg <<
         //           " P[<=0]=" << prob_nonpos );
-        LOG_DEBUG2(contr_ix << "-th contrast done");
+        LOG_DEBUG2("%d-th contrast done", contr_ix);
     }
 
     return as_cpp<data_frame>(package("base")["cbind"](writable::data_frame{

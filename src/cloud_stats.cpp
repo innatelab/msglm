@@ -42,7 +42,8 @@ writable::data_frame CloudsOverlap(
         THROW_EXCEPTION(std::invalid_argument, "Y matrix is empty");
     }
     if (X.ncol() != Y.ncol() || X.nrow() != Y.nrow()) {
-        THROW_EXCEPTION(std::invalid_argument, "Y matrix dimensions are different from X");
+        THROW_EXCEPTION(std::invalid_argument, "Y matrix dimensions (%d, %d) are different from X (%d, %d)",
+                        Y.nrow(), Y.ncol(), X.nrow(), X.ncol());
     }
     if (!R_IsNA(maxBandwidth) && (maxBandwidth < 0.0)) {
         THROW_EXCEPTION(std::invalid_argument, "maxBandwidth cannot be negative");
@@ -72,18 +73,18 @@ writable::data_frame CloudsOverlap(
     double scale_sum = 0.0;
     std::vector<double> delta(ndims);
     for (std::size_t i = 0; i < nsamples; ++i) {
-        //LOG_DEBUG0("i=" << i);
+        //LOG_DEBUG0("i=%d", i);
         // the direction to the X set
         double scale = 0.0;
         for (std::size_t k = 0; k < ndims; ++k) {
-            //LOG_DEBUG0("X[" << i << "," << k << "]=" << (X(i,k)) << " " << "Y[" << i << "," << k << "]=" << (Y(i,k)));
+            //LOG_DEBUG0("X[%d, %d]=%g Y[%d, %d]=%g", i, k, X(i, k), i, k, Y(i, k));
             delta[k] = (Y(i,k) - X(i,k))*X_bw_inv[k];
             scale += delta[k]*delta[k];
             delta[k] *= X_bw_inv[k];
         }
         scale = sqrt(scale);
         if (scale > 0.0) {
-            //LOG_DEBUG0("scale=" << scale);
+            //LOG_DEBUG0("scale=%g", scale);
             // loop over all points of X and calculate the probability that
             // random point generated around Xj would be further than Yi
             double Y_further_prob_sum = 0.0;
@@ -104,9 +105,9 @@ writable::data_frame CloudsOverlap(
             prob_sum += 0.5/(ndims+2);
         }
     }
-    //LOG_DEBUG0("prob_avg=" << prob_sum/nsamples);
-    //LOG_DEBUG0("offset_avg=" << offset_sum/nsamples);
-    //LOG_DEBUG0("scale_avg=" << scale_sum/nsamples);
+    //LOG_DEBUG0("prob_avg=%g", prob_sum/nsamples);
+    //LOG_DEBUG0("offset_avg=%g", offset_sum/nsamples);
+    //LOG_DEBUG0("scale_avg=%g", scale_sum/nsamples);
     return ( writable::data_frame{
               "offset"_nm = writable::doubles{offset_sum/nsamples},
               "scale"_nm = writable::doubles{scale_sum/nsamples},

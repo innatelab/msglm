@@ -24,16 +24,16 @@ using namespace cpp11;
 
 namespace bacc = boost::accumulators;
 
-//??? Probability that random X-distributed variable would
-//??? be less or equal than the given value.
-//??? Gaussian kernel smoothing is used to represent the
-//??? distribution of X variable.
-//???
-//??? @X samples of X random variable
-//??? @y value to compare with
-//??? @nsteps the number of segments to divide the range of X value into
-//??? @bandwidth the gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
-//??? @return P(X<=y)
+// Probability that random X-distributed variable would
+// be less or equal than the given value.
+// Gaussian kernel smoothing is used to represent the
+// distribution of X variable.
+//
+// @param X samples of X random variable
+// @param y value to compare with
+// @param nsteps the number of segments to divide the range of X value into
+// @param bandwidth the gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
+// @return P(X<=y)
 double ProbabilityLessSmoothed(
     doubles X,
     double y,
@@ -63,16 +63,16 @@ double ProbabilityLessSmoothed(
     }
 }
 
-//??? Probability that random X-distributed variable would
-//??? be less or equal than the Y-distributed variable.
-//??? Gaussian kernel smoothing is used to represent the
-//??? distribution of X-Y variable.
-//???
-//??? @X samples of X random variable
-//??? @Y samples of Y random variable
-//??? @nsteps the number of segments to divide the range of X-Y value into
-//??? @bandwidth the gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
-//??? @return P(X<Y)
+// Probability that random X-distributed variable would
+// be less or equal than the Y-distributed variable.
+// Gaussian kernel smoothing is used to represent the
+// distribution of X-Y variable.
+//
+// @param X samples of X random variable
+// @param Y samples of Y random variable
+// @param nsteps the number of segments to divide the range of X-Y value into
+// @param bandwidth the gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
+// @return P(X<Y)
 [[cpp11::register]]
 double ProbabilityLessSmoothed(
     doubles  X,
@@ -106,19 +106,19 @@ name_index_map_t nameToIndexMap( const strings& strs )
     return ( res );
 }
 
-//??? Average probability that random X-distributed variable would
-//??? be less or equal than the Y-distributed variable.
-//??? Gaussian kernel smoothing is used to represent the
-//??? distribution of X-Y variable.
-//??? The probability is averaged across the set of X and Y experiments
-//???
-//??? @X matrix of samples of X random variable, columns are different experiments, rows are MCMC iterations
-//??? @Y matrix of samples of Y random variable, columns are different experiments, rows are MCMC iterations
-//??? @Deltas 3-D array of adjustments to add to Y when comparing i-th experiment of X and j-th experiment of Y
-//??? @nsteps the number of segments to divide the range of X-Y value into
-//??? @maxBandwidth the maximum gaussian smoothing kernel bandwidth, 0 disables smoothing
-//??? @matchIterations if true, X[i]-Y[i] is used, otherwise X[i]-X[j], where i and j are independent iterations
-//??? @return E(X-Y), D(X-Y), P(X<Y)
+// Average probability that random X-distributed variable would
+// be less or equal than the Y-distributed variable.
+// Gaussian kernel smoothing is used to represent the
+// distribution of X-Y variable.
+// The probability is averaged across the set of X and Y experiments
+//
+// @param X matrix of samples of X random variable, columns are different experiments, rows are MCMC iterations
+// @param Y matrix of samples of Y random variable, columns are different experiments, rows are MCMC iterations
+// @param Deltas 3-D array of adjustments to add to Y when comparing i-th experiment of X and j-th experiment of Y
+// @param nsteps the number of segments to divide the range of X-Y value into
+// @param maxBandwidth the maximum gaussian smoothing kernel bandwidth, 0 disables smoothing
+// @param matchIterations if true, X[i]-Y[i] is used, otherwise X[i]-X[j], where i and j are independent iterations
+// @return E(X-Y), D(X-Y), P(X<Y)
 [[cpp11::register]]
 writable::data_frame DifferenceStatistics(
     doubles_matrix<by_column>  X,
@@ -274,21 +274,21 @@ writable::data_frame ContrastStatistics(
         doubles  quant_probs = writable::doubles{0.025, 0.25, 0.50, 0.75, 0.975}
 #endif
 
-//??? Calculates average probabilities that given contrasts would be
-//??? be less or equal than zero.
-//??? Gaussian kernel smoothing is used to represent the contrast distribution.
-//??? The probability is averaged across all possible combinations of
-//??? the columns of the relevant groups.
-//???
-//??? @var2group_var index of the variable (X column) in many-to-many var <-> group map
-//??? @var2group_group index of the group in many-to-many var <-> group map
-//??? @var2group_contrast index of the contrast in many-to-many var <-> group map (group contents could be contrast-specific)
-//??? @contrastXvargroup contrast matrix, rows are contrasts, columns are variable groups
-//??? @contrast_offsets vector of contrast offsets, i.e. the reported difference is not X-Y, it's X-Y+offset
-//??? @X matrix of samples of X random variable, columns are different variables, rows are MCMC draws
-//??? @nsteps the number of segments to divide the range of X values into
-//??? @maxBandwidth the maximum Gaussian smoothing kernel bandwidth, 0 disables smoothing
-//??? @return E(X), D(X), P(X>=0), P(X<=0)
+// Calculates average probabilities that given contrasts would be
+// be less or equal than zero.
+// Gaussian kernel smoothing is used to represent the contrast distribution.
+// The probability is averaged across all possible combinations of
+// the columns of the relevant groups.
+//
+// @param var2group_var index of the variable (X column) in many-to-many var <-> group map
+// @param var2group_group index of the group in many-to-many var <-> group map
+// @param var2group_contrast index of the contrast in many-to-many var <-> group map (group contents could be contrast-specific)
+// @param contrastXvargroup contrast matrix, rows are contrasts, columns are variable groups
+// @param contrast_offsets vector of contrast offsets, i.e. the reported difference is not X-Y, it's X-Y+offset
+// @param X matrix of samples of X random variable, columns are different variables, rows are MCMC draws
+// @param nsteps the number of segments to divide the range of X values into
+// @param maxBandwidth the maximum Gaussian smoothing kernel bandwidth, 0 disables smoothing
+// @return E(X), D(X), P(X>=0), P(X<=0)
 [[cpp11::register]]
 data_frame ContrastStatistics(
     doubles   X,

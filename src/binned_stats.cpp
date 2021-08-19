@@ -14,6 +14,7 @@
 #include <boost/accumulators/statistics/extended_p_square.hpp>
 
 #include "logging.h"
+#include "pvalue_utils.h"
 
 typedef std::vector<int> var_set_t;
 typedef int r_index_t;
@@ -33,34 +34,42 @@ namespace bacc = boost::accumulators;
 // @param y value to compare with
 // @param nsteps the number of segments to divide the range of X value into
 // @param bandwidth the gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
+// @param mlog10_threshold if `-log10(prob)` is above this threshold, compresses *prob* using `pvalue_sqrt_compress()`
 // @return P(X<=y)
 double ProbabilityLessSmoothed(
     doubles X,
     double y,
     int   nsteps = 100,
-    double bandwidth = na<double>()
+    double bandwidth = na<double>(),
+    double mlog10_threshold = 10.0,
+    double mlog10_hard_threshold_factor = 3.0
 ){
     if ( X.size() == 0 ) {
         throw std::length_error( "X is empty" );
     }
     ImportedValues xvals( X );
+    double res = na<double>();
 
     if ( ( xvals.val_max - xvals.val_min ) > nsteps * std::numeric_limits<double>::epsilon() ) {
-        return BinnedValues( xvals, xvals.defaultBinWidth( nsteps ), true ).probabilityLessOrEqual( y, bandwidth );
+        res = BinnedValues( xvals, xvals.defaultBinWidth( nsteps ), true ).probabilityLessOrEqual( y, bandwidth );
     } else {
         // degenerated
         LOG_DEBUG1( "Degenerated distribution" );
         if ( is_na( bandwidth ) ) {
             if ( fabs( xvals.val_max - y ) <= nsteps * std::numeric_limits<double>::epsilon() ) {
                 LOG_DEBUG1( "Near zero" );
-                return ( 0.5 );
+                res = 0.5;
             } else {
-                return ( xvals.val_max <= y ? 1.0 : 0.0 );
+                res = xvals.val_max <= y ? 1.0 : 0.0;
             }
         } else {
-            return ( Rf_pnorm5( y, xvals.val_max, bandwidth, 1, 0 ) );
+            res = Rf_pnorm5( y, xvals.val_max, bandwidth, 1, 0 );
         }
     }
+    if (!is_na(mlog10_threshold)) {
+        res = pvalue_sqrt_compress(res, mlog10_threshold, mlog10_hard_threshold_factor);
+    }
+    return res;
 }
 
 // Probability that random X-distributed variable would
@@ -72,13 +81,16 @@ double ProbabilityLessSmoothed(
 // @param Y samples of Y random variable
 // @param nsteps the number of segments to divide the range of X-Y value into
 // @param bandwidth the gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
+// @param mlog10_threshold if `-log10(prob)` is above this threshold, compresses *prob* using `pvalue_sqrt_compress()`
 // @return P(X<Y)
 [[cpp11::register]]
 double ProbabilityLessSmoothed(
     doubles  X,
     doubles  Y,
     int   nsteps,
-    double bandwidth
+    double bandwidth,
+    double mlog10_threshold = 10.0,
+    double mlog10_hard_threshold_factor = 3.0
 ){
     if ( X.size() == 0 ) {
         throw std::length_error( "X is empty" );
@@ -92,7 +104,11 @@ double ProbabilityLessSmoothed(
     ImportedValues yvals( Y );
     BinnedValues diffBins = BinnedValues::difference( xvals, yvals, nsteps );
 
-    return ( diffBins.probabilityLessOrEqual( 0.0, bandwidth ) );
+    double res = diffBins.probabilityLessOrEqual(0.0, bandwidth);
+    if (!is_na(mlog10_threshold)) {
+        res = pvalue_sqrt_compress(res, mlog10_threshold, mlog10_hard_threshold_factor);
+    }
+    return res;
 }
 
 typedef std::map<r_string, std::size_t> name_index_map_t;
@@ -118,6 +134,7 @@ name_index_map_t nameToIndexMap( const strings& strs )
 // @param nsteps the number of segments to divide the range of X-Y value into
 // @param maxBandwidth the maximum gaussian smoothing kernel bandwidth, 0 disables smoothing
 // @param matchIterations if true, X[i]-Y[i] is used, otherwise X[i]-X[j], where i and j are independent iterations
+// @param mlog10pvalue_threshold if `-log10(pvalue)` is above this threshold, compresses p-value using `pvalue_sqrt_compress()`
 // @return E(X-Y), D(X-Y), P(X<Y)
 [[cpp11::register]]
 writable::data_frame DifferenceStatistics(
@@ -126,7 +143,9 @@ writable::data_frame DifferenceStatistics(
     doubles  Deltas,
     int   nsteps,
     double maxBandwidth,
-    bool  matchIterations
+    bool  matchIterations,
+    double mlog10pvalue_threshold = 10.0,
+    double mlog10pvalue_hard_threshold_factor = 3.0
 ){
     if ( X.ncol() == 0 || X.nrow() == 0 ) {
         throw std::length_error( "X matrix is empty" );
@@ -255,6 +274,9 @@ writable::data_frame DifferenceStatistics(
         diff_var = sum_var / X.ncol();
     }
     LOG_DEBUG("P(X <= Y) = %g", prob);
+    if (!is_na(mlog10pvalue_threshold)) {
+        prob = pvalue_sqrt_compress(prob, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor);
+    }
     return ( writable::data_frame{
         "mean"_nm = diff_mean,
         "sd"_nm = sqrt( diff_var ),
@@ -271,7 +293,9 @@ writable::data_frame ContrastStatistics(
         doubles  contrast_offsets,
         int   nsteps = 100,
         double maxBandwidth = na<double>(),
-        doubles  quant_probs = writable::doubles{0.025, 0.25, 0.50, 0.75, 0.975}
+        doubles  quant_probs = writable::doubles{0.025, 0.25, 0.50, 0.75, 0.975},
+        double mlog10pvalue_threshold = 10.0,
+        double mlog10pvalue_hard_threshold_factor = 3.0
 #endif
 
 // Calculates average probabilities that given contrasts would be
@@ -288,6 +312,7 @@ writable::data_frame ContrastStatistics(
 // @param X matrix of samples of X random variable, columns are different variables, rows are MCMC draws
 // @param nsteps the number of segments to divide the range of X values into
 // @param maxBandwidth the maximum Gaussian smoothing kernel bandwidth, 0 disables smoothing
+// @param mlog10pvalue_threshold if `-log10(pvalue)` is above this threshold, compresses p-value using `pvalue_sqrt_compress()`
 // @return E(X), D(X), P(X>=0), P(X<=0)
 [[cpp11::register]]
 data_frame ContrastStatistics(
@@ -299,7 +324,9 @@ data_frame ContrastStatistics(
     doubles  contrast_offsets,
     int   nsteps,
     double maxBandwidth,
-    function summaryfun
+    function summaryfun,
+    double mlog10pvalue_threshold,
+    double mlog10pvalue_hard_threshold_factor
 ){
     R_xlen_t ncontrasts = contrastXvargroup.nrow();
     R_xlen_t ngroups = contrastXvargroup.ncol();
@@ -491,7 +518,14 @@ data_frame ContrastStatistics(
         //           " P[<=0]=" << prob_nonpos );
         LOG_DEBUG2("%d-th contrast done", contr_ix);
     }
-
+    if (!is_na(mlog10pvalue_threshold)) {
+        for (auto it = prob_nonneg.begin(); it != prob_nonneg.end(); ++it) {
+            *it = pvalue_sqrt_compress(*it, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor);
+        }
+        for (auto it = prob_nonpos.begin(); it != prob_nonpos.end(); ++it) {
+            *it = pvalue_sqrt_compress(*it, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor);
+        }
+    }
     return as_cpp<data_frame>(package("base")["cbind"](writable::data_frame{
            "__contrast_ix__"_nm = index_contrast
         },

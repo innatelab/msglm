@@ -98,8 +98,10 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
 #' @returns data frame with the p-value per each varspec
 #' @export
 vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "positive"),
-                         nsteps = 100L, maxBandwidth = NA_real_)
-{
+                         nsteps = 100L, maxBandwidth = NA_real_,
+                         mlog10pvalue_threshold = 10.0,
+                         mlog10pvalue_hard_threshold_factor = 3.0
+){
   tail = match.arg(tail)
   if (!rlang::has_name(varspecs, "prior_mean")) {
     varspecs$prior_mean <- 0.0
@@ -109,10 +111,11 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
     dplyr::rowwise() %>%
     dplyr::mutate(p_value = if (has_mcmc_draws) {
                         pvalue_compare(rlang::as_double(posterior::subset_draws(vars_draws, variable = varspec)),
-                                       prior_mean, tail = tail, nsteps = nsteps, bandwidth = maxBandwidth)
+                                       prior_mean, tail = tail, nsteps = nsteps, bandwidth = maxBandwidth,
+                                       mlog10_threshold = mlog10pvalue_threshold,
+                                       mlog10_hard_threshold_factor = mlog10pvalue_hard_threshold_factor)
                       } else { NA_real_ }) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(p_value = 10^(-mlog10pvalue_compress(-log10(p_value))))
+    dplyr::ungroup()
   if (!all(res.df$has_mcmc_draws)) {
     warning("Missing MCMC samples for vars: ", paste0(res.df$varspec[!res.df$has_mcmc_draws], collapse=" "))
   }
@@ -159,7 +162,9 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
 #' @export
 vars_contrast_stats <- function(vars_draws, vargroups,
                                 contrastXvargroup, contrasts,
-                                nsteps = 100L, maxBandwidth = NA_real_)
+                                nsteps = 100L, maxBandwidth = NA_real_,
+                                mlog10pvalue_threshold = 10.0,
+                                mlog10pvalue_hard_threshold_factor = 3.0)
 {
   if (n_groups(vargroups) < ncol(contrastXvargroup)) {
     stop("Number of vargroups (", n_groups(vargroups),
@@ -203,6 +208,8 @@ vars_contrast_stats <- function(vars_draws, vargroups,
                             vargroups$varspec_ix, vargroups$`__vargroup_ix__`, vargroups$`__contrast_ix__`,
                             contrastXvargroup, contrast_offsets[rownames(contrastXvargroup)],
                             nsteps = nsteps, maxBandwidth = maxBandwidth,
+                            mlog10pvalue_threshold = mlog10pvalue_threshold,
+                            mlog10pvalue_hard_threshold_factor = mlog10pvalue_hard_threshold_factor,
                             summaryfun = function(draws) {
                               posterior::as_draws_array(draws) %>%
                               posterior::summarise_draws(
@@ -213,10 +220,6 @@ vars_contrast_stats <- function(vars_draws, vargroups,
     dplyr::mutate(mean_log2 = mean/log(2),
                   median_log2 = median/log(2),
                   sd_log2 = sd/log(2),
-                  # compress probabilities that contrast is positive/negative since
-                  # too small probabilities indicate the bandwidth might be too small
-                  prob_nonpos = 10^(-mlog10pvalue_compress(-log10(prob_nonpos))),
-                  prob_nonneg = 10^(-mlog10pvalue_compress(-log10(prob_nonneg))),
                   p_value = 2*pmin(prob_nonpos, prob_nonneg, 0.5))
   return (res)
 }

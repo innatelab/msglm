@@ -98,7 +98,8 @@ mlog10pvalue_compress <- function(x, threshold = 10) {
 
 pvalue_compare <- function(xsamples, y=0, tail = c("both", "negative", "positive"),
                            nsteps = 100, bandwidth = NA,
-                           mlog10_threshold = 10)
+                           mlog10_threshold = 10,
+                           mlog10_hard_threshold_factor = 3)
 {
   tail = match.arg(tail)
   if (length(xsamples) == 0L) {
@@ -111,12 +112,12 @@ pvalue_compare <- function(xsamples, y=0, tail = c("both", "negative", "positive
   } else if (tail == "both") {
     # 2x correction as both tails are tested
     res <- 2 * min(c(0.5,
-                     ProbabilityLessSmoothed(xsamples, y, nsteps = nsteps, bandwidth = bandwidth),
-                     ProbabilityLessSmoothed(-xsamples, -y, nsteps = nsteps, bandwidth = bandwidth)))
-  }
-  # compress too significant p-values
-  if (!is.na(mlog10_threshold)) {
-    res = 10^(-mlog10pvalue_compress_scalar(-log10(res), threshold = mlog10_threshold))
+                     ProbabilityLessSmoothed(xsamples, y, nsteps = nsteps, bandwidth = bandwidth,
+                                             mlog10_threshold = mlog10_threshold,
+                                             mlog10_hard_threshold_factor = mlog10_hard_threshold_factor),
+                     ProbabilityLessSmoothed(-xsamples, -y, nsteps = nsteps, bandwidth = bandwidth,
+                                             mlog10_threshold = mlog10_threshold,
+                                             mlog10_hard_threshold_factor = mlog10_hard_threshold_factor)))
   }
   return(res)
 }

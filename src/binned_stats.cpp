@@ -311,18 +311,18 @@ data_frame ContrastStatistics(
         THROW_EXCEPTION( std::length_error, "X draws are empty" );
     }
     if ( var2group_var.size() != var2group_group.size() ) {
-        THROW_EXCEPTION(std::length_error, "var2group vars length (%d) doesn't match the groups length (%d)",
+        THROW_EXCEPTION(std::length_error, "var2group vars length (%ld) doesn't match the groups length (%ld)",
                         var2group_var.size(), var2group_group.size());
     }
     if ( var2group_var.size() != var2group_contrast.size() ) {
-        THROW_EXCEPTION(std::length_error, "var2group vars length (%d) doesn't match the contrasts length (%d)",
+        THROW_EXCEPTION(std::length_error, "var2group vars length (%ld) doesn't match the contrasts length (%ld)",
                         var2group_var.size(), var2group_contrast.size());
     }
     if ( !is_na( maxBandwidth ) && (maxBandwidth < 0.0) ) {
         THROW_EXCEPTION(std::domain_error, "maxBandwidth cannot be negative");
     }
     if ( contrast_offsets.size() != ncontrasts ) {
-        THROW_EXCEPTION(std::length_error, "contrast_offsets size (%d) doesn't match the rows of contrastXvargroup (%d)",
+        THROW_EXCEPTION(std::length_error, "contrast_offsets size (%ld) doesn't match the rows of contrastXvargroup (%ld)",
                         contrast_offsets.size(), ncontrasts);
     }
 
@@ -334,26 +334,26 @@ data_frame ContrastStatistics(
     R_xlen_t nchains = Xdims[1];
     R_xlen_t nvars = Xdims[2];
     R_xlen_t ndraws = niters * nchains;
-    LOG_DEBUG1("nmcmc_iters=%d nchains=%d nvars=%d", niters, nchains, nvars);
+    LOG_DEBUG1("nmcmc_iters=%ld nchains=%ld nvars=%ld", niters, nchains, nvars);
 
     LOG_DEBUG1("Initializing vargroup map");
     vargroup_map_t vargroups;
     for ( std::size_t i = 0; i < var2group_group.size(); i++ ) {
         r_index_t group_ix = var2group_group[i];
         if ( group_ix == 0 ) {
-            THROW_EXCEPTION(std::domain_error, "Group index should be in 1:%d range, %d found", ngroups, group_ix);
+            THROW_EXCEPTION(std::domain_error, "Group index should be in 1:%ld range, %d found", ngroups, group_ix);
         } else {
             --group_ix;
         }
         r_index_t contrast_ix = var2group_contrast[i];
         if ( contrast_ix == 0 ) {
-            THROW_EXCEPTION(std::domain_error, "Contrast index should be in 1:%d range, %d found", ncontrasts, contrast_ix);
+            THROW_EXCEPTION(std::domain_error, "Contrast index should be in 1:%ld range, %d found", ncontrasts, contrast_ix);
         } else {
             --contrast_ix;
         }
         r_index_t var_ix = var2group_var[i];
         if ( var_ix == 0 || var_ix > nvars ) {
-            THROW_EXCEPTION(std::domain_error, "Variable index should be in 1:%d range, %d found", nvars, var_ix);
+            THROW_EXCEPTION(std::domain_error, "Variable index should be in 1:%ld range, %d found", nvars, var_ix);
         } else {
           --var_ix;
         }

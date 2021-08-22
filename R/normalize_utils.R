@@ -87,7 +87,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
                                                   levels=levels(mschan_df$mschannel)))
     msdata_df <- dplyr::left_join(tidyr::expand(msdata_df, obj, mschannel), msdata_df) %>%
       dplyr::arrange(as.integer(obj), as.integer(mschannel)) %>%
-      dplyr::mutate(safe_quant = replace_na(quant + 1E-1, 0.0)) # add fractional number to force qData to be non-integer on save
+      dplyr::mutate(safe_quant = replace_na(quant, 1.0))
 
     stan_input$qData <- matrix(msdata_df$safe_quant,
                                ncol = nrow(mschan_df),

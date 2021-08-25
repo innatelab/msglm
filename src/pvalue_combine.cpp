@@ -1,9 +1,11 @@
 #include <algorithm>
 #include <map>
-#include <Rcpp.h>
-// [[Rcpp::depends(BH)]]
 #include <boost/math/tools/roots.hpp>
-#include <Rcpp/Rmath.h>
+
+#include <cpp11.hpp>
+#include "Rmath.h"
+
+using namespace cpp11;
 
 #ifndef NDEBUG
 //#define DYNLOAD_DEBUG
@@ -27,7 +29,7 @@ public:
 
     double operator()( double x ) const
     {
-        return ( R::pgamma( nTests * R::qgamma( stt, x, 1.0, 0, 0 ),
+        return ( Rf_pgamma( nTests * Rf_qgamma( stt, x, 1.0, 0, 0 ),
                             nTests * x, 1.0, 0, 0 ) - stt );
     }
 };
@@ -52,22 +54,22 @@ double GammaMethodParam(
     pmit->second.insert( ipmit, std::make_pair( nTests, res ) );
     return ( res );
 }
-    
+
 //??? Combine p-values according to Zaykin (2007) Pharm.Stat. (10.1002/pst.304).
 //???
 //??? @param pvalues P-values to combine
 //??? @param stt Soft Truncation Threshold
 //??? @return combined p-value
-// [[Rcpp::export]]
-double GammaMethodPValuesCombine( std::vector<double> pvalues, double stt )
+[[cpp11::register]]
+double GammaMethodPValuesCombine( doubles pvalues, double stt )
 {
     if ( pvalues.size() == 1 ) return ( pvalues[0] );
     double param = GammaMethodParam( stt, pvalues.size() );
     double Y = 0;
-    for ( std::size_t i = 0; i < pvalues.size(); ++i ) {
-        Y += R::qgamma( pvalues[i], param, 1.0, 0, 0 );
+    for ( R_xlen_t i = 0; i < pvalues.size(); ++i ) {
+        Y += Rf_qgamma( pvalues[i], param, 1.0, 0, 0 );
     }
-    return ( R::pgamma( Y, param * pvalues.size(), 1.0, 0, 0 ) );
+    return ( Rf_pgamma( Y, param * pvalues.size(), 1.0, 0, 0 ) );
 }
 
 #if 0
@@ -76,7 +78,7 @@ double GammaMethodPValuesCombine( std::vector<double> pvalues, double stt )
 //??? @param nTests number of tests
 //??? @param stt Soft Truncation Threshold
 //??? @return parameter
-/// [[Rcpp::export]]
+//[[cpp11::register]]
 double GammaMethodPValuesCombineParam( std::size_t nTests, double stt )
 {
     return ( GammaMethodParam( stt, nTests ) );

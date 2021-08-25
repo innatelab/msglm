@@ -1,7 +1,8 @@
 #pragma once
 
 #include <cmath>
-#include <Rcpp.h>
+
+#include <cpp11/R.hpp>
 
 #include "imported_values.h"
 
@@ -48,12 +49,15 @@ struct BinnedValues {
     // @x value to compare with
     // @bandwidth the Gaussian smoothing kernel bandwidth, defaults to the segment size, 0 disables smoothing
     // @return P(X<=y) if negative, P(X>=y) if !negative
-    double probabilityCompareWith(double y, double bandwidth = NA_REAL, bool negative = true) const;
+    double probabilityCompareWith(double y, double bandwidth = cpp11::na<double>(),
+                                  bool negative = true) const;
 
-    double probabilityLessOrEqual(double y, double bandwidth = NA_REAL, double offset = 0.0) const {
+    double probabilityLessOrEqual(double y, double bandwidth = cpp11::na<double>(),
+                                  double offset = 0.0) const {
         return probabilityCompareWith(y, bandwidth, true);
     }
-    double probabilityGreaterOrEqual(double y, double bandwidth = NA_REAL, double offset = 0.0) const {
+    double probabilityGreaterOrEqual(double y, double bandwidth = cpp11::na<double>(),
+                                     double offset = 0.0) const {
         return probabilityCompareWith(y, bandwidth, false);
     }
 

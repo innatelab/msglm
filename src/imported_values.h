@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include <Rcpp.h>
+#include <cpp11.hpp>
 
 // values
 typedef double value_t;
@@ -18,20 +18,15 @@ struct ImportedValues {
 
     void init_bounds(double support_prob);
 
-    ImportedValues(const Rcpp::NumericVector& values, double support_prob = 0.95)
-    : values(Rcpp::as<values_t>(values))
-    {
-        init_bounds(support_prob);
-    }
-
-    ImportedValues(const Rcpp::MatrixColumn<REALSXP>& values, double support_prob = 0.95)
-    : values(values.begin(), values.end())
+    template<typename V>
+    ImportedValues(V values, double support_prob = 0.95)
+        : values(values.begin(), values.end())
     {
         init_bounds(support_prob);
     }
 
     ImportedValues(const values_t& values, double support_prob = 0.95)
-    : values(values)
+        : values(values)
     {
         init_bounds(support_prob);
     }

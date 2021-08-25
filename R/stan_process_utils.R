@@ -16,68 +16,64 @@ matrix2csr <- function(mtx_name, mtx) {
     return(mtx_csr)
 }
 
-stan.iterations_frame <- function(stan_result)
-{
-  n_iterations <- dim(stan_result)[[1]]
-  n_chains <- dim(stan_result)[[2]]
-  n_thin <- stan_result@sim$thin
-
-  tidyr::crossing(chain = seq_len(n_chains),
-                  sample_ix = seq_len(n_iterations)) %>%
-    mutate(iteration = sample_ix * n_thin,
-           unpermuted_ix = row_number())
+extract_var <- function(varspecs) {
+  stringr::str_remove(varspecs, '\\[(?:\\d+\\,)*\\d+\\]$')
 }
 
-stan.extract_samples <- function(stan_result, pars, chains = NA, min.iteration = NA, permuted = FALSE)
-{
-  res <- rstan::extract(stan_result, pars = pars, permuted = permuted, inc_warmup = !is.na(min.iteration))
-  if (permuted) {
-    iter_info.df <- stan.iterations_frame(stan_result)
-  } else {
-    iter_info.df <- NULL
-  }
-  if (!is.na(min.iteration) || !is.na(chains)) {
-    n_thin <- stan_result@sim$thin
-    if (permuted) {
-      if (!is.na(min.iteration)) {
-        iter_info.df <- dplyr::filter(iter_info.df, iteration >= min.iteration - stan_result@sim$warmup)
-      }
-      if (!is.na(chains)) {
-        iter_info.df <- dplyr::filter(iter_info.df, chain %in% chains)
-      }
-      sample_ixs <- sort(iter_info.df$unpermuted_ix)
-      n_samples_per_chain <- n_distinct(sample_ixs)
-      res <- lapply(res, function(var_samples) {
-        new_dims <- dim(var_samples)
-        new_dims[[1]] <- n_samples_per_chain
-        array(var_samples[slice.index(var_samples, 1) %in% sample_ixs], dim = new_dims) })
-    } else {
-      if (!is.na(min.iteration)) {
-        res <- res[seq(from=as.integer(ceiling(min.iteration/n_thin)), dim(res)[[1]]), , ]
-      }
-      if (!is.na(chains)) {
-        res <- res[, chains, , drop=FALSE]
-      }
-    }
-  }
-  if (!is.null(iter_info.df)) {
-    attr(res, 'iter_info') <- iter_info.df
-  }
-  return(res)
-}
+process_varspecs <- function(varspecs, vars_info, dims_info) {
+  all_vars.df <- bind_rows(lapply(names(vars_info), function(cat) tibble(category = cat,
+                                                                         var = vars_info[[cat]]$names)))
+  all_varspecs.df <- tibble(varspec = varspecs,
+                            varspec_ix = seq_along(varspecs)) %>%
+    tidyr::extract(varspec, c("var", "index_spec"),
+                   '^(\\w[^[]+)(?:\\[((?:\\d+\\,)*\\d+)\\])?$', remove=FALSE) %>%
+    dplyr::mutate(index_spec = ifelse(index_spec == '', NA_character_, index_spec)) %>%
+    dplyr::inner_join(all_vars.df, by = 'var')
+  cat_specs.df <- dplyr::distinct(all_varspecs.df, category, index_spec) %>%
+    dplyr::group_by(category)
+  cats_info <- dplyr::group_map(cat_specs.df, function(cat_df, cat_row) {
+      cat <- cat_row$category
+      cat_info <- vars_info[[cat]]
 
-extract_index <- function(var_names, ndims=NA_integer_) {
-  var_ndims <- str_count(var_names, stringr::fixed(",")) + 1L
-  if ((length(var_ndims) > 0) && !is.na(ndims) && var_ndims != ndims) {
-    stop('Data have ', var_ndims, ' dimension(s), expected ', ndims)
-  }
-  res <- str_remove(var_names, '\\]$') %>% str_remove('^[^\\[]+\\[') %>%
-      str_split_fixed(stringr::fixed(','), var_ndims) %>%
-      as.integer() %>% matrix(ncol=if(length(var_ndims)==0L) replace_na(ndims, 0L) else var_ndims)
-  return(res)
-}
-extract_var <- function(var_names) {
-  stringr::str_remove(var_names, '\\[(?:\\d+\\,)*\\d+\\]$')
+      dims.df <- tibble(ix = seq_along(cat_info$dims),
+                        name = if (is.null(cat_info$dims)) {character(0)} else {cat_info$dims}) %>%
+        dplyr::mutate(col = paste0('index_', name)) %>%
+        dplyr::group_by(name) %>%
+        dplyr::mutate(local_ix = row_number(),
+                      col = if (n() > 1) { paste0(col, '.', local_ix) } else { col }) %>%
+        dplyr::ungroup()
+      if (any(dims.df$local_ix > 1)) {
+        warning('Category ', cat, ' dimensions ',
+                dims.df$name[dims.df$local_ix > 1], ' not unique, using suffixes')
+      }
+      cat_df <- tidyr::separate(cat_df, index_spec, c(dims.df$col), remove=FALSE, convert=TRUE, sep=",")
+      # append info of each dimension
+      for (dim_ix in seq_len(nrow(dims.df))) {
+        dim_name = dims.df$name
+        if (!(dim_name %in% names(dims_info))) {
+          warning('No information for dimension #', dim_ix, " (", dim_name, ")")
+        } else {
+          dim_info = dims_info[[dim_name]]
+          ixs = cat_df[[dims.df$col[[dim_ix]]]]
+          avail_ixs <- unique(ixs)
+          def_ixs = 1:nrow(dim_info)
+          missing_ixs = setdiff(def_ixs, avail_ixs)
+          if (length(missing_ixs) > 0) {
+            stop('Dimension #', dim_ix, '(', dim_name,'): indices ',
+                 paste0(missing_ixs, collapse=' '), ' not found in the results')
+          }
+          extra_ixs = setdiff(avail_ixs, def_ixs)
+          if (length(extra_ixs) > 0) {
+            stop('Dimension #', dim_ix, '(', dim_name,'): indices ',
+                paste0(extra_ixs, collapse=' '), ' have no information')
+          }
+          cat_df <- bind_cols(cat_df, dim_info[ixs, , drop=FALSE])
+        }
+      }
+      return(cat_df)
+    })
+  names(cats_info) <- group_keys(cat_specs.df)$category
+  return (list(spec_info = all_varspecs.df, cats_info = cats_info))
 }
 
 # compresses -log10(p_value) so that very significant p-values (mlog10(pvalue) >= threshold) are constrained
@@ -101,24 +97,27 @@ mlog10pvalue_compress <- function(x, threshold = 10) {
 }
 
 pvalue_compare <- function(xsamples, y=0, tail = c("both", "negative", "positive"),
-                          mlog10_threshold = 10)
+                           nsteps = 100, bandwidth = NA,
+                           mlog10_threshold = 10,
+                           mlog10_hard_threshold_factor = 3)
 {
   tail = match.arg(tail)
   if (length(xsamples) == 0L) {
     warning("No samples provided, returning P-value=NA")
     return(NA_real_)
   } else if (tail == "negative") {
-    res <- ProbabilityLessSmoothed(xsamples, y, nsteps = 100, bandwidth = NA)
+    res <- ProbabilityLessSmoothed(xsamples, y, nsteps = nsteps, bandwidth = bandwidth)
   } else if (tail == "positive") {
-    res <- ProbabilityLessSmoothed(-xsamples, -y, nsteps = 100, bandwidth = NA)
+    res <- ProbabilityLessSmoothed(-xsamples, -y, nsteps = nsteps, bandwidth = bandwidth)
   } else if (tail == "both") {
     # 2x correction as both tails are tested
-    res <- 2 * min(c(0.5,ProbabilityLessSmoothed(xsamples, y, nsteps = 100, bandwidth = NA),
-                     ProbabilityLessSmoothed(-xsamples, -y, nsteps = 100, bandwidth = NA)))
-  }
-  # compress too significant p-values
-  if (!is.na(mlog10_threshold)) {
-    res = 10^(-mlog10pvalue_compress_scalar(-log10(res), threshold = mlog10_threshold))
+    res <- 2 * min(c(0.5,
+                     ProbabilityLessSmoothed(xsamples, y, nsteps = nsteps, bandwidth = bandwidth,
+                                             mlog10_threshold = mlog10_threshold,
+                                             mlog10_hard_threshold_factor = mlog10_hard_threshold_factor),
+                     ProbabilityLessSmoothed(-xsamples, -y, nsteps = nsteps, bandwidth = bandwidth,
+                                             mlog10_threshold = mlog10_threshold,
+                                             mlog10_hard_threshold_factor = mlog10_hard_threshold_factor)))
   }
   return(res)
 }

@@ -1,83 +1,60 @@
 #' @export
-process_msglm_chunk <- function(file_ix,
-                                strip_samples=FALSE, strip_stats=FALSE,
-                                results_tag = "msglm_results",
-                                postprocess.f = NULL) {
-  fit_file <- fit_files.df[file_ix, 'filename']
-  message( 'Loading ', fit_file, '...' )
+load_fit_chunk <- function(chunk, chunks = fit_files.df, chunks_path = fit_path,
+                           load_vars = c("msglm_results", "results_info", "dims_info"),
+                           process.f = NULL) {
+  chunk_file <- chunks[chunk, 'filename']
+  message('Loading ', chunk_file, '...')
   tmp.env <- new.env(parent = baseenv())
-  load(file.path(fit_path, fit_file), envir = tmp.env)
-  if (!is.null(postprocess.f)) {
-    postprocess.f(envir = tmp.env, fit_file)
-  }
-  if (strip_samples || strip_stats) {
-    env_bind(tmp.env, results_tag, lapply(env_get(tmp.env, results_tag), function(res) {
-      if (strip_samples) { res$samples <- NULL }
-      if (strip_stats) { res$stats <- NULL }
-      return ( res )
-    }))
+  load(file.path(chunks_path, chunk_file), envir = tmp.env)
+  if (!is.null(process.f)) {
+    process.f(envir = tmp.env, chunk_file)
   }
   gc()
-  res <- mget(ls(envir=tmp.env), envir=tmp.env)
+  res <- mget(load_vars, envir=tmp.env)
   return ( res )
 }
 
 #' @export
-join_report_frames <- function(reports, frame_extractor=function(report) stop('no frame extractor'),
-                               global_vars = c('model_dataset', 'version', 'chunk'),
-                               prot_info=NULL)
-{
-  if (is.null(names(reports))) {
-    report_names <- seq_along(reports)
-  } else {
-    report_names <- names(reports)
-  }
-  joined_res.df <- dplyr::bind_rows(lapply(report_names, function(report_name) {
-    report <- reports[[report_name]]
-    frame <- frame_extractor(report)
-    if (is.null(frame)) return ( NULL )
-    if (nrow(frame) > 0L) {
-      frame$report_name <- report_name
-    } else {
-      frame$report_name <- character()
-    }
-    for (var in global_vars) {
-      frame[[var]] <- report[[var]]
-    }
-    return ( frame )
-  } ) )
-  # FIXME other object types?
-  if (!is.null(prot_info) && rlang::has_name(joined_res.df, 'protein_ac_noiso')) {
-    joined_res.df <- dplyr::inner_join(joined_res.df, dplyr::select(prot_info, protein_ac_noiso, protein_label, description))
-  }
-  return ( joined_res.df )
-}
-
-#' @export
-join_msglm_reports <- function(section, reports, type, results_tag="msglm_results") {
-  message( 'Assembling joint ', type, ' report for ', section, '...' )
-  res <- join_report_frames(reports, frame_extractor = function(report) {
-    res <- report[[results_tag]][[section]][[type]]
-    # add object id columns
-    # FIXME model_data$objects support?
-    if (!is.null(res)) {
-      obj_id_cols <- setdiff(intersect(c('protregroup_id', 'superprotgroup_id', 'protgroup_id',
-                                         'majority_protein_acs', 'pepmod_id', 'site_id', 'multiplicity'),
-                                       colnames(report$model_data$objects)), colnames(res))
-      for (obj_id_col in obj_id_cols) {
-        res[[obj_id_col]] <- rep_len(report$model_data$objects[[obj_id_col]][[1]], nrow(res))
+combine_fit_chunk_section <- function(section, chunks, type, dims_info, report_var="msglm_results") {
+  message('Combining ', type, ' reports for ', section, '...')
+  obj_id_cols <- str_subset(colnames(dims_info$object), "_id$")
+  #message('  object ID columns: ', paste0(obj_id_cols, collapse=", "))
+  report_df <- dplyr::bind_rows(lapply(chunks, function(chunk) {
+    frame <- chunk[[report_var]][[section]][[type]]
+    if (!is.null(frame)) {
+      obj_info = chunk$dims_info$object
+      for (col in setdiff(obj_id_cols, colnames(frame))) {
+        frame[[col]] <- rep_len(obj_info[[col]][[1]], nrow(frame))
       }
     }
-    res
-  },
-  NULL, global_vars = c())
-  return(res)
+    return (frame)
+  }))
+  # attach extra object information columns to the report
+  if (length(report_df) > 0) {
+    if (length(obj_id_cols) > 0) {
+      objs_df <- bind_rows(lapply(chunks[sapply(chunks, function(chunk) is.data.frame(chunk$dims_info$object))],
+                                  function(chunk) chunk$dims_info$object))
+      obj_info_cols <- setdiff(colnames(objs_df), colnames(report_df))
+      if (length(obj_info_cols) > 0) {
+        message('  attaching object info: ', paste0(obj_info_cols, collapse=", "))
+        report_df <- dplyr::left_join(report_df, dplyr::select_at(objs_df, c(obj_id_cols, obj_info_cols)), by=obj_id_cols)
+      }
+    } else {
+      warning("No object id columns for the ", type, " reports for ", section)
+    }
+  } else {
+    report_df <- NULL
+  }
+  return(report_df)
 }
 
 #' @export
-join_msglm_reports_allsections <- function(reports, type, results_tag="msglm_results") {
-  sections <- names(reports[[1]][[results_tag]])
-  res <- lapply(sections, join_msglm_reports, reports, type, results_tag=results_tag)
-  names(res) <- sections
+combine_fit_chunks <- function(reports, type, report_var="msglm_results") {
+  dims_info <- reports[[1]]$dims_info
+  sections <- names(reports[[1]][[report_var]])
+  res <- rlang::set_names(lapply(sections, combine_fit_chunk_section,
+                                 reports, type, dims_info, report_var=report_var),
+                          sections)
+  res <- res[!sapply(res, is.null)]
   return(res)
 }

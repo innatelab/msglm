@@ -9,7 +9,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
         msdata_df, mschan_preshifts, condgroup_id, cond_col,
         max_objs=1000L, quant_ratio.max=NA,
         stan_method = c("optimizing", "mcmc", "vb"),
-        mcmc.iter=2000L, mcmc.chains=getOption("mc.cores", 4), mcmc.thin=4, mcmc.adapt_delta=0.9,
+        mcmc.iter=2000L, mcmc.chains=getOption("mc.cores", 4), mcmc.thin=1L, mcmc.adapt_delta=0.9,
         vb.iter=100000L,
         Rhat.max = 1.1, neff_ratio.min = 0.25,
         shifts_constraint=c("none", "mean=0", "median=0"),
@@ -87,7 +87,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
                                                   levels=levels(mschan_df$mschannel)))
     msdata_df <- dplyr::left_join(tidyr::expand(msdata_df, obj, mschannel), msdata_df) %>%
       dplyr::arrange(as.integer(obj), as.integer(mschannel)) %>%
-      dplyr::mutate(safe_quant = replace_na(quant, 0.0))
+      dplyr::mutate(safe_quant = replace_na(quant, 1.0))
 
     stan_input$qData <- matrix(msdata_df$safe_quant,
                                ncol = nrow(mschan_df),
@@ -95,7 +95,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
     message("Running Stan optimization...")
     out_params <- c("data_sigma", "shift_sigma", "shift")
     if (stan_method == 'optimizing') {
-        norm_fit <- optimizing(stan_norm_model, stan_input, algorithm="LBFGS",
+        norm_fit <- stan_norm_model$optimize(stan_input, algorithm="LBFGS",
                                init=list(sigma=1.0, shift0=as.array(rep.int(0.0, stan_input$Nshifts-1L))),
                                history_size=10L)
         shift_pars <- norm_fit$par[str_detect(names(norm_fit$par), "^shift\\[\\d+\\]$")]
@@ -103,35 +103,28 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
         res <- tibble(condition = levels(mschan_df$condition)[shift_ixs],
                       shift = as.numeric(shift_pars))
     } else if (stan_method == 'mcmc') {
-        norm_fit <- rstan::sampling(stan_norm_model, stan_input, chains=mcmc.chains, iter=mcmc.iter, thin=mcmc.thin,
-                                    pars=out_params, include=TRUE,
+        norm_fit <- stan_norm_model$sample(stan_input, chains=mcmc.chains,
+                                           iter_warmup=0.5*mcmc.iter, iter_sampling=0.5*mcmc.iter,
+                                           thin=mcmc.thin,
+                                    #pars=out_params, include=TRUE,
                                     #init=function() list(shift_sigma=1.0, shift_shift0=as.array(rep.int(0.0, stan_input$Nshifts-1L))),
-                                    control = list(adapt_delta=mcmc.adapt_delta))
-        norm_fit_stat <- rstan::monitor(norm_fit)
-        shift_mask <- str_detect(rownames(norm_fit_stat), "^shift\\[\\d+\\]$")
-        nonconv_mask.Rhat <- norm_fit_stat[shift_mask, 'Rhat'] > Rhat.max
-        if (any(nonconv_mask.Rhat)) {
-            warning("Rhat>", Rhat.max, " for ", sum(nonconv_mask.Rhat), " shift(s)")
+                                    adapt_delta=mcmc.adapt_delta, show_messages=verbose)
+        neff_min <- neff_ratio.min * mcmc.iter
+        res <- norm_fit$summary(variables = out_params) %>%
+          tidyr::extract("variable", "shift_ix", "^shift\\[(\\d+)\\]$", remove=FALSE, convert=TRUE) %>%
+          dplyr::filter(!is.na(shift_ix)) %>%
+          dplyr::mutate(condition = levels(mschan_df$condition)[shift_ix],
+                        converged = (rhat <= Rhat.max) & (ess_bulk >= neff_min)) %>%
+          dplyr::select(condition, shift=mean, shift_sd=sd, shift_median=median, shift_mad=mad, shift_q5=q5, shift_q95=q95,
+                        rhat, ess_bulk, ess_tail, converged)
+        if (!all(res$converged)) {
+            warning("Convergence problems for ", sum(!res$converged), " shift(s)")
         }
-        neff_min <- neff_ratio.min*mcmc.iter
-        nonconv_mask.neff <- norm_fit_stat[shift_mask, 'n_eff'] < neff_min
-        if (any(nonconv_mask.neff)) {
-            warning("n_eff<", neff_min, " for ", sum(nonconv_mask.neff), " shift(s)")
-        }
-        shift_pars <- norm_fit_stat[shift_mask, 'mean']
-        shift_sd_pars <- norm_fit_stat[shift_mask, 'sd']
-        shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[shift_mask], "\\[(\\d+)\\]$")[,2])
-        res <- tibble(condition = levels(mschan_df$condition)[shift_ixs],
-                      shift = as.numeric(shift_pars),
-                      shift_sd = as.numeric(shift_sd_pars),
-                      Rhat = norm_fit_stat[shift_mask, 'Rhat'],
-                      n_eff = norm_fit_stat[shift_mask, 'n_eff'],
-                      converged = !nonconv_mask.Rhat & !nonconv_mask.neff)
     } else if (stan_method == 'vb') {
-        norm_fit <- rstan::vb(stan_norm_model, stan_input, iter=vb.iter,
-                              pars=out_params, include=TRUE,
+        norm_fit <- stan_norm_model$variational(stan_input, iter=vb.iter,
+                              #pars=out_params, include=TRUE,
                               init=function() list(shift_sigma=1.0, shift0=as.array(rep.int(0.0, stan_input$Nshifts-1L))) )
-        norm_fit_stat <- rstan::monitor(norm_fit)
+        norm_fit_stat <- norm_fit$summary(pars=out_params)
         shift_mask <- str_detect(rownames(norm_fit_stat), "^shift\\[\\d+\\]$")
         shift_pars <- norm_fit_stat[shift_mask, 'mean']
         shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[shift_mask], "\\[(\\d+)\\]$")[,2])
@@ -167,7 +160,7 @@ normalize_experiments <- function(stan_input_base, msdata_df,
                                   max_objs=1000L,
                                   quant_ratio.max=NA, mschan_shift.min = -0.5,
                                   nmschan_ratio.min=0.9, ncond_ratio.min=if (mschan_col==cond_col) nmschan_ratio.min else 1.0,
-                                  mcmc.iter=2000L, mcmc.chains=getOption("mc.cores", 4), mcmc.thin=4, mcmc.adapt_delta=0.9,
+                                  mcmc.iter=2000L, mcmc.chains=getOption("mc.cores", 4L), mcmc.thin=1L, mcmc.adapt_delta=0.9,
                                   vb.iter=100000L,
                                   Rhat.max = 1.1, neff_ratio.min = 0.25,
                                   shifts_constraint=c("none", "mean=0", "median=0"),

@@ -101,10 +101,8 @@ data {
   int<lower=0> Nmsprotocols;    // number of MS protocols used
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
   int<lower=0> Nobservations;   // number of observations of interactions (objectXexperiment pairs for all iactions and experiments of its condition)
-  int<lower=0> NunderdefObjs;   // number of virtual interactions (the ones not detected but required for comparison)
   int<lower=1,upper=Nobjects> suo2obj[Nsubobjects];
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
-  int<lower=1,upper=Nobjects> underdef_objs[NunderdefObjs];
 
   vector[Nexperiments] experiment_shift;
 
@@ -182,7 +180,6 @@ data {
   real<lower=0> suo_subbatch_effect_tau;
   real<lower=0> suo_subbatch_effect_df;
   real<lower=0> suo_subbatch_effect_c;
-  real<upper=0> underdef_obj_shift;
 
   // instrument calibrated parameters (FIXME: msproto-dependent)
   real<lower=0> zDetectionFactor;
@@ -431,11 +428,10 @@ transformed data {
 
 parameters {
   //real obj_base;
-  //real<lower=-20, upper=-2> underdef_obj_shift;
   //real<lower=0, upper=5.0> obj_shift_sigma;
   //vector<lower=0>[Nconditions] condition_repl_effect_sigma;
 
-  vector[Nobjects] obj_base_labu0; // baseline object abundance without underdefinedness adjustment
+  vector[Nobjects] obj_base_labu0; // baseline object abundance
 
   real<lower=1.0> suo_shift_sigma;
   vector[Nsubobjects > 0 ? Nsubobjects-Nobjects : 0] suo_shift0_unscaled; // subobject shift within object
@@ -466,7 +462,7 @@ parameters {
 }
 
 transformed parameters {
-  vector[Nobjects] obj_base_labu;
+  vector[Nobjects] obj_base_labu = obj_base_labu0 * obj_base_labu_sigma;
   vector[NobjEffects] obj_effect;
   real<lower=0> effect_slab_c;
   vector<lower=0>[NobjEffects] obj_effect_sigma; // AKA lambda_tilde*tau in rstanarm
@@ -484,12 +480,6 @@ transformed parameters {
 
   vector[Nsubobjects] suo_shift_unscaled; // subcomponent shift within object
   vector[Nsubobjects] suo_shift; // subcomponent shift within object
-
-  // correct baseline abundances of underdefined objects
-  obj_base_labu = obj_base_labu0 * obj_base_labu_sigma;
-  for (i in 1:NunderdefObjs) {
-    obj_base_labu[underdef_objs[i]] = obj_base_labu[underdef_objs[i]] + underdef_obj_shift;
-  }
 
   // calculate effects lambdas and scale effects
   {
@@ -553,8 +543,6 @@ model {
     effect_slab_c_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * effect_slab_df, 0.5 * effect_slab_df);
     // batch effect parameters, cauchy prior on sigma
     //condition_repl_effect_sigma ~ inv_gamma(1.5, 1.0);
-
-    //underdef_obj_shift ~ normal(0.0, 10.0);
 
     //repl_shift_lambda ~ student_t(2, 0.0, repl_shift_tau);
     //obj_repl_effect ~ normal(0.0, obj_repl_effect_lambda);

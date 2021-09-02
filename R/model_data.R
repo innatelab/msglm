@@ -42,7 +42,7 @@ iactXeffect <- function(expXeff, iact2obj, iact2exp) {
 # use experimental design matrices and add
 # object/replicate/batch effects information to model_data
 #' @export
-prepare_effects <- function(model_data, underdefined_iactions=FALSE)
+prepare_effects <- function(model_data)
 {
   is_glmm <- exists("supXcond.mtxs") && exists("mixeffects.df")
   if (is_glmm) {
@@ -179,23 +179,6 @@ prepare_effects <- function(model_data, underdefined_iactions=FALSE)
     model_data$subbatch_effects <- dplyr::select(subbatch_effects.df, subbatch_effect, is_positive) %>%
       dplyr::mutate(subbatch_effect = factor(subbatch_effect, levels=levels(model_data$suo_subbatch_effects$subbatch_effect))) %>%
       dplyr::arrange(subbatch_effect)
-  }
-
-  if (underdefined_iactions) {
-    # detect proteins that have no quantifications for estimating object_shift
-    oe2iact.df <- model_data$object_effects %>%
-      dplyr::inner_join(dplyr::mutate(conditionXeffect.df, effect = factor(effect, levels=levels(model_data$object_effects$effect)))) %>%
-      dplyr::inner_join(model_data$interactions)
-    effectless_iactions.df <- model_data$interactions %>% dplyr::anti_join(oe2iact.df)
-    underdefined_objects.df <- dplyr::anti_join(model_data$objects,
-                                                effectless_iactions.df %>% dplyr::filter(!is_virtual)) %>%
-      dplyr::select(glm_object_ix)
-
-    model_data$objects <- dplyr::mutate(model_data$objects,
-                                        is_underdefined = glm_object_ix %in% underdefined_objects.df$glm_object_ix)
-  } else {
-    model_data$objects <- dplyr::mutate(model_data$objects,
-                                        is_underdefined = FALSE)
   }
 
   return(model_data)

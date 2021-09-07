@@ -127,3 +127,49 @@ frame2matrix <- function(df, row_col, col_col, val_col="w", val_default=0, cols=
   }
   return(mtx)
 }
+
+#' Converts a matrix into a 3-column frame (matrix row, matrix column, cell value).
+#'
+#' @param mtx matrix to convert
+#' @param row_col the column of the result containing matrix row names
+#' @param col_col the column of the result containing matrix column names
+#' @param val_col the column of the result containing matrix element values
+#' @param skip_val if not null, the element of the matrix that have this value would not be exported into data frame
+#'
+#' @export
+matrix2frame <- function(mtx, row_col = NULL, col_col = NULL, val_col = "w", skip_val = 0) {
+  dnn <- names(dimnames(mtx))
+  if (is.null(row_col)) {
+    row_col <- dnn[[1]]
+    checkmate::assert_string(row_col, na.ok=FALSE, null.ok=FALSE)
+  } else {
+    dnn[[1]] <- row_col # overriding the existing name
+  }
+  if (is.null(col_col)) {
+    col_col <- dnn[[2]]
+    checkmate::assert_string(col_col, na.ok=FALSE, null.ok=FALSE)
+  } else {
+    dnn[[2]] <- col_col # overriding the existing name
+  }
+  df <- as.data.frame.table(mtx, dnn=dnn, stringsAsFactors=TRUE, responseName=val_col)
+  if (!is.null(skip_val)) {
+    df <- dplyr::filter(df, !!sym(val_col) != skip_val)
+  }
+
+  # fix that for empty matrices, rows/cols columns are not added
+  if (nrow(mtx) == 0) {
+    # add missing row column
+    df[[row_col]] <- if (is.na(names(dimnames(mtx))[[1]])) integer(0) else character(0)
+  } else if (any(rownames(mtx) == as.character(seq_len(nrow(mtx))))) {
+    # don't keep indices as factors
+    df[[row_col]] <- as.integer(df[[row_col]])
+  }
+  if (ncol(mtx) == 0) {
+    # add missing col column
+    df[[col_col]] <- if (is.na(names(dimnames(mtx))[[2]])) integer(0) else character(0)
+  } else if (any(colnames(mtx) == as.character(seq_len(ncol(mtx))))) {
+    # don't keep indices as factors
+    df[[col_col]] <- as.integer(df[[col_col]])
+  }
+  return(df)
+}

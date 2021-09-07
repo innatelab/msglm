@@ -289,7 +289,7 @@ writable::data_frame ContrastStatistics(
         doubles   X,
         integers  col2group_col,
         integers  col2group_group,
-        doubles_matrix<by_row>  contrastXvargroup,
+        doubles_matrix<by_row>  vargroupXcontrast,
         doubles  contrast_offsets,
         int   nsteps = 100,
         double maxBandwidth = na<double>(),
@@ -307,7 +307,7 @@ writable::data_frame ContrastStatistics(
 // @param var2group_var index of the variable (X column) in many-to-many var <-> group map
 // @param var2group_group index of the group in many-to-many var <-> group map
 // @param var2group_contrast index of the contrast in many-to-many var <-> group map (group contents could be contrast-specific)
-// @param contrastXvargroup contrast matrix, rows are contrasts, columns are variable groups
+// @param vargroupXcontrast contrast matrix, rows are contrasts, columns are variable groups
 // @param contrast_offsets vector of contrast offsets, i.e. the reported difference is not X-Y, it's X-Y+offset
 // @param X matrix of samples of X random variable, columns are different variables, rows are MCMC draws
 // @param nsteps the number of segments to divide the range of X values into
@@ -320,7 +320,7 @@ data_frame ContrastStatistics(
     integers  var2group_var,
     integers  var2group_group,
     integers  var2group_contrast,
-    doubles_matrix<by_row>  contrastXvargroup,
+    doubles_matrix<by_column>  vargroupXcontrast,
     doubles  contrast_offsets,
     int   nsteps,
     double maxBandwidth,
@@ -328,11 +328,11 @@ data_frame ContrastStatistics(
     double mlog10pvalue_threshold,
     double mlog10pvalue_hard_threshold_factor
 ){
-    R_xlen_t ncontrasts = contrastXvargroup.nrow();
-    R_xlen_t ngroups = contrastXvargroup.ncol();
+    R_xlen_t ncontrasts = vargroupXcontrast.ncol();
+    R_xlen_t ngroups = vargroupXcontrast.nrow();
     LOG_DEBUG1("ncontrasts=%d ngroups=%d", ncontrasts, ngroups);
-    if ( contrastXvargroup.ncol() == 0 || contrastXvargroup.nrow() == 0 ) {
-        THROW_EXCEPTION( std::length_error, "contrastXvargroup matrix is empty" );
+    if ( ncontrasts == 0 || ngroups == 0 ) {
+        THROW_EXCEPTION( std::length_error, "vargroupXcontrast matrix is empty" );
     }
     if ( X.size() == 0 ) {
         THROW_EXCEPTION( std::length_error, "X draws are empty" );
@@ -349,7 +349,7 @@ data_frame ContrastStatistics(
         THROW_EXCEPTION(std::domain_error, "maxBandwidth cannot be negative");
     }
     if ( contrast_offsets.size() != ncontrasts ) {
-        THROW_EXCEPTION(std::length_error, "contrast_offsets size (%ld) doesn't match the rows of contrastXvargroup (%ld)",
+        THROW_EXCEPTION(std::length_error, "contrast_offsets size (%ld) doesn't match the rows of vargroupXcontrast (%ld)",
                         contrast_offsets.size(), ncontrasts);
     }
 
@@ -414,13 +414,13 @@ data_frame ContrastStatistics(
         LOG_DEBUG1("Calculating contrast #%d", contr_ix);
         std::vector<vargroup_map_t::const_iterator> contr_groups;
         std::size_t nperm = 1;
-        auto group_weights = contrastXvargroup[contr_ix];
+        auto group_weights = vargroupXcontrast[contr_ix];
 
         bool empty_groups = false;
         for ( R_xlen_t group_ix = 0; group_ix < ngroups; ++group_ix ) {
             const double w = group_weights[group_ix];
             if (w != 0.0) {
-                LOG_DEBUG2("contrastXvargroup[%d, %d]=%g", contr_ix, group_ix, w);
+                LOG_DEBUG2("vargroupXcontrast[%d, %d]=%g", contr_ix, group_ix, w);
                 const auto cXg = vargroup_id_t(contr_ix, group_ix);
                 vargroup_map_t::const_iterator groupIt = vargroups.find(cXg);
                 if ( groupIt != vargroups.end() ) {

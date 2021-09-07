@@ -63,6 +63,20 @@ maybe_rename <- function(df, cols, verbose=FALSE) {
   return(df)
 }
 
+#' Creates a matrix filled with a given value.
+#'
+#' @param val value for the matrix elements
+#' @param ... matrix dimnames specification
+#'
+#' @export
+constant_matrix <- function(val, dimnames, .var.name = varname(val))
+{
+  checkmate::assert_scalar(val, .var.name = .var.name)
+  checkmate::assert_list(dimnames, len=2, names="unique")
+  matrix(val, ncol = length(dimnames[[2]]), nrow = length(dimnames[[1]]),
+         dimnames = dimnames)
+}
+
 # converts data.frame df (long format) into a matrix
 # using row_col and col_col as its rows and columns and val_col as its values
 #' @export

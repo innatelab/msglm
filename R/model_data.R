@@ -71,14 +71,14 @@ prepare_effects <- function(model_data)
     conditions <- levels(model_data$conditions$condition)
     sactXiact.mtxs <- lapply(model_data$supXcond, function(supXcond.mtx){
       res <- iactXeffect(supXcond.mtx,
-                         model_data$superactions$glm_object_ix,
+                         model_data$superactions$index_object,
                          model_data$superactions$supcondition_ix)
       names(dimnames(res$mtx)) <- c("sact", "iact")
       res$mtx <- res$mtx[, colSums(abs(res$mtx)) != 0.0, drop=FALSE]
       res$df <- dplyr::rename(res$df, condition=eff, iaction_id=objeff)
       res$iaction_df <- dplyr::rename(res$objeff_df, condition=eff,
                                       iaction_id=objeff,
-                                      glm_object_ix=obj)
+                                      index_object=obj)
       res$objeff_df <- NULL
       return(res)
     })
@@ -95,8 +95,8 @@ prepare_effects <- function(model_data)
       return(x)
     })
     model_data$interactions <- dplyr::distinct(dplyr::bind_rows(lapply(sactXiact.mtxs, function(x) x$iaction_df))) %>%
-      dplyr::mutate(condition_ix = as.integer(condition)) %>%
-      dplyr::mutate(glm_iaction_ix = row_number(),
+      dplyr::mutate(index_condition = as.integer(condition)) %>%
+      dplyr::mutate(index_interaction = row_number(),
              is_virtual = FALSE)
     model_data$mixtions <- dplyr::bind_rows(lapply(names(sactXiact.mtxs), function(mixcoef){
       tibble::tibble(mixcoef = mixcoef,
@@ -106,7 +106,7 @@ prepare_effects <- function(model_data)
                     mixtion = paste0(mixcoef, " ", iaction_id),
                     mixcoef = factor(mixcoef, levels=rownames(mixcoefXeff.mtx)),
                     mixcoef_ix = replace_na(as.integer(mixcoef), 0L)) %>%
-    dplyr::left_join(dplyr::select(model_data$interactions, iaction_id, glm_iaction_ix)) %>%
+    dplyr::left_join(dplyr::select(model_data$interactions, iaction_id, index_interaction)) %>%
     dplyr::arrange(mixtion_ix)
     model_data$supactXmixt <- do.call(cbind, lapply(sactXiact.mtxs, function(x) x$mtx))
     dimnames(model_data$supactXmixt) <- list(superaction = model_data$superactions$supaction_id,
@@ -116,26 +116,26 @@ prepare_effects <- function(model_data)
     obs_ids <- unique(model_data$observations$observation_id)
   }
 
-  conds_ordered.df <- dplyr::select(model_data$interactions, condition, condition_ix) %>%
-        dplyr::distinct() %>% dplyr::arrange(condition_ix)
-  msruns_ordered.df <- dplyr::select(model_data$observations, msrun, msrun_ix) %>%
-        dplyr::distinct() %>% dplyr::arrange(msrun_ix)
+  conds_ordered.df <- dplyr::select(model_data$interactions, condition, index_condition) %>%
+        dplyr::distinct() %>% dplyr::arrange(index_condition)
+  msruns_ordered.df <- dplyr::select(model_data$observations, msrun, index_msrun) %>%
+        dplyr::distinct() %>% dplyr::arrange(index_msrun)
 
   iactXobjeff <- iactXeffect(conditionXeffect.mtx[as.character(conds_ordered.df$condition), , drop=FALSE],
-                             model_data$interactions$glm_object_ix,
-                             model_data$interactions$condition_ix)
+                             model_data$interactions$index_object,
+                             model_data$interactions$index_condition)
   if (exists("msrunXeffect.mtx")) {
     obsXobjeff <- iactXeffect(msrunXeffect.mtx[as.character(msruns_ordered.df$msrun), , drop=FALSE],
-                              model_data$observations$glm_object_ix,
-                              model_data$observations$msrun_ix)
+                              model_data$observations$index_object,
+                              model_data$observations$index_msrun)
   } else {
     obsXobjeff <- iactXeffect(conditionXeffect.mtx[as.character(conds_ordered.df$condition), , drop=FALSE],
-                              model_data$observations$glm_object_ix,
-                              model_data$observations$condition_ix)
+                              model_data$observations$index_object,
+                              model_data$observations$index_condition)
   }
   obsXobjeff$mtx <- obsXobjeff$mtx[, colnames(iactXobjeff$mtx), drop=FALSE]
   model_data$object_effects <- iactXobjeff$objeff_df %>%
-    dplyr::rename(glm_object_ix = obj,
+    dplyr::rename(index_object = obj,
                   effect = eff, object_effect = objeff) %>%
     dplyr::arrange(object_effect)
   model_data$iactXobjeff <- iactXobjeff$mtx
@@ -149,10 +149,10 @@ prepare_effects <- function(model_data)
       dplyr::arrange(effect)
 
   obsXobjbatcheff <- iactXeffect(msrunXbatchEffect.mtx[msruns_ordered.df$msrun, , drop=FALSE],
-                                 model_data$observations$glm_object_ix,
-                                 model_data$observations$msrun_ix)
+                                 model_data$observations$index_object,
+                                 model_data$observations$index_ msrun)
   model_data$object_batch_effects <- obsXobjbatcheff$objeff_df %>%
-    dplyr::rename(glm_object_ix = obj,
+    dplyr::rename(index_object = obj,
                   batch_effect = eff,
                   object_batch_effect = objeff) %>%
     dplyr::arrange(object_batch_effect)
@@ -161,20 +161,20 @@ prepare_effects <- function(model_data)
       dplyr::arrange(batch_effect)
   model_data$obsXobjbatcheff <- obsXobjbatcheff$mtx
   if ("subobjects" %in% names(model_data)) {
-    suoXobs = tidyr::crossing(glm_observation_ix = model_data$observations$glm_observation_ix,
-                              glm_subobject_ix = model_data$subobjects$glm_subobject_ix) %>%
-      dplyr::left_join(select(model_data$observations, glm_observation_ix, msrun_ix))
+    suoXobs = tidyr::crossing(index_observation = model_data$observations$index_observation,
+                              index_subobject = model_data$subobjects$index_subobject) %>%
+      dplyr::left_join(select(model_data$observations, index_observation, index_ msrun))
     suoxobsXsuobatcheff <- iactXeffect(msrunXsubbatchEffect.mtx[msruns_ordered.df$msrun, , drop=FALSE],
-                                       suoXobs$glm_subobject_ix,
-                                       suoXobs$msrun_ix)
+                                       suoXobs$index_subobject,
+                                       suoXobs$index_ msrun)
     model_data$suo_subbatch_effects <- suoxobsXsuobatcheff$objeff_df %>%
-      dplyr::rename(glm_subobject_ix = obj,
+      dplyr::rename(index_subobject = obj,
                     subbatch_effect = eff,
                     subobject_subbatch_effect = objeff) %>%
       dplyr::arrange(subobject_subbatch_effect)
     # remove reference subobject from subbatch effects (FIXME 1st subobject for EACH object in the model)
-    model_data$suoxobsXsuobatcheff <- suoxobsXsuobatcheff$mtx[, model_data$suo_subbatch_effects$glm_subobject_ix != 1L, drop=FALSE]
-    model_data$suo_subbatch_effects <- dplyr::filter(model_data$suo_subbatch_effects, glm_subobject_ix != 1L) %>%
+    model_data$suoxobsXsuobatcheff <- suoxobsXsuobatcheff$mtx[, model_data$suo_subbatch_effects$index_subobject != 1L, drop=FALSE]
+    model_data$suo_subbatch_effects <- dplyr::filter(model_data$suo_subbatch_effects, index_subobject != 1L) %>%
       dplyr::mutate(subobject_subbatch_effect = factor(subobject_subbatch_effect, levels=as.character(subobject_subbatch_effect)))
     model_data$subbatch_effects <- dplyr::select(subbatch_effects.df, subbatch_effect, is_positive) %>%
       dplyr::mutate(subbatch_effect = factor(subbatch_effect, levels=levels(model_data$suo_subbatch_effects$subbatch_effect))) %>%

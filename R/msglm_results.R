@@ -15,28 +15,28 @@
 msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
 {
   is_glmm <- "mixeffects" %in% names(model_data)
-  xaction_ix_col <- if (is_glmm) "glm_supaction_ix" else "glm_iaction_ix"
-  xdition_ix_col <- if (is_glmm) "supcondition_ix" else "condition_ix"
+  xaction_ix_col <- if (is_glmm) "glm_supaction_ix" else "index_interaction"
+  xdition_ix_col <- if (is_glmm) "supcondition_ix" else "index_condition"
   xdition_col <-  if (is_glmm) "supcondition" else "condition"
 
   objs_df <- model_data$objects
   if (!is.null(object_cols)) {
-    objs_df <- dplyr::select(objs_df, !!!unique(c("glm_object_ix", object_cols)))
+    objs_df <- dplyr::select(objs_df, !!!unique(c("index_object", object_cols)))
   }
   res <- list(iteration = NULL,
-    msrun = dplyr::select(model_data$mschannels, msrun_ix, msrun, any_of(c("mschannel", "mschannel_ix", "mstag", "condition", "supcondition"))),
-    observation = dplyr::select(model_data$msdata, glm_observation_ix, !!xaction_ix_col, glm_object_ix,
-                                !!xdition_ix_col, !!xdition_col, msrun, msrun_ix, any_of(c("mschannel", "mschannel_ix", "mstag"))) %>%
+    msrun = dplyr::select(model_data$mschannels, index_msrun, msrun, any_of(c("mschannel", "index_ mschannel", "mstag", "condition", "supcondition"))),
+    observation = dplyr::select(model_data$msdata, index_observation, !!xaction_ix_col, index_object,
+                                !!xdition_ix_col, !!xdition_col, msrun, index_msrun, any_of(c("mschannel", "index_ mschannel", "mstag"))) %>%
         dplyr::distinct() %>%
         dplyr::inner_join(objs_df),
     object = model_data$objects, # use full object information
     object_effect = model_data$object_effects %>%
-        dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
+        dplyr::mutate(index_object = as.integer(index_object)) %>%
         dplyr::inner_join(objs_df) %>%
         dplyr::inner_join(model_data$effects) %>%
         maybe_rename(c("prior_mean" = "mean", "prior_tau" = "tau")),
     object_batch_effect = model_data$object_batch_effects %>%
-        dplyr::mutate(glm_object_ix = as.integer(glm_object_ix)) %>%
+        dplyr::mutate(index_object = as.integer(index_object)) %>%
         dplyr::inner_join(objs_df)
   )
   if (!rlang::has_name(res$object_effect, "prior_mean")) { # set the default min to 0
@@ -46,21 +46,21 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
   res$object_effect <- mutate(res$object_effect,
                               prior_mean_log2=prior_mean/log(2))
   if ("subobjects" %in% names(model_data)) {
-    res$subobject <- dplyr::select(model_data$subobjects, glm_object_ix, glm_subobject_ix,
+    res$subobject <- dplyr::select(model_data$subobjects, index_object, index_subobject,
                                    any_of(c("protregroup_id", "protgroup_id", "pepmod_id", "pepmodstate_id", "charge")))
     if ("suo_subbatch_effects" %in% names(model_data)) {
       res$subobject_subbatch_effect <- model_data$suo_subbatch_effects %>%
-        dplyr::mutate(glm_subobject_ix = as.integer(glm_subobject_ix)) %>%
+        dplyr::mutate(index_subobject = as.integer(index_subobject)) %>%
         dplyr::left_join(res$subobject)
     }
   }
-  if ("msproto_ix" %in% colnames(model_data$mschannels)) {
-    res$msprotocol <- dplyr::select(model_data$mschannels, msproto_ix,
+  if ("index_mscalib" %in% colnames(model_data$mschannels)) {
+    res$msprotocol <- dplyr::select(model_data$mschannels, index_mscalib,
                                     any_of("instrument")) %>%
       dplyr::distinct()
   }
-  res$iaction <- dplyr::select(model_data$interactions, glm_iaction_ix,
-                               glm_object_ix, iaction_id, condition_ix, condition, is_virtual) %>%
+  res$iaction <- dplyr::select(model_data$interactions, index_interaction,
+                               index_object, iaction_id, index_condition, condition, is_virtual) %>%
     dplyr::inner_join(objs_df)
   if (is_glmm) {
     res$object_mixeffect <- dplyr::mutate(model_data$mixeffects, tmp="a") %>%
@@ -77,7 +77,7 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
       dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
       dplyr::select(-tmp)
     res$supaction <- dplyr::select(model_data$superactions, glm_supaction_ix,
-                                   glm_object_ix, supaction_id, supcondition_ix, supcondition, is_virtual) %>%
+                                   index_object, supaction_id, supcondition_ix, supcondition, is_virtual) %>%
         dplyr::inner_join(objs_df)
   }
   return(res)
@@ -263,7 +263,7 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
 append_contrasts_stats <- function(vars_results, standraws, varspecs,
         metaconditionXcontrast, contrasts.df, conditionXcontrast.df,
         condition_agg_col = "condition", # filtering is based on pregrouping quantiles in metacondition using this column (per contrast)
-        object_cols = 'glm_object_ix', metacondition_cols = c(),
+        object_cols = 'index_object', metacondition_cols = c(),
         group_cols = c()
 ){
   metacondition_col <- names(dimnames(metaconditionXcontrast))[[1]]
@@ -400,16 +400,16 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
     # we reuse(abuse) the contrast calculation for that -- just to group the appropriate draws
     # and get the summary statistics, but we don't need the contrasts
     message("  * obs_labu aggregate statistics...")
-    iactions.df <- dplyr::select(varspecs$cats_info$observations, glm_iaction_ix) %>% dplyr::distinct()
+    iactions.df <- dplyr::select(varspecs$cats_info$observations, index_interaction) %>% dplyr::distinct()
     iactions_diag <- diag(nrow = nrow(iactions.df), ncol = nrow(iactions.df))
-    dimnames(iactions_diag) <- list(glm_iaction_ix = iactions.df$glm_iaction_ix,
-                                    contrast = iactions.df$glm_iaction_ix)
+    dimnames(iactions_diag) <- list(index_interaction = iactions.df$index_interaction,
+                                    contrast = iactions.df$index_interaction)
     res$iactions_obsCI <- list(stats = vars_contrast_stats(msglm.stan_draws,
                                                            dplyr::filter(varspecs$spec_info, var == 'obs_labu') %>%
                                                            dplyr::inner_join(varspecs$cats_info$observations, by="var_index") %>%
-                                                           dplyr::group_by(condition, glm_object_ix, glm_iaction_ix),
+                                                           dplyr::group_by(condition, index_object, index_interaction),
                                                            vargroupXcontrast = iactions_diag,
-                                                           contrasts = dplyr::mutate(iactions.df, contrast=glm_iaction_ix, offset=0)) %>%
+                                                           contrasts = dplyr::mutate(iactions.df, contrast=index_interaction, offset=0)) %>%
                                       # actually, we don't need contrasts
                                       dplyr::select(-contrast, -offset))
   }

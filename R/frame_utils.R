@@ -46,6 +46,7 @@ rbind_all_frames <- function(frames_coll_list, frame_names = NULL, collection_id
   return (res)
 }
 
+# maybe rename the columns of the data.frame is they exist
 maybe_rename <- function(df, cols, verbose=FALSE) {
   for (i in seq_along(cols)) {
     old_col <- cols[[i]]

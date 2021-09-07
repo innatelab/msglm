@@ -3,8 +3,16 @@
 # Author: Alexey Stukalov
 ###############################################################################
 
+#' Binds the rows of the data frames from the list
+#' @param frames_coll_list list of lists of data frames
+#'
+#' @param frame_names character vector of data frame names (subelements of `frames_coll_list` elements) to bind
+#' @param collection_idcol name of the additional column that will be set to the name of the `frames_coll_list`
+#'        element where the rows are coming from
+#' @param verbose produce verbose output
+#'
 #' @export
-rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NULL, verbose=FALSE)
+rbind_all_frames <- function(frames_coll_list, frame_names = NULL, collection_idcol = NULL, verbose=FALSE)
 {
   if (is.null(frame_names)) {
     if (verbose) message("Determining which frames to bind...")
@@ -26,8 +34,8 @@ rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NU
     if (verbose) message("Binding rows of ", fname)
     dplyr::bind_rows(lapply(seq_along(frames_coll_list), function(coll_ix) {
       res <- frames_coll_list[[coll_ix]][[fname]]
-      if (!is.null(link_col) && nrow(res)>0) {
-        res[[link_col]] <- if (!is.null(names(frames_coll_list))) {
+      if (!is.null(collection_idcol) && nrow(res)>0) {
+        res[[collection_idcol]] <- if (!is.null(names(frames_coll_list))) {
           names(frames_coll_list)[[coll_ix]]
         } else coll_ix
       }

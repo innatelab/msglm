@@ -140,7 +140,7 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
 #' @param vars_draws MCMC draws for the model variables to use for contrast
 #'     calculation in `posterior::draws_array` 3D array format.
 #' @param vargroups grouped data frame that defines how variables are grouped.
-#'     The variables are identified by `varspec_ix` column, which corresponds
+#'     The variables are identified by `index_varspec` column, which corresponds
 #'     to the index of the variable in `vars_draws` array.
 #'     The existing grouping defines how the variables would be grouped.
 #'     The grouping should contain the column having the same name as
@@ -205,7 +205,7 @@ vars_contrast_stats <- function(vars_draws, vargroups,
   contrast_offsets <- rlang::set_names(contrasts$offset, contrasts$contrast)
   res <- dplyr::left_join(dplyr::select(contrasts, -dplyr::matches("^[lr]hs_quantile")),
         ContrastStatistics(vars_draws,
-                            vargroups$varspec_ix, vargroups$`__vargroup_ix__`, vargroups$`__contrast_ix__`,
+                            vargroups$index_varspec, vargroups$`__vargroup_ix__`, vargroups$`__contrast_ix__`,
                             vargroupXcontrast, contrast_offsets[colnames(vargroupXcontrast)],
                             nsteps = nsteps, maxBandwidth = maxBandwidth,
                             mlog10pvalue_threshold = mlog10pvalue_threshold,
@@ -300,9 +300,9 @@ append_contrasts_stats <- function(vars_results, standraws, varspecs,
                                   # FIXME use contrast_type for is_lhs check?
                                    (!is_lhs & is_preserved_condition)))
 
-    vargroups.df <- dplyr::inner_join(cat_varspecs, cat_info, by = "index_spec") %>%
+    vargroups.df <- dplyr::inner_join(cat_varspecs, cat_info, by = "var_index") %>%
       dplyr::inner_join(dplyr::filter(conditionXcontrast_pregroup_stats.df, is_accepted)) %>%
-      dplyr::select_at(c("var", "varspec_ix", "category", group_cols, contrast_col, metacondition_col, condition_col)) %>%
+      dplyr::select_at(c("var", "index_varspec", "category", group_cols, contrast_col, metacondition_col, condition_col)) %>%
       dplyr::group_by_at(c("var", "category", group_cols)) %>%
       dplyr::group_modify(~ vars_contrast_stats(standraws,
                               vargroups = dplyr::group_by_at(.x, c(metacondition_col, contrast_col)),
@@ -372,19 +372,19 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
     cat_varspecs.df <- dplyr::filter(varspecs$spec_info, category == cat)
     res.df <- msglm.stan_stats %>%
       dplyr::inner_join(cat_varspecs.df, by = "varspec") %>%
-      dplyr::left_join(cat_info.df, by = "index_spec") %>%
+      dplyr::left_join(cat_info.df, by = "var_index") %>%
       dplyr::select(-category) %>%
       dplyr::mutate(mean_log2 = mean/log(2),
                     median_log2 = median/log(2),
                     sd_log2 = sd/log(2))
     cat_eff_varspecs.df <- dplyr::filter(cat_varspecs.df, var %in% effect_vars) %>%
-      dplyr::left_join(dplyr::select(cat_info.df, index_spec, any_of("prior_mean")), by = "index_spec")
+      dplyr::left_join(dplyr::select(cat_info.df, var_index, any_of("prior_mean")), by = "var_index")
     if (nrow(cat_eff_varspecs.df) > 0) {
       message('    - calculating P-values for: ',
               paste0(unique(cat_eff_varspecs.df$var), collapse=', '), '...')
       p_values.df <- vars_pvalues(msglm.stan_draws, dplyr::select(cat_eff_varspecs.df, varspec, any_of("prior_mean")))
       res.df <- dplyr::left_join(res.df, p_values.df) %>%
-        dplyr::select(-varspec_ix, -index_spec)
+        dplyr::select(-index_varspec, -var_index)
     }
     list(stats = res.df)
   })
@@ -406,7 +406,7 @@ process.stan_fit <- function(msglm.stan_fit, dims_info,
                                     contrast = iactions.df$glm_iaction_ix)
     res$iactions_obsCI <- list(stats = vars_contrast_stats(msglm.stan_draws,
                                                            dplyr::filter(varspecs$spec_info, var == 'obs_labu') %>%
-                                                           dplyr::inner_join(varspecs$cats_info$observations, by="index_spec") %>%
+                                                           dplyr::inner_join(varspecs$cats_info$observations, by="var_index") %>%
                                                            dplyr::group_by(condition, glm_object_ix, glm_iaction_ix),
                                                            vargroupXcontrast = iactions_diag,
                                                            contrasts = dplyr::mutate(iactions.df, contrast=glm_iaction_ix, offset=0)) %>%

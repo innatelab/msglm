@@ -24,12 +24,12 @@ process_varspecs <- function(varspecs, vars_info, dims_info) {
   all_vars.df <- bind_rows(lapply(names(vars_info), function(cat) tibble(category = cat,
                                                                          var = vars_info[[cat]]$names)))
   all_varspecs.df <- tibble(varspec = varspecs,
-                            varspec_ix = seq_along(varspecs)) %>%
-    tidyr::extract(varspec, c("var", "index_spec"),
+                            index_varspec = seq_along(varspecs)) %>%
+    tidyr::extract(varspec, c("var", "var_index"),
                    '^(\\w[^[]+)(?:\\[((?:\\d+\\,)*\\d+)\\])?$', remove=FALSE) %>%
-    dplyr::mutate(index_spec = ifelse(index_spec == '', NA_character_, index_spec)) %>%
+    dplyr::mutate(var_index = ifelse(var_index == '', NA_character_, var_index)) %>%
     dplyr::inner_join(all_vars.df, by = 'var')
-  cat_specs.df <- dplyr::distinct(all_varspecs.df, category, index_spec) %>%
+  cat_specs.df <- dplyr::distinct(all_varspecs.df, category, var_index) %>%
     dplyr::group_by(category)
   cats_info <- dplyr::group_map(cat_specs.df, function(cat_df, cat_row) {
       cat <- cat_row$category
@@ -46,7 +46,7 @@ process_varspecs <- function(varspecs, vars_info, dims_info) {
         warning('Category ', cat, ' dimensions ',
                 dims.df$name[dims.df$local_ix > 1], ' not unique, using suffixes')
       }
-      cat_df <- tidyr::separate(cat_df, index_spec, c(dims.df$col), remove=FALSE, convert=TRUE, sep=",")
+      cat_df <- tidyr::separate(cat_df, var_index, c(dims.df$col), remove=FALSE, convert=TRUE, sep=",")
       # append info of each dimension
       for (dim_ix in seq_len(nrow(dims.df))) {
         dim_name = dims.df$name

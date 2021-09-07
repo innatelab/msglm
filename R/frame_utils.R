@@ -80,11 +80,11 @@ constant_matrix <- function(val, dimnames, .var.name = varname(val))
 # converts data.frame df (long format) into a matrix
 # using row_col and col_col as its rows and columns and val_col as its values
 #' @export
-frame2matrix <- function(df, row_col, col_col, val_col="w", cols=NULL, rows=NULL) {
+frame2matrix <- function(df, row_col, col_col, val_col="w", val_default=0, cols=NULL, rows=NULL) {
   mtx_dims <- list(if (!is.null(rows) && length(rows) > 0) rows else if (is.factor(df[[row_col]])) levels(df[[row_col]]) else as.character(unique(df[[row_col]])),
                    if (!is.null(cols) && length(cols) > 0) cols else if (is.factor(df[[col_col]])) levels(df[[col_col]]) else as.character(unique(df[[col_col]])))
   names(mtx_dims) <- c(row_col, col_col)
-  mtx <- do.call(zero_matrix, mtx_dims)
+  mtx <- constant_matrix(val_default, mtx_dims)
   row_vals <- df[[row_col]]
   col_vals <- df[[col_col]]
   w_vals <- df[[val_col]]

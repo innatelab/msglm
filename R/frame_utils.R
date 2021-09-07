@@ -77,21 +77,53 @@ constant_matrix <- function(val, dimnames, .var.name = varname(val))
          dimnames = dimnames)
 }
 
-# converts data.frame df (long format) into a matrix
-# using row_col and col_col as its rows and columns and val_col as its values
+#' Converts data.frame into a matrix
+#' using row_col and col_col as its rows and columns and val_col as its values
+#'
+#' @param df data.frame (in a long format) to convert
+#' @param row_col the Id of the row in the resulting matrix
+#' @param col_col the Id of the column in the resulting matrix
+#' @param val_col the values of the matrix elements
+#' @param val_default the default value if no corresponding row in `df` exist
+#' @param cols (optional) column ids of the resulting matrix (in a specified order)
+#' @param rows (optional) row ids of the resulting matrix (in a specified order)
+#'
 #' @export
 frame2matrix <- function(df, row_col, col_col, val_col="w", val_default=0, cols=NULL, rows=NULL) {
-  mtx_dims <- list(if (!is.null(rows) && length(rows) > 0) rows else if (is.factor(df[[row_col]])) levels(df[[row_col]]) else as.character(unique(df[[row_col]])),
-                   if (!is.null(cols) && length(cols) > 0) cols else if (is.factor(df[[col_col]])) levels(df[[col_col]]) else as.character(unique(df[[col_col]])))
-  names(mtx_dims) <- c(row_col, col_col)
-  mtx <- constant_matrix(val_default, mtx_dims)
-  row_vals <- df[[row_col]]
-  col_vals <- df[[col_col]]
-  w_vals <- df[[val_col]]
-  if (nrow(df) > 0L) {
-    for (i in 1:nrow(df)) {
-      mtx[row_vals[[i]], col_vals[[i]]] <- w_vals[[i]]
+  # fix the rows/cols order
+  if (is.null(rows)) {
+    df_rows <- df[[row_col]]
+    rows <- if (is.factor(df_rows)) {
+      levels(df_rows)
+    } else {
+      sort(unique(df_rows))
     }
+  }
+  if (is.null(cols)) {
+    df_cols <- df[[col_col]]
+    cols <- if (is.factor(df_cols)) {
+      levels(df_cols)
+    } else {
+      sort(unique(df_cols))
+    }
+  }
+  df_expanded <- tidyr::expand_grid(!!sym(col_col) := cols, !!sym(row_col) := rows) %>%
+    dplyr::left_join(df, by=c(col_col, row_col)) %>%
+    dplyr::mutate(!!sym(val_col) := coalesce(!!sym(val_col), val_default),
+                  !!sym(row_col) := factor(!!sym(row_col), levels=rows),
+                  !!sym(col_col) := factor(!!sym(col_col), levels=cols)) %>%
+    dplyr::arrange_at(c(col_col, row_col))
+  mtx <- stats::xtabs(as.formula(paste0(val_col, " ~ ", row_col, " + ", col_col)), data=df_expanded)
+  checkmate::assert_set_equal(names(dimnames(mtx)), c(row_col, col_col), ordered=TRUE)
+  if (nrow(mtx) == 0 || is.integer(rows) && vctrs::vec_equal(rows, seq_len(nrow(mtx)))) {
+    rownames(mtx) <- NULL
+  } else {
+    checkmate::assert_set_equal(rownames(mtx), rows, ordered=TRUE)
+  }
+  if (ncol(mtx) == 0 || is.integer(cols) && vctrs::vec_equal(cols, seq_len(ncol(mtx)))) {
+    colnames(mtx) <- NULL
+  } else {
+    checkmate::assert_set_equal(colnames(mtx), cols, ordered=TRUE)
   }
   return(mtx)
 }

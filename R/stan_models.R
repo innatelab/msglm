@@ -48,7 +48,7 @@ nrows_cumsum <- function(df, group_col) {
 #' @param base_input_data input data already in Stan format (e.g. MS noise model parameters)
 #' @param model_data the list with MS data an experimental design
 #'
-#' @param global_labu_shift the average log-abundance of model objects
+#' @param obj_labu_shift the average log-abundance of model objects
 #' @param effect_slab_df the *degrees of freedom* for the prior of object effect *slab* regularization parameter
 #' @param effect_slab_scale the *scale* parameter for the prior of object effect *slab* regularization parameter
 #' @param obj_labu_min minimal object log-abundance
@@ -68,7 +68,7 @@ nrows_cumsum <- function(df, group_col) {
 #'
 #' @export
 stan.prepare_data <- function(base_input_data, model_data,
-                              global_labu_shift = global_protgroup_labu_shift,
+                              obj_labu_shift = global_protgroup_labu_shift,
                               effect_slab_df = 4, effect_slab_scale = 2.5,
                               obj_labu_min = -10, obj_labu_min_scale = 1,
                               iact_repl_shift_tau=0.03, iact_repl_shift_df=4.0,
@@ -130,13 +130,18 @@ stan.prepare_data <- function(base_input_data, model_data,
     batch_effect_is_positive = as.array(as.integer(model_data$batch_effects$is_positive)),
     NobjBatchEffects = nrow(model_data$object_batch_effects),
     obj_batch_effect2batch_effect = as.array(as.integer(model_data$object_batch_effects$batch_effect)),
+
+    obj_labu_shift = obj_labu_shift,
+    obj_base_labu_sigma = 15.0,
+    obj_labu_min = obj_labu_min,
+    obj_labu_min_scale = obj_labu_min_scale,
+
     Nquanted = sum(!missing_mask),
     Nmissed = sum(missing_mask),
     missing_sigmoid_scale = as.array(if_else(msdata_obs_flags.df$is_empty_observation[missing_mask], empty_observation_sigmoid_scale, 1.0)),
     quant2obs = as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_qdata)]),
     miss2obs = as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_mdata)]),
     qData = as.array(model_data$msdata$intensity[!missing_mask]),
-    global_labu_shift = global_labu_shift,
     effect_tau = effects.df$prior_tau,
     effect_mean = effects.df$prior_mean,
     effect_df = if (rlang::has_name(effects.df, "prior_df")) {effects.df$prior_df} else {rep.int(1.0, nrow(effects.df))},
@@ -145,8 +150,6 @@ stan.prepare_data <- function(base_input_data, model_data,
     effect_slab_scale = effect_slab_scale,
     hsprior_lambda_a_offset = hsprior_lambda_a_offset,
     hsprior_lambda_t_offset = hsprior_lambda_t_offset,
-    obj_labu_min = obj_labu_min, obj_labu_min_scale = obj_labu_min_scale,
-    obj_base_labu_sigma = 15.0,
     iact_repl_shift_tau = iact_repl_shift_tau, iact_repl_shift_df = iact_repl_shift_df,
     batch_effect_sigma = batch_effect_sigma,
     #zShift = mean(log(msdata$protgroup_intensities$intensity), na.rm = TRUE),

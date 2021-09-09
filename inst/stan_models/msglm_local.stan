@@ -144,17 +144,18 @@ data {
   int<lower=1, upper=NobjBatchEffects> obsXobjbatcheff_v[obsXobjbatcheff_Nw];
 
   // global model constants
+  real obj_labu_shift;   // shift to be applied to all XXX_labu variables to get the real log intensity
+  real obj_labu_min; // minimal average abundance of an object
+  real<lower=0> obj_labu_min_scale; // scale that defines the softness of lower abundance limit
+
   real<lower=0.0> hsprior_lambda_a_offset; // prevent lambda_a/t being too close to zero, because that negatively affects MCMC convergence
   real<lower=0.0> hsprior_lambda_t_offset;
-  real global_labu_shift;   // shift to be applied to all XXX_labu variables to get the real log intensity
   vector<lower=0>[Neffects] effect_tau;
   vector<lower=0>[Neffects] effect_df;
   vector<lower=0>[Neffects] effect_df2;
   real<lower=0> effect_slab_df;
   real<lower=0> effect_slab_scale;
 
-  real obj_labu_min; // minimal average abundance of an object
-  real<lower=0> obj_labu_min_scale; // scale that defines the softness of lower abundance limit
   real<lower=0> obj_base_labu_sigma; // sigma of average abundance distribution
   real<lower=0> iact_repl_shift_tau;
   real<lower=0> iact_repl_shift_df;
@@ -175,7 +176,7 @@ data {
 }
 
 transformed data {
-  real mzShift = zShift - global_labu_shift; // zShift for the missing observation intensity
+  real mzShift = zShift - obj_labu_shift; // zShift for the missing observation intensity
   vector[Nquanted] zScore = (log(qData) - zShift) * zScale;
   vector[Nquanted] qLogStd; // log(sd(qData))-global_labu_shift
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
@@ -227,7 +228,7 @@ transformed data {
     for (i in 1:Nquanted) {
       qLogStd[i] = intensity_log_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
       qDataNorm[i] = exp(log(qData[i]) - qLogStd[i]);
-      qLogStd[i] -= global_labu_shift; // obs_labu is modeled without obj_base
+      qLogStd[i] -= obj_labu_shift; // obs_labu is modeled without obj_base
     }
   }
 

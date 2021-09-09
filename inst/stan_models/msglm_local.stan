@@ -129,19 +129,19 @@ data {
   // iactXobjeff (interaction X object_effect) sparse matrix
   int<lower=0> iactXobjeff_Nw;
   vector[iactXobjeff_Nw] iactXobjeff_w;
-  int<lower=0, upper=iactXobjeff_Nw+1> iactXobjeff_u[Niactions+1];
-  int<lower=0, upper=NobjEffects> iactXobjeff_v[iactXobjeff_Nw];
+  int<lower=1, upper=iactXobjeff_Nw+1> iactXobjeff_u[Niactions+1];
+  int<lower=1, upper=NobjEffects> iactXobjeff_v[iactXobjeff_Nw];
 
   int<lower=0> obsXobjeff_Nw;
   vector[obsXobjeff_Nw] obsXobjeff_w;
-  int<lower=0, upper=obsXobjeff_Nw+1> obsXobjeff_u[Nobservations+1];
-  int<lower=0, upper=NobjEffects> obsXobjeff_v[obsXobjeff_Nw];
+  int<lower=1, upper=obsXobjeff_Nw+1> obsXobjeff_u[Nobservations+1];
+  int<lower=1, upper=NobjEffects> obsXobjeff_v[obsXobjeff_Nw];
 
   // obsXobj_batcheff (observation X object_batch_effect) sparse matrix
   int<lower=0> obsXobjbatcheff_Nw;
   vector[obsXobjbatcheff_Nw] obsXobjbatcheff_w;
-  int<lower=0, upper=obsXobjbatcheff_Nw+1> obsXobjbatcheff_u[Nobservations + 1];
-  int<lower=0, upper=NobjBatchEffects> obsXobjbatcheff_v[obsXobjbatcheff_Nw];
+  int<lower=1, upper=obsXobjbatcheff_Nw+1> obsXobjbatcheff_u[NbatchEffects > 0 ? Nobservations + 1 : 1];
+  int<lower=1, upper=NobjBatchEffects> obsXobjbatcheff_v[obsXobjbatcheff_Nw];
 
   // global model constants
   real<lower=0.0> hsprior_lambda_a_offset; // prevent lambda_a/t being too close to zero, because that negatively affects MCMC convergence

@@ -12,7 +12,7 @@
 #' @seealso process.stan_fit
 #'
 #' @export
-msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
+msglm_dims <- function(model_data)
 {
   is_glmm <- "mixeffects" %in% names(model_data)
   xaction_ix_col <- if (is_glmm) "glm_supaction_ix" else "index_interaction"
@@ -55,13 +55,13 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
     }
   }
   if ("index_mscalib" %in% colnames(model_data$mschannels)) {
-    res$msprotocol <- dplyr::select(model_data$mschannels, index_mscalib,
-                                    any_of("instrument")) %>%
+    res$mscalib <- dplyr::select(model_data$mschannels, index_mscalib,
+                                 any_of("instrument")) %>%
       dplyr::distinct()
   }
-  res$iaction <- dplyr::select(model_data$interactions, index_interaction,
-                               index_object, iaction_id, index_condition, condition, is_virtual) %>%
-    dplyr::inner_join(objs_df)
+  res$interaction <- dplyr::select(model_data$interactions, index_interaction,
+                                   index_object, iaction_id, index_condition, condition, is_virtual) %>%
+    dplyr::inner_join(objs_df, by="index_object")
   if (is_glmm) {
     res$object_mixeffect <- dplyr::mutate(model_data$mixeffects, tmp="a") %>%
       dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
@@ -80,6 +80,17 @@ msglm.prepare_dims_info <- function(model_data, object_cols = NULL)
                                    index_object, supaction_id, supcondition_ix, supcondition, is_virtual) %>%
         dplyr::inner_join(objs_df)
   }
+  res <- lapply(setNames(names(res), names(res)), function(dimname) {
+    dim_df <- res[[dimname]]
+    if (!is.null(dim_df)) {
+      # check index correctness
+      index_col <- paste0('index_', dimname)
+      checkmate::assert_set_equal(dim_df[[index_col]], seq_len(nrow(dim_df)), ordered=TRUE)
+      # remove unused dimensions (everything except index_object and index_interaction)
+      dim_df <- dplyr::select(dim_df, -(starts_with("index_") & !any_of(c(index_col, "index_interaction", "index_object", "index_subobject"))))
+    }
+    return(dim_df)
+  })
   return(res)
 }
 

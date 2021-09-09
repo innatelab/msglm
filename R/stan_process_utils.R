@@ -53,7 +53,7 @@ process_varspecs <- function(varspecs, vars_info, dims_info) {
         if (!(dim_name %in% names(dims_info))) {
           warning('No information for dimension #', dim_ix, " (", dim_name, ")")
         } else {
-          dim_info = dims_info[[dim_name]]
+          dim_info = dplyr::select(dims_info[[dim_name]], -all_of(paste0('index_', dim_name)))
           ixs = cat_df[[dims.df$col[[dim_ix]]]]
           avail_ixs <- unique(ixs)
           def_ixs = 1:nrow(dim_info)

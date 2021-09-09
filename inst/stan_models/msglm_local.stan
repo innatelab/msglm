@@ -94,23 +94,23 @@ functions {
 }
 
 data {
-  int<lower=1> Nexperiments;    // number of experiments
+  int<lower=1> Nmschannels;     // number of mschannels
   int<lower=1> Nconditions;     // number of experimental conditions
   int<lower=0> Nobjects;        // number of objects (proteins/peptides/sites etc)
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
-  int<lower=0> Nobservations;   // number of observations of interactions (objectXexperiment pairs for all iactions and experiments of its condition)
+  int<lower=0> Nobservations;   // number of observations of interactions (objectXmschannel pairs for all iactions and mschannels of its condition)
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
 
-  vector[Nexperiments] experiment_shift;
+  vector[Nmschannels] mschannel_shift;
 
-  int<lower=1,upper=Nexperiments> observation2experiment[Nobservations];
+  int<lower=1,upper=Nmschannels> observation2mschannel[Nobservations];
   int<lower=1,upper=Niactions> observation2iaction[Nobservations];
 
   // map from labelXreplicateXobject to observed/missed data
-  int<lower=0> Nquanted;        // total number of quantified objectsXexperiments
+  int<lower=0> Nquanted;        // total number of quantified objectsXmschannels
   int<lower=1,upper=Nobservations>  quant2obs[Nquanted];
   int<lower=0,upper=1> quant_isreliable[Nquanted];
-  int<lower=0> Nmissed;         // total number of missed objectsXexperiments
+  int<lower=0> Nmissed;         // total number of missed objectsXmschannels
   int<lower=1,upper=Nobservations> miss2obs[Nmissed];
   vector<lower=0>[Nquanted] qData; // quanted data
   vector<lower=0, upper=1>[Nmissed] missing_sigmoid_scale; // sigmoid scales for indiv. observations (<1 for higher uncertainty)
@@ -185,9 +185,9 @@ transformed data {
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
 
   int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2obs];
-  int<lower=1,upper=Nexperiments> quant2experiment[Nquanted] = observation2experiment[quant2obs];
+  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted] = observation2mschannel[quant2obs];
   int<lower=1,upper=Niactions> miss2iaction[Nmissed] = observation2iaction[miss2obs];
-  int<lower=1,upper=Nexperiments> miss2experiment[Nmissed] = observation2experiment[miss2obs];
+  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed] = observation2mschannel[miss2obs];
 
   int<lower=0,upper=NobjEffects> NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   int<lower=0,upper=NobjEffects> NobjEffectsOther = NobjEffects - NobjEffectsPos;
@@ -345,7 +345,7 @@ parameters {
   vector[NobjEffectsOther] obj_effect_unscaled_other;
 
   //real<lower=0> obj_repl_effect_sigma;
-  //vector<lower=0>[Nobjects*Nexperiments] repl_shift_lambda;
+  //vector<lower=0>[Nobjects*Nmschannels] repl_shift_lambda;
   vector<lower=0>[Nobservations0 > 0 ? Niactions : 0] iact_repl_shift_lambda_t;
   vector<lower=0>[Nobservations0 > 0 ? Niactions : 0] iact_repl_shift_lambda_a;
   vector[Nobservations0] obs_shift0;
@@ -365,7 +365,7 @@ transformed parameters {
 
   vector<lower=0>[Nobservations0 > 0 ? Niactions : 0] iact_repl_shift_sigma;
 
-  vector[Nobservations] obs_labu; // iaction_labu + objXexp_repl_shift * obj_repl_shift_sigma
+  vector[Nobservations] obs_labu; // iaction_labu + iact_repl_shift * obj_repl_shift_sigma
   vector[Nobservations0 > 0 ? Nobservations : 0] obs_repl_shift; // replicate shifts for all potential observations (including missing)
   vector[NobjBatchEffects > 0 ? Nobservations : 0] obs_batch_shift;
 
@@ -445,10 +445,10 @@ model {
         vector[Nquanted] q_labu;
         vector[Nmissed] m_labu;
 
-        q_labu = obs_labu[quant2obs] + experiment_shift[quant2experiment];
-        m_labu = obs_labu[miss2obs] + experiment_shift[miss2experiment];
-        //qLogAbu = iaction_shift[quant2iaction] + experiment_shift[quant2experiment];
-        //mLogAbu = iaction_shift[miss2iaction] + experiment_shift[miss2experiment];
+        q_labu = obs_labu[quant2obs] + mschannel_shift[quant2mschannel];
+        m_labu = obs_labu[miss2obs] + mschannel_shift[miss2mschannel];
+        //qLogAbu = iaction_shift[quant2iaction] + mschannel_shift[quant2mschannel];
+        //mLogAbu = iaction_shift[miss2iaction] + mschannel_shift[miss2mschannel];
         if (NbatchEffects > 0) {
           q_labu += obs_batch_shift[quant2obs];
           m_labu += obs_batch_shift[miss2obs];

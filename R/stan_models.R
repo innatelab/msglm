@@ -100,11 +100,11 @@ stan.prepare_data <- function(model_data,
   missing_mask <- is.na(model_data$msdata$intensity)
   res <- list(
     Nobservations = nrow(obs_df),
-    Nexperiments = n_distinct(model_data$mschannels$index_mschannel),
+    Nmschannels = n_distinct(model_data$mschannels$index_mschannel),
     Nconditions = nrow(model_def$conditions),
     Nobjects = nrow(model_data$objects),
-    experiment_shift = as.array(model_data$mschannels$mschannel_shift),
-    observation2experiment = as.array(obs_df$index_mschannel),
+    mschannel_shift = as.array(model_data$mschannels$mschannel_shift),
+    observation2mschannel = as.array(obs_df$index_mschannel),
 
     Neffects = ncol(model_def$conditionXeffect),
     effect_is_positive = as.array(as.integer(model_def$effects$is_positive)),
@@ -184,7 +184,7 @@ stan.prepare_data <- function(model_data,
       subobs2obs = as.array(model_data$msdata$index_observation),
       # TODO support different noise models
       Nmsprotocols = 0L,
-      experiment2msproto = integer(0),
+      mschannel2msproto = integer(0),
 
       # subobject-specific batch effects
       NquantBatchEffects = n_distinct(model_data$subobject_batch_effects$index_quant_batch_effect),
@@ -205,7 +205,7 @@ stan.prepare_data <- function(model_data,
   }
   if ('index_mscalib' %in% names(model_data$mschannels)) {
     res$Nmsprotocols <- n_distinct(model_data$mschannels$index_mscalib)
-    res$experiment2msproto <- as.array(model_data$mschannels$index_mscalib)
+    res$mschannel2msproto <- as.array(model_data$mschannels$index_mscalib)
   }
   if ("Nsubobjects" %in% names(res)) {
     message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s) with ",

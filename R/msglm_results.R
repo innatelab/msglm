@@ -294,11 +294,13 @@ append_contrasts_stats <- function(vars_results, standraws, varspecs,
     message('  * ', cat$category,
             ' variables: ', paste0(unique(cat_varspecs$var), collapse=', '), '...')
     cat_info <- varspecs$cats_info[[cat$category]]
-    cat_vars_stats <- dplyr::semi_join(vars_results[[cat$category]]$stats, dplyr::select(cat_varspecs, varspec), by = "varspec")
+    cat_vars_stats <- dplyr::semi_join(vars_results[[cat$category]]$stats,
+                                       dplyr::select(cat_varspecs, varspec), by = "varspec")
     cat_cols <- intersect(colnames(cat_vars_stats), colnames(cat_info))
 
     conditionXcontrast_pregroup_stats.df <- dplyr::inner_join(cat_vars_stats,
-                                                              dplyr::mutate(conditionXcontrast.df, is_lhs = weight > 0)) %>%
+                                                              dplyr::mutate(conditionXcontrast.df, is_lhs = weight > 0),
+                                                              by = condition_col) %>%
       dplyr::group_by_at(c("var", group_cols, contrast_col, metacondition_col, condition_agg_col,
                            "is_lhs", "is_preserved_condition")) %>%
       dplyr::summarize(var_pregroup_max = max(mean), var_pregroup_min = min(mean)) %>%

@@ -188,7 +188,8 @@ transformed data {
 
   int<lower=0,upper=NobjEffects> NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   int<lower=0,upper=NobjEffects> NobjEffectsOther = NobjEffects - NobjEffectsPos;
-  int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects];
+  int<lower=1,upper=NobjEffects> obj_effect_reshuffle[NobjEffects] =
+      objeffects_reshuffle(obj_effect2effect, effect_is_positive);
   vector<lower=0>[NobjEffects] obj_effect_tau = effect_tau[obj_effect2effect];
   vector[NobjEffects] obj_effect_mean = effect_mean[obj_effect2effect];
   vector<lower=0>[NobjEffects] obj_effect_df = effect_df[obj_effect2effect];
@@ -196,7 +197,8 @@ transformed data {
 
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsPos = sum(batch_effect_is_positive[obj_batch_effect2batch_effect]);
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsOther = NobjBatchEffects - NobjBatchEffectsPos;
-  int<lower=1,upper=NobjBatchEffects> obj_batch_effect_reshuffle[NobjBatchEffects];
+  int<lower=1,upper=NobjBatchEffects> obj_batch_effect_reshuffle[NobjBatchEffects] =
+      objeffects_reshuffle(obj_batch_effect2batch_effect, batch_effect_is_positive);
 
   vector[Niactions] iactXobjbase_w = rep_vector(1.0, Niactions);
   int<lower=0> iactXobjbase_u[Niactions + 1] = one_to(Niactions + 1);
@@ -218,10 +220,6 @@ transformed data {
   matrix[Nobjects + NobjEffects, Niactions] iaction2objeffx_op;
   //matrix[Niactions, Nobjects] iactXobjbase = csr_to_dense_matrix(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u);
   //matrix[Niactions, NobjEffects] iactXobjeff = csr_to_dense_matrix(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u);
-
-  // prepare reshuffling of positive/other effects
-  obj_effect_reshuffle = objeffects_reshuffle(obj_effect2effect, effect_is_positive);
-  obj_batch_effect_reshuffle = objeffects_reshuffle(obj_batch_effect2batch_effect, batch_effect_is_positive);
 
   // process the intensity data to optimize likelihood calculation
   {

@@ -124,10 +124,20 @@ stan.prepare_data <- function(base_input_data, model_data,
     observation2experiment = as.array(obs_df$index_mschannel),
     Neffects = ncol(conditionXeffect.mtx),
     effect_is_positive = as.array(as.integer(model_data$effects$is_positive)),
+    effect_tau = effects.df$prior_tau,
+    effect_mean = effects.df$prior_mean,
+    effect_df = if (rlang::has_name(effects.df, "prior_df")) {effects.df$prior_df} else {rep.int(1.0, nrow(effects.df))},
+    effect_df2 = if (rlang::has_name(effects.df, "prior_df2")) {effects.df$prior_df2} else {rep.int(1.0, nrow(effects.df))},
+    effect_slab_df = effect_slab_df,
+    effect_slab_scale = effect_slab_scale,
+
     NobjEffects = nrow(model_data$object_effects),
     obj_effect2effect = as.array(as.integer(model_data$object_effects$effect)),
+
     NbatchEffects = ncol(msrunXbatchEffect.mtx),
     batch_effect_is_positive = as.array(as.integer(model_data$batch_effects$is_positive)),
+    batch_effect_sigma = batch_effect_sigma,
+
     NobjBatchEffects = nrow(model_data$object_batch_effects),
     obj_batch_effect2batch_effect = as.array(as.integer(model_data$object_batch_effects$batch_effect)),
 
@@ -142,16 +152,9 @@ stan.prepare_data <- function(base_input_data, model_data,
     quant2obs = as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_qdata)]),
     miss2obs = as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_mdata)]),
     qData = as.array(model_data$msdata$intensity[!missing_mask]),
-    effect_tau = effects.df$prior_tau,
-    effect_mean = effects.df$prior_mean,
-    effect_df = if (rlang::has_name(effects.df, "prior_df")) {effects.df$prior_df} else {rep.int(1.0, nrow(effects.df))},
-    effect_df2 = if (rlang::has_name(effects.df, "prior_df2")) {effects.df$prior_df2} else {rep.int(1.0, nrow(effects.df))},
-    effect_slab_df = effect_slab_df,
-    effect_slab_scale = effect_slab_scale,
     hsprior_lambda_a_offset = hsprior_lambda_a_offset,
     hsprior_lambda_t_offset = hsprior_lambda_t_offset,
     iact_repl_shift_tau = iact_repl_shift_tau, iact_repl_shift_df = iact_repl_shift_df,
-    batch_effect_sigma = batch_effect_sigma,
     #zShift = mean(log(msdata$protgroup_intensities$intensity), na.rm = TRUE),
     #zScale = 1.0/sd(log(msdata$protgroup_intensities$intensity), na.rm = TRUE)
   )) %>%
@@ -185,10 +188,6 @@ stan.prepare_data <- function(base_input_data, model_data,
 
   if ("subobjects" %in% names(model_data)) {
     # data have subobjects
-    res$Nsubobjects <- nrow(model_data$subobjects)
-    res$subobj2obj <- as.array(as.integer(model_data$subobjects$index_object))
-    res$quant2subobj <- as.array(as.integer(model_data$msdata$index_subobject[!is.na(model_data$msdata$index_qdata)]))
-    res$miss2subobj <- as.array(as.integer(model_data$msdata$index_subobject[!is.na(model_data$msdata$index_mdata)]))
     # calculate probabilities that all quantitations of subobjects in a given observation are false discoveries
     # TODO this could be applied to the protgroup-level model if there's external quality measure (e.g. protein identification q-value)
     obs_stats.df <- dplyr::group_by(model_data$msdata, index_interaction, index_observation) %>%
@@ -209,21 +208,29 @@ stan.prepare_data <- function(base_input_data, model_data,
                     dplyr::ungroup()
     obs_stats.df <- left_join(obs_stats.df, iact_stats.df) %>%
       arrange(index_observation)
-    res$observation_reliable <- as.array(obs_stats.df$obj_exists_pvalue <= reliable_obs_fdr |
-                                         obs_stats.df$iaction_specific_pvalue <= specific_iaction_fdr)
-    res$Nmsprotocols <- 0L
-    res$experiment2msproto <- integer(0)
-    # subobject-specific batch effects
-    if ("subobj_batch_effects" %in% names(model_data)) {
-      res$NquantBatchEffects <- ncol(msrunXsubbatchEffect.mtx)
-      res$NsubobjBatchEffects <- nrow(model_data$subobj_batch_effects)
-      res$quant_batch_effect_tau <- subbatch_tau
-      res$quant_batch_effect_df <- subbatch_df
-      res$quant_batch_effect_c <- subbatch_c
-      res$subobj_batch_effect2quant_batch_effect <- as.array(as.integer(model_data$quant_batch_effects$quant_batch_effect))
-      res$quant_batch_effect_is_positive = as.array(as.integer(model_data$quant_batch_effects$is_positive))
-      res <- modifyList(res, matrix2csr("subobsXsubobjbatcheff", model_data$subobsXsubobjbatcheff))
-    }
+
+    subobj_data <- list(
+      Nsubobjects = nrow(model_data$subobjects),
+      subobj2obj = as.array(as.integer(model_data$subobjects$index_object)),
+      quant2subobj = as.array(as.integer(model_data$msdata$index_subobject[!is.na(model_data$msdata$index_qdata)])),
+      miss2subobj = as.array(as.integer(model_data$msdata$index_subobject[!is.na(model_data$msdata$index_mdata)])),
+      observation_reliable = as.array(obs_stats.df$obj_exists_pvalue <= reliable_obs_fdr |
+                                      obs_stats.df$iaction_specific_pvalue <= specific_iaction_fdr),
+      # TODO support different noise models
+      Nmsprotocols = 0L,
+      experiment2msproto = integer(0),
+
+      # subobject-specific batch effects
+      NquantBatchEffects = ncol(msrunXsubbatchEffect.mtx),
+      quant_batch_effect_tau = subbatch_tau,
+      quant_batch_effect_df = subbatch_df,
+      quant_batch_effect_c = subbatch_c,
+      quant_batch_effect_is_positive = as.array(as.integer(model_data$quant_batch_effects$is_positive)),
+      NsubobjBatchEffects = nrow(model_data$subobj_batch_effects),
+      subobj_batch_effect2quant_batch_effect = as.array(as.integer(model_data$subobject_batch_effects$quant_batch_effect))
+    ) %>%
+    modifyList(matrix2csr("subobsXsubobjbatcheff", model_data$subobsXsubobjbatcheff))
+    res <- modifyList(res, subobj_data)
   }
   if ('index_mscalib' %in% names(model_data$mschannels)) {
     res$Nmsprotocols <- n_distinct(model_data$mschannels$index_mscalib)

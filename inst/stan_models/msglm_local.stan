@@ -108,9 +108,9 @@ data {
 
   // map from labelXreplicateXobject to observed/missed data
   int<lower=0> Nquanted;        // total number of quantified objectsXexperiments
-  int<lower=1,upper=Nobservations>  quant2observation[Nquanted];
+  int<lower=1,upper=Nobservations>  quant2obs[Nquanted];
   int<lower=0> Nmissed;         // total number of missed objectsXexperiments
-  int<lower=1,upper=Nobservations> miss2observation[Nmissed];
+  int<lower=1,upper=Nobservations> miss2obs[Nmissed];
   vector<lower=0>[Nquanted] qData; // quanted data
   vector<lower=0, upper=1>[Nmissed] missing_sigmoid_scale; // sigmoid scales for indiv. observations (<1 for higher uncertainty)
 
@@ -137,7 +137,7 @@ data {
   int<lower=0, upper=obsXobjeff_Nw+1> obsXobjeff_u[Nobservations+1];
   int<lower=0, upper=NobjEffects> obsXobjeff_v[obsXobjeff_Nw];
 
-  // obsXobj_batcheff (observation X batch_effect) sparse matrix
+  // obsXobj_batcheff (observation X object_batch_effect) sparse matrix
   int<lower=0> obsXobjbatcheff_Nw;
   vector[obsXobjbatcheff_Nw] obsXobjbatcheff_w;
   int<lower=0, upper=obsXobjbatcheff_Nw+1> obsXobjbatcheff_u[Nobservations + 1];
@@ -180,10 +180,10 @@ transformed data {
   vector[Nquanted] qLogStd; // log(sd(qData))-global_labu_shift
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
 
-  int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2observation];
-  int<lower=1,upper=Nexperiments> quant2experiment[Nquanted] = observation2experiment[quant2observation];
-  int<lower=1,upper=Niactions> miss2iaction[Nmissed] = observation2iaction[miss2observation];
-  int<lower=1,upper=Nexperiments> miss2experiment[Nmissed] = observation2experiment[miss2observation];
+  int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2obs];
+  int<lower=1,upper=Nexperiments> quant2experiment[Nquanted] = observation2experiment[quant2obs];
+  int<lower=1,upper=Niactions> miss2iaction[Nmissed] = observation2iaction[miss2obs];
+  int<lower=1,upper=Nexperiments> miss2experiment[Nmissed] = observation2experiment[miss2obs];
 
   int<lower=0,upper=NobjEffects> NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   int<lower=0,upper=NobjEffects> NobjEffectsOther = NobjEffects - NobjEffectsPos;
@@ -209,10 +209,10 @@ transformed data {
 
   int<lower=0> NrealIactions = ndistinct(observation2iaction, Niactions);
   int<lower=0> Nobservations0 = Nobservations - NrealIactions; // number of observations degrees of freedom ()
-  int<lower=0> obsXobs0_Nw = contr_poly_Nw(Niactions, observation2iaction);
-  vector[obsXobs0_Nw] obsXobs_shift0_w;
-  int<lower=1, upper=obsXobs0_Nw + 1> obsXobs_shift0_u[Nobservations + 1];
-  int<lower=1, upper=Nobservations0> obsXobs_shift0_v[obsXobs0_Nw];
+  int<lower=0> obs_shiftXobs_shift0_Nw = contr_poly_Nw(Niactions, observation2iaction);
+  vector[obs_shiftXobs_shift0_Nw] obs_shiftXobs_shift0_w;
+  int<lower=1, upper=obs_shiftXobs_shift0_Nw + 1> obs_shiftXobs_shift0_u[Nobservations + 1];
+  int<lower=1, upper=Nobservations0> obs_shiftXobs_shift0_v[obs_shiftXobs_shift0_Nw];
 
   matrix[Nobjects + NobjEffects, Niactions] iaction2objeffx_op;
   //matrix[Niactions, Nobjects] iactXobjbase = csr_to_dense_matrix(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u);
@@ -231,14 +231,14 @@ transformed data {
     }
   }
 
-  // prepare obsXobs_shift0
+  // prepare obs_shiftXobs_shift0
   {
     int iaction2nobs[Niactions];
 
     int iaction2nobs_2ndpass[Niactions];
     int iaction2obs_shift0_offset[Niactions];
 
-    int obsXobs_shift0_offset;
+    int obs_shiftXobs_shift0_offset;
     int obs_shift0_offset;
 
     iaction2nobs = rep_array(0, Niactions);
@@ -249,8 +249,8 @@ transformed data {
     }
     //print("iaction2nobs=", iaction2nobs);
     obs_shift0_offset = 0;
-    obsXobs_shift0_offset = 0;
-    obsXobs_shift0_u[1] = 1;
+    obs_shiftXobs_shift0_offset = 0;
+    obs_shiftXobs_shift0_u[1] = 1;
     iaction2nobs_2ndpass = rep_array(0, Niactions);
     iaction2obs_shift0_offset = rep_array(0, Niactions);
     for (i in 1:Nobservations) {
@@ -276,16 +276,16 @@ transformed data {
               real w = iact_obsXobs0[iaction2nobs_2ndpass[iact_ix], j];
               //if (w != 0) { // don't skip non-structural zeros for contr_poly (otherwise there's mismatch with contr_poly_Nw)
                 nW += 1;
-                obsXobs_shift0_v[obsXobs_shift0_offset + nW] = iaction2obs_shift0_offset[iact_ix] + j;
-                obsXobs_shift0_w[obsXobs_shift0_offset + nW] = w;
+                obs_shiftXobs_shift0_v[obs_shiftXobs_shift0_offset + nW] = iaction2obs_shift0_offset[iact_ix] + j;
+                obs_shiftXobs_shift0_w[obs_shiftXobs_shift0_offset + nW] = w;
               //}
             }
-            obsXobs_shift0_u[i+1] = obsXobs_shift0_u[i] + nW;
-            obsXobs_shift0_offset += nW;
+            obs_shiftXobs_shift0_u[i+1] = obs_shiftXobs_shift0_u[i] + nW;
+            obs_shiftXobs_shift0_offset += nW;
         }
     }
   }
-  //print("obsXobs_shift0=", csr_to_dense_matrix(Nobservations, Nobservations0, obsXobs_shift0_w, obsXobs_shift0_v, obsXobs_shift0_u));
+  //print("obs_shiftXobs_shift0=", csr_to_dense_matrix(Nobservations, Nobservations0, obs_shiftXobs_shift0_w, obs_shiftXobs_shift0_v, obs_shiftXobs_shift0_u));
 
   {
     matrix[Niactions, Nobjects+NobjEffects] objeffx2iaction_op;
@@ -373,7 +373,7 @@ transformed parameters {
   // calculate obs_shift and obs_labu
   if (Nobservations0 > 0) {
     iact_repl_shift_sigma = iact_repl_shift_lambda_a .* sqrt(iact_repl_shift_lambda_t) * iact_repl_shift_tau;
-    obs_repl_shift = csr_matrix_times_vector(Nobservations, Nobservations0, obsXobs_shift0_w, obsXobs_shift0_v, obsXobs_shift0_u, obs_shift0) .*
+    obs_repl_shift = csr_matrix_times_vector(Nobservations, Nobservations0, obs_shiftXobs_shift0_w, obs_shiftXobs_shift0_v, obs_shiftXobs_shift0_u, obs_shift0) .*
         csr_matrix_times_vector(Nobservations, Niactions, obsXiact_w, observation2iaction, obsXiact_u, iact_repl_shift_sigma);
     obs_labu += obs_repl_shift;
   }
@@ -413,7 +413,7 @@ model {
       //print("iact_repl_shift_sigma=", iact_repl_shift_sigma);
       //print("obsXiact=", csr_to_dense_matrix(Nobservations, Niactions,
       //          obsXiact_w, observation2iaction, obsXiact_u));
-      obs_repl_shift_unscaled = csr_matrix_times_vector(Nobservations, Nobservations0, obsXobs_shift0_w, obsXobs_shift0_v, obsXobs_shift0_u, obs_shift0);
+      obs_repl_shift_unscaled = csr_matrix_times_vector(Nobservations, Nobservations0, obs_shiftXobs_shift0_w, obs_shiftXobs_shift0_v, obs_shiftXobs_shift0_u, obs_shift0);
       obs_repl_shift_unscaled ~ std_normal();
     }
     //to_vector(repl_shift) ~ normal(0.0, repl_shift_lambda);
@@ -432,13 +432,13 @@ model {
         vector[Nquanted] q_labu;
         vector[Nmissed] m_labu;
 
-        q_labu = obs_labu[quant2observation] + experiment_shift[quant2experiment];
-        m_labu = obs_labu[miss2observation] + experiment_shift[miss2experiment];
+        q_labu = obs_labu[quant2obs] + experiment_shift[quant2experiment];
+        m_labu = obs_labu[miss2obs] + experiment_shift[miss2experiment];
         //qLogAbu = iaction_shift[quant2iaction] + experiment_shift[quant2experiment];
         //mLogAbu = iaction_shift[miss2iaction] + experiment_shift[miss2experiment];
         if (NbatchEffects > 0) {
-          q_labu += obs_batch_shift[quant2observation];
-          m_labu += obs_batch_shift[miss2observation];
+          q_labu += obs_batch_shift[quant2obs];
+          m_labu += obs_batch_shift[miss2obs];
         }
 
         // model quantitations and missing data

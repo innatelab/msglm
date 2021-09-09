@@ -101,7 +101,7 @@ data {
   int<lower=0> Nmsprotocols;    // number of MS protocols used
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
   int<lower=0> Nobservations;   // number of observations of interactions (objectXexperiment pairs for all iactions and experiments of its condition)
-  int<lower=1,upper=Nobjects> suo2obj[Nsubobjects];
+  int<lower=1,upper=Nobjects> subobj2obj[Nsubobjects];
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
 
   vector[Nexperiments] experiment_shift;
@@ -113,18 +113,18 @@ data {
 
   // map from labelXreplicateXobject to observed/missed data
   int<lower=0> Nquanted;        // total number of quantified subobjectsXexperiments
-  int<lower=1,upper=Nobservations>  quant2observation[Nquanted];
-  int<lower=1,upper=Nsubobjects> quant2suo[Nsubobjects > 0 ? Nquanted : 0];
+  int<lower=1,upper=Nobservations>  quant2obs[Nquanted];
+  int<lower=1,upper=Nsubobjects> quant2subobj[Nsubobjects > 0 ? Nquanted : 0];
   int<lower=0> Nmissed;         // total number of missed subobjectsXexperiments
-  int<lower=1,upper=Nobservations> miss2observation[Nmissed];
-  int<lower=1,upper=Nsubobjects> miss2suo[Nsubobjects > 0 ? Nmissed : 0];
+  int<lower=1,upper=Nobservations> miss2obs[Nmissed];
+  int<lower=1,upper=Nsubobjects> miss2subobj[Nsubobjects > 0 ? Nmissed : 0];
   vector<lower=0>[Nquanted] qData; // quanted data
   vector<lower=0, upper=1>[Nmissed] missing_sigmoid_scale; // sigmoid scales for indiv. observations (<1 for higher uncertainty)
 
   // linear model specification
   int<lower=0> Neffects;        // number of effects (that define conditions)
   int<lower=0> NbatchEffects;   // number of batch effects (that define assay experimental variation, but not biology)
-  int<lower=0> NsubBatchEffects;// number of subobject batch effects (that define assay experimental variation, but not biology)
+  int<lower=0> NquantBatchEffects;// number of quantification batch effects (that define subobject-level quantification variation, but not biology)
   int<lower=0> NobjEffects;
   int<lower=1,upper=Neffects> obj_effect2effect[NobjEffects];
   int<lower=0,upper=1> effect_is_positive[Neffects];
@@ -134,9 +134,9 @@ data {
   int<lower=1,upper=NbatchEffects> obj_batch_effect2batch_effect[NobjBatchEffects];
   int<lower=0,upper=1> batch_effect_is_positive[NbatchEffects];
 
-  int<lower=0> NsuoBatchEffects;
-  int<lower=1,upper=NsubBatchEffects> suo_subbatch_effect2subbatch_effect[NsuoBatchEffects];
-  int<lower=0,upper=1> subbatch_effect_is_positive[NsubBatchEffects];
+  int<lower=0> NsubobjBatchEffects;
+  int<lower=1,upper=NquantBatchEffects> subobj_batch_effect2quant_batch_effect[NsubobjBatchEffects];
+  int<lower=0,upper=1> quant_batch_effect_is_positive[NquantBatchEffects];
 
   // iactXobjeff (interaction X object_effect) sparse matrix
   int<lower=0> iactXobjeff_Nw;
@@ -149,17 +149,17 @@ data {
   int<lower=0, upper=obsXobjeff_Nw+1> obsXobjeff_u[Nobservations+1];
   int<lower=0, upper=NobjEffects> obsXobjeff_v[obsXobjeff_Nw];
 
-  // obsXobj_batcheff (observation X batch_effect) sparse matrix
+  // obsXobj_batcheff (observation X object_batch_effect) sparse matrix
   int<lower=0> obsXobjbatcheff_Nw;
   vector[obsXobjbatcheff_Nw] obsXobjbatcheff_w;
-  int<lower=0, upper=obsXobjbatcheff_Nw+1> obsXobjbatcheff_u[Nobservations + 1];
+  int<lower=0, upper=obsXobjbatcheff_Nw+1> obsXobjbatcheff_u[NbatchEffects > 0 ? Nobservations + 1 : 1];
   int<lower=0, upper=NobjBatchEffects> obsXobjbatcheff_v[obsXobjbatcheff_Nw];
 
-  // obsXobj_suobatcheff (observation X sub-object batch_effect) sparse matrix
-  int<lower=0> suoxobsXsuobatcheff_Nw;
-  vector[suoxobsXsuobatcheff_Nw] suoxobsXsuobatcheff_w;
-  int<lower=0, upper=suoxobsXsuobatcheff_Nw+1> suoxobsXsuobatcheff_u[Nsubobjects*Nobservations + 1];
-  int<lower=0, upper=NsuoBatchEffects> suoxobsXsuobatcheff_v[suoxobsXsuobatcheff_Nw];
+  // subobsXsubobjbatcheff (sub-object observation X subobject_batch_effect) sparse matrix
+  int<lower=0> subobsXsubobjbatcheff_Nw;
+  vector[subobsXsubobjbatcheff_Nw] subobsXsubobjbatcheff_w;
+  int<lower=0, upper=subobsXsubobjbatcheff_Nw+1> subobsXsubobjbatcheff_u[Nsubobjects*Nobservations + 1];
+  int<lower=0, upper=NsubobjBatchEffects> subobsXsubobjbatcheff_v[subobsXsubobjbatcheff_Nw];
 
   // global model constants
   real<lower=0.0> hsprior_lambda_a_offset; // prevent lambda_a/t being too close to zero, because that negatively affects MCMC convergence
@@ -177,9 +177,9 @@ data {
   real<lower=0> iact_repl_shift_tau;
   real<lower=0> iact_repl_shift_df;
   real<lower=0> batch_effect_sigma;
-  real<lower=0> suo_subbatch_effect_tau;
-  real<lower=0> suo_subbatch_effect_df;
-  real<lower=0> suo_subbatch_effect_c;
+  real<lower=0> quant_batch_effect_tau;
+  real<lower=0> quant_batch_effect_df;
+  real<lower=0> quant_batch_effect_c;
 
   // instrument calibrated parameters (FIXME: msproto-dependent)
   real<lower=0> zDetectionFactor;
@@ -196,6 +196,7 @@ data {
 }
 
 transformed data {
+  int<lower=0> Nsubobservations = Nobservations*Nsubobjects; // number of subobject observations (observation X subobject)
   real mzShift = zShift - global_labu_shift; // zShift for the missing observation intensity
   vector[Nquanted] zScore = (log(qData) - zShift) * zScale;
   vector[Nquanted] qLogStd; // log(sd(qData))-global_labu_shift
@@ -220,12 +221,12 @@ transformed data {
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsOther = NobjBatchEffects - NobjBatchEffectsPos;
   int<lower=1,upper=NobjBatchEffects> obj_batch_effect_reshuffle[NobjBatchEffects];
 
-  int<lower=0,upper=NsuoBatchEffects> NsuoBatchEffectsPos = sum(subbatch_effect_is_positive[suo_subbatch_effect2subbatch_effect]);
-  int<lower=0,upper=NsuoBatchEffects> NsuoBatchEffectsOther = NsuoBatchEffects - NsuoBatchEffectsPos;
-  int<lower=1,upper=NsuoBatchEffects> suo_subbatch_effect_reshuffle[NsuoBatchEffects];
-  int<lower=1,upper=Nobservations*Nsubobjects> quant2suoxobs[NsuoBatchEffects > 0 ? Nquanted : 0];
-  int<lower=1,upper=Nobservations*Nsubobjects> miss2suoxobs[NsuoBatchEffects > 0 ? Nmissed : 0];
-  real<lower=0> suo_subbatch_effect_c2 = square(suo_subbatch_effect_c);
+  int<lower=0,upper=NsubobjBatchEffects> NsubobjBatchEffectsPos = sum(quant_batch_effect_is_positive[subobj_batch_effect2quant_batch_effect]);
+  int<lower=0,upper=NsubobjBatchEffects> NsubobjBatchEffectsOther = NsubobjBatchEffects - NsubobjBatchEffectsPos;
+  int<lower=1,upper=NsubobjBatchEffects> subobj_batch_effect_reshuffle[NsubobjBatchEffects];
+  int<lower=1,upper=Nsubobservations> quant2subobs[NsubobjBatchEffects > 0 ? Nquanted : 0];
+  int<lower=1,upper=Nsubobservations> miss2subobs[NsubobjBatchEffects > 0 ? Nmissed : 0];
+  real<lower=0> subobj_batch_effect_c2 = square(quant_batch_effect_c);
 
   vector[Niactions] iactXobjbase_w = rep_vector(1.0, Niactions);
   int<lower=0> iactXobjbase_u[Niactions + 1] = one_to(Niactions + 1);
@@ -239,15 +240,15 @@ transformed data {
 
   int<lower=0> NrealIactions = ndistinct(observation2iaction, Niactions);
   int<lower=0> Nobservations0 = Nobservations - NrealIactions; // number of observations degrees of freedom ()
-  int<lower=0> obsXobs0_Nw = contr_poly_Nw(Niactions, observation2iaction);
-  vector[obsXobs0_Nw] obsXobs_shift0_w;
-  int<lower=1, upper=obsXobs0_Nw + 1> obsXobs_shift0_u[Nobservations + 1];
-  int<lower=1, upper=Nobservations0> obsXobs_shift0_v[obsXobs0_Nw];
+  int<lower=0> obs_shiftXobs_shift0_Nw = contr_poly_Nw(Niactions, observation2iaction);
+  vector[obs_shiftXobs_shift0_Nw] obs_shiftXobs_shift0_w;
+  int<lower=1, upper=obs_shiftXobs_shift0_Nw + 1> obs_shiftXobs_shift0_u[Nobservations + 1];
+  int<lower=1, upper=Nobservations0> obs_shiftXobs_shift0_v[obs_shiftXobs_shift0_Nw];
 
-  int<lower=0> suoXsuo0_Nw = contr_treatment_Nw(Nobjects, suo2obj);
-  vector[suoXsuo0_Nw] suoXsuo_shift0_w;
-  int<lower=0, upper=suoXsuo0_Nw + 1> suoXsuo_shift0_u[Nsubobjects + 1];
-  int<lower=0, upper=Nsubobjects - Nobjects> suoXsuo_shift0_v[suoXsuo0_Nw];
+  int<lower=0> subobj_shiftXsubobj_shift0_Nw = contr_treatment_Nw(Nobjects, subobj2obj);
+  vector[subobj_shiftXsubobj_shift0_Nw] subobj_shiftXsubobj_shift0_w;
+  int<lower=0, upper=subobj_shiftXsubobj_shift0_Nw + 1> subobj_shiftXsubobj_shift0_u[Nsubobjects + 1];
+  int<lower=0, upper=Nsubobjects - Nobjects> subobj_shiftXsubobj_shift0_v[subobj_shiftXsubobj_shift0_Nw];
 
   matrix[Nobjects + NobjEffects, Niactions] iaction2objeffx_op;
   //matrix[Niactions, Nobjects] iactXobjbase = csr_to_dense_matrix(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u);
@@ -256,7 +257,7 @@ transformed data {
   // prepare reshuffling of positive/other effects
   obj_effect_reshuffle = objeffects_reshuffle(obj_effect2effect, effect_is_positive);
   obj_batch_effect_reshuffle = objeffects_reshuffle(obj_batch_effect2batch_effect, batch_effect_is_positive);
-  suo_subbatch_effect_reshuffle = objeffects_reshuffle(suo_subbatch_effect2subbatch_effect, subbatch_effect_is_positive);
+  subobj_batch_effect_reshuffle = objeffects_reshuffle(subobj_batch_effect2quant_batch_effect, quant_batch_effect_is_positive);
 
   // process the intensity data to optimize likelihood calculation
   {
@@ -271,21 +272,21 @@ transformed data {
   {
     int j = 1;
     for (i in 1:Nquanted) {
-      if (observation_reliable[quant2observation[i]]) {
+      if (observation_reliable[quant2obs[i]]) {
         reliable_quants[j] = i;
         j += 1;
       }
     }
   }
 
-  // prepare obsXobs_shift0
+  // prepare obs_shiftXobs_shift0
   {
     int iaction2nobs[Niactions];
 
     int iaction2nobs_2ndpass[Niactions];
     int iaction2obs_shift0_offset[Niactions];
 
-    int obsXobs_shift0_offset;
+    int obs_shiftXobs_shift0_offset;
     int obs_shift0_offset;
 
     iaction2nobs = rep_array(0, Niactions);
@@ -296,8 +297,8 @@ transformed data {
     }
     //print("iaction2nobs=", iaction2nobs);
     obs_shift0_offset = 0;
-    obsXobs_shift0_offset = 0;
-    obsXobs_shift0_u[1] = 1;
+    obs_shiftXobs_shift0_offset = 0;
+    obs_shiftXobs_shift0_u[1] = 1;
     iaction2nobs_2ndpass = rep_array(0, Niactions);
     iaction2obs_shift0_offset = rep_array(0, Niactions);
     for (i in 1:Nobservations) {
@@ -323,16 +324,16 @@ transformed data {
               real w = iact_obsXobs0[iaction2nobs_2ndpass[iact_ix], j];
               //if (w != 0) { // don't skip non-structural zeros for contr_poly (otherwise there's mismatch with contr_poly_Nw)
                 nW += 1;
-                obsXobs_shift0_v[obsXobs_shift0_offset + nW] = iaction2obs_shift0_offset[iact_ix] + j;
-                obsXobs_shift0_w[obsXobs_shift0_offset + nW] = w;
+                obs_shiftXobs_shift0_v[obs_shiftXobs_shift0_offset + nW] = iaction2obs_shift0_offset[iact_ix] + j;
+                obs_shiftXobs_shift0_w[obs_shiftXobs_shift0_offset + nW] = w;
               //}
             }
-            obsXobs_shift0_u[i+1] = obsXobs_shift0_u[i] + nW;
-            obsXobs_shift0_offset += nW;
+            obs_shiftXobs_shift0_u[i+1] = obs_shiftXobs_shift0_u[i] + nW;
+            obs_shiftXobs_shift0_offset += nW;
         }
     }
   }
-  //print("obsXobs_shift0=", csr_to_dense_matrix(Nobservations, Nobservations0, obsXobs_shift0_w, obsXobs_shift0_v, obsXobs_shift0_u));
+  //print("obs_shiftXobs_shift0=", csr_to_dense_matrix(Nobservations, Nobservations0, obs_shiftXobs_shift0_w, obs_shiftXobs_shift0_v, obs_shiftXobs_shift0_u));
 
   {
     matrix[Niactions, Nobjects+NobjEffects] objeffx2iaction_op;
@@ -361,66 +362,66 @@ transformed data {
     //print("iaction2objeffx_op=", iaction2objeffx_op);
   }
 
-  suoXsuo_shift0_u = rep_array(0, Nsubobjects+1);
+  subobj_shiftXsubobj_shift0_u = rep_array(0, Nsubobjects+1);
   if (Nsubobjects > 0) {
     int obj2nsuo[Nobjects];
 
-    int obj2nsuo_2ndpass[Nobjects];
-    int obj2suo_shift0_offset[Nobjects];
+    int obj2nsubobj_2ndpass[Nobjects];
+    int obj2subobj_shift0_offset[Nobjects];
 
-    int suoXsuo_shift0_offset;
-    int suo_shift0_offset;
+    int subobj_shiftXsubobj_shift0_offset;
+    int subobj_shift0_offset;
 
     obj2nsuo = rep_array(0, Nobjects);
     for (i in 1:Nsubobjects) {
       int obj_ix;
-      obj_ix = suo2obj[i];
+      obj_ix = subobj2obj[i];
       obj2nsuo[obj_ix] += 1;
     }
     //print("object2nsuo=", object2nsuo);
-    suo_shift0_offset = 0;
-    suoXsuo_shift0_offset = 0;
-    suoXsuo_shift0_u[1] = 1;
-    obj2nsuo_2ndpass = rep_array(0, Nobjects);
-    obj2suo_shift0_offset = rep_array(0, Nobjects);
+    subobj_shift0_offset = 0;
+    subobj_shiftXsubobj_shift0_offset = 0;
+    subobj_shiftXsubobj_shift0_u[1] = 1;
+    obj2nsubobj_2ndpass = rep_array(0, Nobjects);
+    obj2subobj_shift0_offset = rep_array(0, Nobjects);
     for (i in 1:Nsubobjects) {
         int obj_ix;
         int obj_nsuo;
-        obj_ix = suo2obj[i];
+        obj_ix = subobj2obj[i];
         //print("obj_ix[", i, "]=", obj_ix);
         obj_nsuo = obj2nsuo[obj_ix];
         if (obj_nsuo > 1) {
             int nW = 0;
             matrix[obj_nsuo, obj_nsuo-1] obj_suoXsuo0 = contr_treatment(obj_nsuo);
 
-            if (obj2nsuo_2ndpass[obj_ix] == 0) {
-                // reserve (nsuo-1) suo_shift0 variables
-                obj2suo_shift0_offset[obj_ix] = suo_shift0_offset;
-                suo_shift0_offset += obj_nsuo-1;
-                //print("suo_shift0_offset=", suo_shift0_offset);
+            if (obj2nsubobj_2ndpass[obj_ix] == 0) {
+                // reserve (nsuo-1) subobj_shift0 variables
+                obj2subobj_shift0_offset[obj_ix] = subobj_shift0_offset;
+                subobj_shift0_offset += obj_nsuo-1;
+                //print("subobj_shift0_offset=", subobj_shift0_offset);
             }
-            obj2nsuo_2ndpass[obj_ix] += 1;
+            obj2nsubobj_2ndpass[obj_ix] += 1;
             // add 2npass-th row of obj_suoXsuo0 to the suoXsuo0
             for (j in 1:cols(obj_suoXsuo0)) {
-              real w = obj_suoXsuo0[obj2nsuo_2ndpass[obj_ix], j];
+              real w = obj_suoXsuo0[obj2nsubobj_2ndpass[obj_ix], j];
               if (w != 0) {
                 nW += 1;
-                suoXsuo_shift0_v[suoXsuo_shift0_offset + nW] = obj2suo_shift0_offset[obj_ix] + j;
-                suoXsuo_shift0_w[suoXsuo_shift0_offset + nW] = w;
+                subobj_shiftXsubobj_shift0_v[subobj_shiftXsubobj_shift0_offset + nW] = obj2subobj_shift0_offset[obj_ix] + j;
+                subobj_shiftXsubobj_shift0_w[subobj_shiftXsubobj_shift0_offset + nW] = w;
               }
             }
-            suoXsuo_shift0_u[i+1] = suoXsuo_shift0_u[i] + nW;
-            suoXsuo_shift0_offset += nW;
+            subobj_shiftXsubobj_shift0_u[i+1] = subobj_shiftXsubobj_shift0_u[i] + nW;
+            subobj_shiftXsubobj_shift0_offset += nW;
         }
     }
 
-    if (NsuoBatchEffects > 0) {
+    if (NsubobjBatchEffects > 0) {
       // all references to the 1st protocol are redirected to index 1 (this shift is always 0)
       for (i in 1:Nquanted) {
-        quant2suoxobs[i] = (quant2observation[i]-1)*Nsubobjects + quant2suo[i];
+        quant2subobs[i] = (quant2observation[i]-1)*Nsubobjects + quant2subobj[i];
       }
       for (i in 1:Nmissed) {
-        miss2suoxobs[i] = (miss2observation[i]-1)*Nsubobjects + miss2suo[i];
+        miss2subobs[i] = (miss2observation[i]-1)*Nsubobjects + miss2subobj[i];
       }
     }
   }
@@ -433,8 +434,8 @@ parameters {
 
   vector[Nobjects] obj_base_labu0; // baseline object abundance
 
-  real<lower=1.0> suo_shift_sigma;
-  vector[Nsubobjects > 0 ? Nsubobjects-Nobjects : 0] suo_shift0_unscaled; // subobject shift within object
+  real<lower=1.0> subobj_shift_sigma;
+  vector[Nsubobjects > 0 ? Nsubobjects-Nobjects : 0] subobj_shift0_unscaled; // subobject shift within object
 
   //real<lower=0.0> obj_effect_tau;
   real<lower=0.0> effect_slab_c_t;
@@ -455,10 +456,10 @@ parameters {
   vector<lower=0.0>[NobjBatchEffectsPos] obj_batch_effect_unscaled_pos;
   vector[NobjBatchEffectsOther] obj_batch_effect_unscaled_other;
 
-  vector<lower=0>[NsuoBatchEffects] suo_subbatch_effect_lambda_t;
-  vector<lower=0>[NsuoBatchEffects] suo_subbatch_effect_lambda_a;
-  vector<lower=0.0>[NsuoBatchEffectsPos] suo_subbatch_effect_unscaled_pos;
-  vector[NsuoBatchEffectsOther] suo_subbatch_effect_unscaled_other;
+  vector<lower=0>[NsubobjBatchEffects] subobj_batch_effect_lambda_t;
+  vector<lower=0>[NsubobjBatchEffects] subobj_batch_effect_lambda_a;
+  vector<lower=0.0>[NsubobjBatchEffectsPos] subobj_batch_effect_unscaled_pos;
+  vector[NsubobjBatchEffectsOther] subobj_batch_effect_unscaled_other;
 }
 
 transformed parameters {
@@ -468,18 +469,18 @@ transformed parameters {
   vector<lower=0>[NobjEffects] obj_effect_sigma; // AKA lambda_tilde*tau in rstanarm
   vector[NobjBatchEffects] obj_batch_effect;
   //vector<lower=0>[NobjBatchEffects] obj_batch_effect_sigma;
-  vector[NsuoBatchEffects] suo_subbatch_effect;
-  vector<lower=0>[NsuoBatchEffects] suo_subbatch_effect_sigma;
+  vector[NsubobjBatchEffects] subobj_batch_effect;
+  vector<lower=0>[NsubobjBatchEffects] subobj_batch_effect_sigma;
 
   vector<lower=0>[Nobservations0 > 0 ? Niactions : 0] iact_repl_shift_sigma;
 
   vector[Nobservations] obs_labu; // iaction_labu + objXexp_repl_shift * obj_repl_shift_sigma
   vector[Nobservations0 > 0 ? Nobservations : 0] obs_repl_shift; // replicate shifts for all potential observations (including missing)
   vector[NobjBatchEffects > 0 ? Nobservations : 0] obs_batch_shift;
-  vector[NsuoBatchEffects > 0 ? Nobservations*Nsubobjects : 0] suoxobs_subbatch_shift;
+  vector[NsubobjBatchEffects > 0 ? Nsubobservations : 0] subobs_batch_shift;
 
-  vector[Nsubobjects] suo_shift_unscaled; // subcomponent shift within object
-  vector[Nsubobjects] suo_shift; // subcomponent shift within object
+  vector[Nsubobjects] subobj_shift_unscaled; // subcomponent shift within object
+  vector[Nsubobjects] subobj_shift; // subcomponent shift within object
 
   // calculate effects lambdas and scale effects
   {
@@ -498,7 +499,7 @@ transformed parameters {
   // calculate obs_shift and obs_labu
   if (Nobservations0 > 0) {
     iact_repl_shift_sigma = iact_repl_shift_lambda_a .* sqrt(iact_repl_shift_lambda_t) * iact_repl_shift_tau;
-    obs_repl_shift = csr_matrix_times_vector(Nobservations, Nobservations0, obsXobs_shift0_w, obsXobs_shift0_v, obsXobs_shift0_u, obs_shift0) .*
+    obs_repl_shift = csr_matrix_times_vector(Nobservations, Nobservations0, obs_shiftXobs_shift0_w, obs_shiftXobs_shift0_v, obs_shiftXobs_shift0_u, obs_shift0) .*
         csr_matrix_times_vector(Nobservations, Niactions, obsXiact_w, observation2iaction, obsXiact_u, iact_repl_shift_sigma);
     obs_labu += obs_repl_shift;
   }
@@ -507,22 +508,24 @@ transformed parameters {
     obj_batch_effect = append_row(obj_batch_effect_unscaled_pos, obj_batch_effect_unscaled_other)[obj_batch_effect_reshuffle] * batch_effect_sigma;
     obs_batch_shift = csr_matrix_times_vector(Nobservations, NobjBatchEffects, obsXobjbatcheff_w, obsXobjbatcheff_v, obsXobjbatcheff_u, obj_batch_effect);
   }
-  // calculate suo_labu_shift
+  // calculate subobj_shift
   if (Nsubobjects > 1) {
-    suo_shift_unscaled = csr_matrix_times_vector(Nsubobjects, Nsubobjects - Nobjects, suoXsuo_shift0_w, suoXsuo_shift0_v, suoXsuo_shift0_u, suo_shift0_unscaled);
+    subobj_shift_unscaled = csr_matrix_times_vector(Nsubobjects, Nsubobjects - Nobjects,
+                                                    subobj_shiftXsubobj_shift0_w, subobj_shiftXsubobj_shift0_v,
+                                                    subobj_shiftXsubobj_shift0_u, subobj_shift0_unscaled);
   } else if (Nsubobjects == 1) {
-    suo_shift_unscaled = rep_vector(0.0, Nsubobjects);
+    subobj_shift_unscaled = rep_vector(0.0, Nsubobjects);
   }
-  suo_shift = suo_shift_unscaled * suo_shift_sigma;
+  subobj_shift = subobj_shift_unscaled * subobj_shift_sigma;
 
   // calculate suoXobs_subbatch_shift (doesn't make sense to add to obs_labu)
-  if (NsuoBatchEffects > 0) {
-    vector[NsuoBatchEffects] suo_subbatch_effect_sigma_pre; // AKA lambda_eta2 in rstanarm
-    suo_subbatch_effect_sigma_pre = square(suo_subbatch_effect_lambda_a) .* suo_subbatch_effect_lambda_t;
-    suo_subbatch_effect_sigma = sqrt(suo_subbatch_effect_c2 * suo_subbatch_effect_sigma_pre ./ (suo_subbatch_effect_c2 + square(suo_subbatch_effect_tau) * suo_subbatch_effect_sigma_pre)) * suo_subbatch_effect_tau;
-    suo_subbatch_effect = append_row(suo_subbatch_effect_unscaled_pos, suo_subbatch_effect_unscaled_other)[suo_subbatch_effect_reshuffle] .* suo_subbatch_effect_sigma;
-    suoxobs_subbatch_shift = csr_matrix_times_vector(Nobservations*Nsubobjects, NsuoBatchEffects, suoxobsXsuobatcheff_w, suoxobsXsuobatcheff_v, suoxobsXsuobatcheff_u,
-                                                     suo_subbatch_effect);
+  if (NsubobjBatchEffects > 0) {
+    vector[NsubobjBatchEffects] subobj_batch_effect_sigma_pre; // AKA lambda_eta2 in rstanarm
+    subobj_batch_effect_sigma_pre = square(subobj_batch_effect_lambda_a) .* subobj_batch_effect_lambda_t;
+    subobj_batch_effect_sigma = sqrt(subobj_batch_effect_c2 * subobj_batch_effect_sigma_pre ./ (subobj_batch_effect_c2 + square(quant_batch_effect_tau) * subobj_batch_effect_sigma_pre)) * quant_batch_effect_tau;
+    subobj_batch_effect = append_row(subobj_batch_effect_unscaled_pos, subobj_batch_effect_unscaled_other)[subobj_batch_effect_reshuffle] .* subobj_batch_effect_sigma;
+    subobs_batch_shift = csr_matrix_times_vector(Nsubobservations, NsubobjBatchEffects, subobsXsubobjbatcheff_w, subobsXsubobjbatcheff_v, subobsXsubobjbatcheff_u,
+                                                 subobj_batch_effect);
   }
 }
 
@@ -555,7 +558,7 @@ model {
       //print("iact_repl_shift_sigma=", iact_repl_shift_sigma);
       //print("obsXiact=", csr_to_dense_matrix(Nobservations, Niactions,
       //          obsXiact_w, observation2iaction, obsXiact_u));
-      obs_repl_shift_unscaled = csr_matrix_times_vector(Nobservations, Nobservations0, obsXobs_shift0_w, obsXobs_shift0_v, obsXobs_shift0_u, obs_shift0);
+      obs_repl_shift_unscaled = csr_matrix_times_vector(Nobservations, Nobservations0, obs_shiftXobs_shift0_w, obs_shiftXobs_shift0_v, obs_shiftXobs_shift0_u, obs_shift0);
       obs_repl_shift_unscaled ~ std_normal();
     }
     //to_vector(repl_shift) ~ normal(0.0, repl_shift_lambda);
@@ -566,14 +569,14 @@ model {
       obj_batch_effect_unscaled_other ~ std_normal();
     }
     if (Nsubobjects > 0) {
-      suo_shift_sigma ~ cauchy(0, 1);
-      suo_shift_unscaled ~ std_normal();
-      if (NsuoBatchEffects > 0) {
-        suo_subbatch_effect_lambda_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * suo_subbatch_effect_df, 0.5 * suo_subbatch_effect_df);
-        suo_subbatch_effect_lambda_a - hsprior_lambda_a_offset ~ std_normal();
+      subobj_shift_sigma ~ cauchy(0, 1);
+      subobj_shift_unscaled ~ std_normal();
+      if (NsubobjBatchEffects > 0) {
+        subobj_batch_effect_lambda_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * quant_batch_effect_df, 0.5 * quant_batch_effect_df);
+        subobj_batch_effect_lambda_a - hsprior_lambda_a_offset ~ std_normal();
         //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
-        suo_subbatch_effect_unscaled_pos ~ std_normal();
-        suo_subbatch_effect_unscaled_other ~ std_normal();
+        subobj_batch_effect_unscaled_pos ~ std_normal();
+        subobj_batch_effect_unscaled_other ~ std_normal();
       }
     }
 
@@ -585,23 +588,23 @@ model {
         vector[Nquanted] q_labu;
         vector[Nmissed] m_labu;
 
-        q_labu = obs_labu[quant2observation] + experiment_shift[quant2experiment];
-        m_labu = obs_labu[miss2observation] + experiment_shift[miss2experiment];
+        q_labu = obs_labu[quant2obs] + experiment_shift[quant2experiment];
+        m_labu = obs_labu[miss2obs] + experiment_shift[miss2experiment];
         //qLogAbu = iaction_shift[quant2iaction] + experiment_shift[quant2experiment];
         //mLogAbu = iaction_shift[miss2iaction] + experiment_shift[miss2experiment];
         if (Nsubobjects > 0) {
             // adjust by subcomponent shift
-            q_labu += suo_shift[quant2suo];
-            m_labu += suo_shift[miss2suo];
+            q_labu += subobj_shift[quant2subobj];
+            m_labu += subobj_shift[miss2subobj];
 
-            if (NsuoBatchEffects > 0) {
-                q_labu += suoxobs_subbatch_shift[quant2suoxobs];
-                m_labu += suoxobs_subbatch_shift[miss2suoxobs];
+            if (NsubobjBatchEffects > 0) {
+                q_labu += subobs_batch_shift[quant2subobs];
+                m_labu += subobs_batch_shift[miss2subobs];
             }
         }
         if (NbatchEffects > 0) {
-          q_labu += obs_batch_shift[quant2observation];
-          m_labu += obs_batch_shift[miss2observation];
+          q_labu += obs_batch_shift[quant2obs];
+          m_labu += obs_batch_shift[miss2obs];
         }
 
         // model quantitations and missing data
@@ -622,7 +625,7 @@ generated quantities {
     vector[Niactions] iaction_labu_replCI = to_vector(normal_rng(iaction_labu, iact_repl_shift_sigma));
     vector[Nobjects] obj_base_labu_replCI;
     vector[NobjEffects] obj_effect_replCI;
-    vector[Nsubobjects] suo_llh;
+    vector[Nsubobjects] subobj_llh;
 
     {
       vector[Nobjects + NobjEffects] obj_effx = iaction2objeffx_op * iaction_labu_replCI;
@@ -640,26 +643,26 @@ generated quantities {
         vector[Nmissed] m_labu;
 
         // prepare predicted abundances
-        q_labu = obs_labu[quant2observation] + experiment_shift[quant2experiment] + suo_shift[quant2suo];
-        m_labu = obs_labu[miss2observation] + experiment_shift[miss2experiment] + suo_shift[miss2suo];
+        q_labu = obs_labu[quant2obs] + experiment_shift[quant2experiment] + subobj_shift[quant2subobj];
+        m_labu = obs_labu[miss2obs] + experiment_shift[miss2experiment] + subobj_shift[miss2subobj];
 
-        if (NsuoBatchEffects > 0) {
-            q_labu += suoxobs_subbatch_shift[quant2suoxobs];
-            m_labu += suoxobs_subbatch_shift[miss2suoxobs];
+        if (NsubobjBatchEffects > 0) {
+            q_labu += subobs_batch_shift[quant2subobs];
+            m_labu += subobs_batch_shift[miss2subobs];
         }
         if (NbatchEffects > 0) {
-          q_labu += obs_batch_shift[quant2observation];
-          m_labu += obs_batch_shift[miss2observation];
+          q_labu += obs_batch_shift[quant2obs];
+          m_labu += obs_batch_shift[miss2obs];
         }
 
         // calculate log-likelihood per subobject
-        suo_llh = rep_vector(0.0, Nsubobjects);
+        subobj_llh = rep_vector(0.0, Nsubobjects);
         for (i in 1:Nquanted) {
-          suo_llh[quant2suo[i]] += double_exponential_lpdf(logcompress(exp(q_labu[i] - qLogStd[i]) - qDataNorm[i], 0.25) | 0, 1) +
+          subobj_llh[quant2subobj[i]] += double_exponential_lpdf(logcompress(exp(q_labu[i] - qLogStd[i]) - qDataNorm[i], 0.25) | 0, 1) +
               bernoulli_logit_lpmf(1 | q_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         }
         for (i in 1:Nmissed) {
-          suo_llh[miss2suo[i]] += bernoulli_logit_lpmf(0 | missing_sigmoid_scale[i] * m_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
+          subobj_llh[miss2subobj[i]] += bernoulli_logit_lpmf(0 | missing_sigmoid_scale[i] * m_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         }
     }
 }

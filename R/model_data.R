@@ -196,3 +196,48 @@ impute_intensities <- function(intensities_df, stats_df, log2_mean_offset=-1.8, 
   # don't take stats_df columns along
   dplyr::select(res, one_of(colnames(intensities_df)), intensity_imputed)
 }
+
+#' @export
+cluster_msprofiles <- function(msdata, msrun_stats, obj_col="pepmodstate_id", msrun_col="msrun", nclu=4) {
+  # create matrix of intensities
+  intensities.df <- tidyr::expand(msdata, !!!rlang::syms(c(obj_col, msrun_col))) %>%
+    dplyr::left_join(dplyr::select(msdata, any_of(c(obj_col, msrun_col, "intensity"))),
+                     by=c(obj_col, msrun_col)) %>%
+    impute_intensities(msrun_stats) %>%
+    dplyr::arrange_at(c(obj_col, msrun_col))
+  # handle trivial cases
+  if (n_distinct(intensities.df[[obj_col]]) == 1L ||
+      n_distinct(intensities.df[[msrun_col]]) == 1L) {
+    return(tibble(!!obj_col := unique(intensities.df[[obj_col]]),
+                  profile_cluster = 1L,
+                  nsimilar_profiles = 1L))
+  }
+  obj_stats.df <- group_by(intensities.df, !!!rlang::syms(obj_col)) %>%
+    summarise(n_quants = sum(!is.na(intensity))) %>%
+    dplyr::ungroup()
+  # add a bit of noise to avoid zero variance
+  intensities.mtx <- matrix(log2(pmax(intensities.df$intensity_imputed + rnorm(nrow(intensities.df)), 0)),
+                            ncol = n_distinct(intensities.df[[obj_col]]),
+                            dimnames = list(msrun = unique(intensities.df[[msrun_col]]),
+                                            object = unique(intensities.df[[obj_col]])))
+  obj.pca <- stats::prcomp(intensities.mtx, scale.=TRUE)
+  # create object feature matrix
+  obj.pca_featmtx <- obj.pca$rotation * crossprod(t(rep.int(1, nrow(obj.pca$rotation))),
+                                                  summary(obj.pca)$importance[2,])
+
+  res <- tibble(!!obj_col := parse_integer(rownames(obj.pca_featmtx)),
+                tmp_profile_cluster = stats::cutree(hclust(dist(obj.pca_featmtx), method="single"),
+                                                    min(c(nclu, nrow(obj.pca_featmtx), ncol(obj.pca_featmtx)))))
+  # assign profile_cluster indices from largest to smallest clusters
+  res_clustats <- dplyr::inner_join(res, obj_stats.df, by=obj_col) %>%
+    dplyr::group_by(tmp_profile_cluster) %>%
+    dplyr::summarise(nsimilar_profiles = n(),
+                     n_quants_cluster_total = sum(n_quants, na.rm=TRUE),
+                     n_quants_cluster_median = median(n_quants, na.rm=TRUE)) %>%
+    dplyr::ungroup() %>%
+    dplyr::arrange(desc(n_quants_cluster_total), desc(nsimilar_profiles)) %>%
+    dplyr::mutate(profile_cluster = row_number())
+
+  return(inner_join(res, res_clustats, by="tmp_profile_cluster") %>%
+           dplyr::select(-tmp_profile_cluster))
+}

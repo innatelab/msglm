@@ -8,10 +8,12 @@ MCMC draws.}
 vars_contrast_stats(
   vars_draws,
   vargroups,
-  contrastXvargroup,
+  vargroupXcontrast,
   contrasts,
   nsteps = 100L,
-  maxBandwidth = NA_real_
+  maxBandwidth = NA_real_,
+  mlog10pvalue_threshold = 10,
+  mlog10pvalue_hard_threshold_factor = 3
 )
 }
 \arguments{
@@ -19,16 +21,16 @@ vars_contrast_stats(
 calculation in `posterior::draws_array` 3D array format.}
 
 \item{vargroups}{grouped data frame that defines how variables are grouped.
-The variables are identified by `varspec_ix` column, which corresponds
+The variables are identified by `index_varspec` column, which corresponds
 to the index of the variable in `vars_draws` array.
 The existing grouping defines how the variables would be grouped.
 The grouping should contain the column having the same name as
-the columns dimension name of the `contrastXvalgroup` matrix.
+the columns dimension name of the `vargroupXcontrast` matrix.
 For contrast-specific grouping of the variables the grouping
 can optionally include the `contrast` column, and its values should
 match the `contrast` column of `contrasts` data frame.}
 
-\item{contrastXvargroup}{the matrix specifying contrasts. The rows are
+\item{vargroupXcontrast}{the matrix specifying contrasts. The rows are
 contrasts (the row names should match the `contrast` column of `contrasts`),
 the columns are variable groups (the column names should match the
 corresponding column of `vargroups`)}

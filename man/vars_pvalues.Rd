@@ -10,7 +10,9 @@ vars_pvalues(
   varspecs,
   tail = c("both", "negative", "positive"),
   nsteps = 100L,
-  maxBandwidth = NA_real_
+  maxBandwidth = NA_real_,
+  mlog10pvalue_threshold = 10,
+  mlog10pvalue_hard_threshold_factor = 3
 )
 }
 \arguments{

@@ -61,103 +61,89 @@ nrows_cumsum <- function(df, group_col) {
 #' @param subbatch_tau
 #' @param subbatch_df
 #' @param subbatch_c
-#' @param suo_fdr
-#' @param reliable_obs_fdr
-#' @param specific_iaction_fdr
 #' @param empty_observation_sigmoid_scale
 #'
 #' @export
-stan.prepare_data <- function(base_input_data, model_data,
-                              obj_labu_shift = global_protgroup_labu_shift,
+stan.prepare_data <- function(model_data,
                               effect_slab_df = 4, effect_slab_scale = 2.5,
-                              obj_labu_min = -10, obj_labu_min_scale = 1,
+                              obj_labu_min_scale = 1,
                               iact_repl_shift_tau=0.03, iact_repl_shift_df=4.0,
                               hsprior_lambda_a_offset = 0.05,
                               hsprior_lambda_t_offset = 0.01,
                               batch_effect_sigma=0.5,
                               subbatch_tau=0.3, subbatch_df=4, subbatch_c=10,
-                              suo_fdr=0.02, reliable_obs_fdr=0.001, specific_iaction_fdr=reliable_obs_fdr,
-                              empty_observation_sigmoid_scale = 1.0)
+                              empty_observation_sigmoid_scale = 1.0,
+                              verbose = FALSE)
 {
-  message('Converting MSGLM model data to Stan-readable format...')
-  is_glmm <- "mixeffects" %in% names(model_data)
-  if (any(as.integer(model_data$effects$effect) != seq_len(nrow(model_data$effects)))) {
-    stop("model_data$effects are not ordered")
-  }
-  if (any(as.integer(model_data$batch_effects$batch_effect) != seq_len(nrow(model_data$batch_effects)))) {
-    stop("model_data$batch_effects are not ordered")
-  }
-  if (!("index_mschannel" %in% names(model_data$mschannels))) {
-    warn("No index_mschannel column found, using index_msrun")
-    model_data$mschannels$index_mschannel <- model_data$mschannels$index_msrun
-    model_data$msdata$index_mschannel <- model_data$msdata$index_msrun
-  }
+  model_def <- model_data$model_def
+  if (verbose) message('Converting MSGLM model data to Stan-readable format...')
+  is_glmm <- rlang::has_name(model_def, "mixeffects")
+  ensure_primary_index_column(model_def$effects, 'index_effect')
+  ensure_primary_index_column(model_data$mschannels, 'index_mschannel')
+
   xaction_ix_col <- if (is_glmm) "glm_supaction_ix" else "index_interaction"
   obs_df <- dplyr::select(model_data$observations, index_observation, index_mschannel, index_msrun, index_object, !!xaction_ix_col) %>%
     dplyr::distinct()
   if (any(obs_df$index_observation != seq_len(nrow(obs_df)))) {
     stop("model_data$msdata not ordered by observations / have missing observations")
   }
-  if (is_glmm && any(as.integer(model_data$mixeffects$mixeffect) !=
-                     seq_len(nrow(model_data$mixeffects)))) {
-    stop("model_data$mixeffects are not ordered")
-  }
-  model_data$effects <- maybe_rename(model_data$effects, c("prior_mean" = "mean", "prior_tau" = "tau"))
   if (is_glmm) {
-    model_data$mixeffects <- maybe_rename(model_data$mixeffects, c("prior_mean" = "mean", "prior_tau" = "tau"))
+    ensure_primary_index_column(model_def$mixeffects, 'index_mixeffect')
+    # FIXME remove model_def$mixeffects <- maybe_rename(model_def$mixeffects, c("prior_mean" = "mean", "prior_tau" = "tau"))
   }
   msdata_obs_flags.df <- dplyr::group_by(model_data$msdata, index_observation) %>%
     dplyr::transmute(is_empty_observation = all(is.na(intensity))) %>%
     dplyr::ungroup()
-  if (any(msdata_obs_flags.df$index_observation != model_data$msdata$index_observation)) {
-    stop("Rows rearranged in msdata_obs_flags.df")
-  }
+  checkmate::assert_set_equal(msdata_obs_flags.df$index_observation,
+                              model_data$msdata$index_observation, ordered=TRUE)
 
   missing_mask <- is.na(model_data$msdata$intensity)
-  res <- base_input_data
-  res <- c(res, list(
+  res <- list(
     Nobservations = nrow(obs_df),
     Nexperiments = n_distinct(model_data$mschannels$index_mschannel),
-    Nconditions = nrow(conditionXeffect.mtx),
-    Nobjects = n_distinct(model_data$interactions$index_object),
-    experiment_shift = as.array(model_data$mschannels$model_mschannel_shift),
+    Nconditions = nrow(model_def$conditions),
+    Nobjects = nrow(model_data$objects),
+    experiment_shift = as.array(model_data$mschannels$mschannel_shift),
     observation2experiment = as.array(obs_df$index_mschannel),
-    Neffects = ncol(conditionXeffect.mtx),
-    effect_is_positive = as.array(as.integer(model_data$effects$is_positive)),
-    effect_tau = effects.df$prior_tau,
-    effect_mean = effects.df$prior_mean,
-    effect_df = if (rlang::has_name(effects.df, "prior_df")) {effects.df$prior_df} else {rep.int(1.0, nrow(effects.df))},
-    effect_df2 = if (rlang::has_name(effects.df, "prior_df2")) {effects.df$prior_df2} else {rep.int(1.0, nrow(effects.df))},
+
+    Neffects = ncol(model_def$conditionXeffect),
+    effect_is_positive = as.array(as.integer(model_def$effects$is_positive)),
+    effect_tau = model_def$effects$prior_tau,
+    effect_mean = model_def$effects$prior_mean,
+    effect_df = model_def$effects$prior_df1,
+    effect_df2 = model_def$effects$prior_df2,
     effect_slab_df = effect_slab_df,
     effect_slab_scale = effect_slab_scale,
 
     NobjEffects = nrow(model_data$object_effects),
-    obj_effect2effect = as.array(as.integer(model_data$object_effects$effect)),
+    obj_effect2effect = as.array(model_data$object_effects$index_effect),
 
-    NbatchEffects = ncol(msrunXbatchEffect.mtx),
-    batch_effect_is_positive = as.array(as.integer(model_data$batch_effects$is_positive)),
+    NbatchEffects = n_distinct(model_data$object_batch_effects$index_batch_effect),
+    batch_effect_is_positive = as.array(if (nrow(model_data$object_batch_effects) > 0)
+                                        as.integer(model_def$batch_effects$is_positive)
+                                        else integer(0)),
     batch_effect_sigma = batch_effect_sigma,
 
     NobjBatchEffects = nrow(model_data$object_batch_effects),
-    obj_batch_effect2batch_effect = as.array(as.integer(model_data$object_batch_effects$batch_effect)),
+    obj_batch_effect2batch_effect = as.array(model_data$object_batch_effects$index_batch_effect),
 
-    obj_labu_shift = obj_labu_shift,
+    obj_labu_shift = model_data$quantobj_labu_shift,
     obj_base_labu_sigma = 15.0,
-    obj_labu_min = obj_labu_min,
+    obj_labu_min = rlang::set_names(model_data$quantobj_labu_min, NULL),
     obj_labu_min_scale = obj_labu_min_scale,
 
     Nquanted = sum(!missing_mask),
     Nmissed = sum(missing_mask),
-    missing_sigmoid_scale = as.array(if_else(msdata_obs_flags.df$is_empty_observation[missing_mask], empty_observation_sigmoid_scale, 1.0)),
-    quant2obs = as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_qdata)]),
-    miss2obs = as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_mdata)]),
+    missing_sigmoid_scale = as.array(if_else(msdata_obs_flags.df$is_empty_observation[missing_mask],
+                                             empty_observation_sigmoid_scale, 1.0)),
     qData = as.array(model_data$msdata$intensity[!missing_mask]),
+    quant_isreliable = as.array(model_data$msdata$is_reliable[!missing_mask]),
+
     hsprior_lambda_a_offset = hsprior_lambda_a_offset,
     hsprior_lambda_t_offset = hsprior_lambda_t_offset,
-    iact_repl_shift_tau = iact_repl_shift_tau, iact_repl_shift_df = iact_repl_shift_df,
-    #zShift = mean(log(msdata$protgroup_intensities$intensity), na.rm = TRUE),
-    #zScale = 1.0/sd(log(msdata$protgroup_intensities$intensity), na.rm = TRUE)
-  )) %>%
+    iact_repl_shift_tau = iact_repl_shift_tau, iact_repl_shift_df = iact_repl_shift_df
+  ) %>%
+    modifyList(model_data$quantobj_mscalib) %>%
     modifyList(matrix2csr("obsXobjbatcheff", model_data$obsXobjbatcheff))
 
   iact_data <- list(Niactions = nrow(model_data$interactions),
@@ -166,11 +152,11 @@ stan.prepare_data <- function(base_input_data, model_data,
 
   if (is_glmm) {
     message("Setting GLMM interaction data...")
-    res$Nmix <- nrow(model_data$mixcoefXeff)
-    res$NmixEffects <- nrow(model_data$mixeffects)
-    res$mixeffect_mean <- as.array(model_data$mixeffects$prior_mean)
-    res$mixeffect_tau <- as.array(model_data$mixeffects$prior_tau)
-    res$mixcoefXeff <- as.matrix(model_data$mixcoefXeff)
+    res$Nmix <- nrow(model_def$mixcoefXeff)
+    res$NmixEffects <- nrow(model_def$mixeffects)
+    res$mixeffect_mean <- as.array(model_def$mixeffects$prior_mean)
+    res$mixeffect_tau <- as.array(model_def$mixeffects$prior_tau)
+    res$mixcoefXeff <- as.matrix(model_def$mixcoefXeff)
 
     iact_data <- modifyList(iact_data,
                  list(Nsupactions = nrow(model_data$superactions),
@@ -188,49 +174,34 @@ stan.prepare_data <- function(base_input_data, model_data,
 
   if ("subobjects" %in% names(model_data)) {
     # data have subobjects
-    # calculate probabilities that all quantitations of subobjects in a given observation are false discoveries
-    # TODO this could be applied to the protgroup-level model if there's external quality measure (e.g. protein identification q-value)
-    obs_stats.df <- dplyr::group_by(model_data$msdata, index_interaction, index_observation) %>%
-                    dplyr::summarise(nsuo_observed = n_distinct(index_subobject[!is.na(index_qdata)]),
-                                     nsuo_missed = n_distinct(index_subobject[!is.na(index_mdata)])) %>%
-      dplyr::ungroup() %>% dplyr::arrange(index_observation) %>%
-      dplyr::mutate(obj_exists_pvalue = pbinom(nsuo_observed - 1L, nsuo_observed + nsuo_missed, suo_fdr, lower.tail = FALSE)) %>%
-      ungroup()
-    # calculate probabilities that observations of an object are specific to the given interaction
-    # TODO this could be applied to the protgroup-level model
-    iact_stats.df <- dplyr::group_by(model_data$msdata, index_object, index_interaction) %>%
-                    dplyr::summarise(nexp_observed = n_distinct(index_mschannel[!is.na(index_qdata)]),
-                                     nexp_iaction = n_distinct(index_mschannel)) %>%
-                    dplyr::group_by(index_object) %>%
-                    dplyr::mutate(nexp_observed_total = sum(nexp_observed)) %>%
-                    dplyr::group_by(index_object, index_interaction) %>%
-                    dplyr::mutate(iaction_specific_pvalue = phyper(nexp_observed-1, nexp_observed_total, res$Nexperiments, nexp_iaction, lower.tail=FALSE)) %>%
-                    dplyr::ungroup()
-    obs_stats.df <- left_join(obs_stats.df, iact_stats.df) %>%
-      arrange(index_observation)
-
     subobj_data <- list(
       Nsubobjects = nrow(model_data$subobjects),
-      subobj2obj = as.array(as.integer(model_data$subobjects$index_object)),
-      quant2subobj = as.array(as.integer(model_data$msdata$index_subobject[!is.na(model_data$msdata$index_qdata)])),
-      miss2subobj = as.array(as.integer(model_data$msdata$index_subobject[!is.na(model_data$msdata$index_mdata)])),
-      observation_reliable = as.array(obs_stats.df$obj_exists_pvalue <= reliable_obs_fdr |
-                                      obs_stats.df$iaction_specific_pvalue <= specific_iaction_fdr),
+      subobj2obj = as.array(model_data$subobjects$index_object),
+      Nsubobservations = nrow(model_data$msdata),
+      quant2subobs = as.array(model_data$msdata$index_subobservation[!is.na(model_data$msdata$index_qdata)]),
+      miss2subobs = as.array(model_data$msdata$index_subobservation[!is.na(model_data$msdata$index_mdata)]),
+      subobs2subobj = as.array(model_data$msdata$index_subobject),
+      subobs2obs = as.array(model_data$msdata$index_observation),
       # TODO support different noise models
       Nmsprotocols = 0L,
       experiment2msproto = integer(0),
 
       # subobject-specific batch effects
-      NquantBatchEffects = ncol(msrunXsubbatchEffect.mtx),
+      NquantBatchEffects = n_distinct(model_data$subobject_batch_effects$index_quant_batch_effect),
       quant_batch_effect_tau = subbatch_tau,
       quant_batch_effect_df = subbatch_df,
       quant_batch_effect_c = subbatch_c,
-      quant_batch_effect_is_positive = as.array(as.integer(model_data$quant_batch_effects$is_positive)),
-      NsubobjBatchEffects = nrow(model_data$subobj_batch_effects),
-      subobj_batch_effect2quant_batch_effect = as.array(as.integer(model_data$subobject_batch_effects$quant_batch_effect))
+      quant_batch_effect_is_positive = as.array(if (nrow(model_data$subobject_batch_effects)>0)
+                                                as.integer(model_def$quant_batch_effects$is_positive)
+                                                else integer(0)),
+      NsubobjBatchEffects = nrow(model_data$subobject_batch_effects),
+      subobj_batch_effect2quant_batch_effect = as.array(model_data$subobject_batch_effects$index_quant_batch_effect)
     ) %>%
     modifyList(matrix2csr("subobsXsubobjbatcheff", model_data$subobsXsubobjbatcheff))
     res <- modifyList(res, subobj_data)
+  } else {
+    res$quant2obs <- as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_qdata)])
+    res$miss2obs <- as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_mdata)])
   }
   if ('index_mscalib' %in% names(model_data$mschannels)) {
     res$Nmsprotocols <- n_distinct(model_data$mschannels$index_mscalib)
@@ -239,11 +210,11 @@ stan.prepare_data <- function(base_input_data, model_data,
   if ("Nsubobjects" %in% names(res)) {
     message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s) with ",
             res$Nsubobjects, " subobject(s), ",
-            res$Nquanted, " quantitation(s) (", sum(res$observation_reliable[res$quant2observation]), " reliable), ",
+            res$Nquanted, " quantitation(s) (", sum(res$quant_isreliable), " reliable), ",
             res$Nmissed, " missed (", sum(msdata_obs_flags.df$is_empty_observation), " in empty observations)")
   } else {
     message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s), ",
-            res$Nquanted, " quantitation(s), ",
+            res$Nquanted, " quantitation(s) (", sum(res$quant_isreliable), " reliable), ",
             res$Nmissed, " missed (", sum(msdata_obs_flags.df$is_empty_observation), " in empty observations)")
   }
   return(res)

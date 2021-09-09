@@ -101,23 +101,25 @@ data {
   int<lower=0> Nmsprotocols;    // number of MS protocols used
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
   int<lower=0> Nobservations;   // number of observations of interactions (objectXexperiment pairs for all iactions and experiments of its condition)
+  int<lower=0> Nsubobservations;// number of subobject observations (observation X subobject)
   int<lower=1,upper=Nobjects> subobj2obj[Nsubobjects];
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
 
   vector[Nexperiments] experiment_shift;
 
+  int<lower=1,upper=Nobservations> subobs2obs[Nsubobservations];
+  int<lower=1,upper=Nsubobjects> subobs2subobj[Nsubobservations];
+
   int<lower=1,upper=Nexperiments> observation2experiment[Nobservations];
   int<lower=1,upper=Niactions> observation2iaction[Nobservations];
-  int<lower=0,upper=1> observation_reliable[Nobservations];
   int<lower=1,upper=Nmsprotocols> experiment2msproto[Nmsprotocols > 0 ? Nexperiments : 0];
 
   // map from labelXreplicateXobject to observed/missed data
   int<lower=0> Nquanted;        // total number of quantified subobjectsXexperiments
-  int<lower=1,upper=Nobservations>  quant2obs[Nquanted];
-  int<lower=1,upper=Nsubobjects> quant2subobj[Nsubobjects > 0 ? Nquanted : 0];
+  int<lower=1,upper=Nsubobservations>  quant2subobs[Nquanted];
+  int<lower=0,upper=1> quant_isreliable[Nquanted];
   int<lower=0> Nmissed;         // total number of missed subobjectsXexperiments
-  int<lower=1,upper=Nobservations> miss2obs[Nmissed];
-  int<lower=1,upper=Nsubobjects> miss2subobj[Nsubobjects > 0 ? Nmissed : 0];
+  int<lower=1,upper=Nsubobservations> miss2subobs[Nmissed];
   vector<lower=0>[Nquanted] qData; // quanted data
   vector<lower=0, upper=1>[Nmissed] missing_sigmoid_scale; // sigmoid scales for indiv. observations (<1 for higher uncertainty)
 
@@ -197,18 +199,22 @@ data {
 }
 
 transformed data {
-  int<lower=0> Nsubobservations = Nobservations*Nsubobjects; // number of subobject observations (observation X subobject)
   real mzShift = zShift - obj_labu_shift; // zShift for the missing observation intensity
   vector[Nquanted] zScore = (log(qData) - zShift) * zScale;
   vector[Nquanted] qLogStd; // log(sd(qData))-global_labu_shift
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
-  int<lower=0,upper=Nquanted> NreliableQuants = sum(observation_reliable[quant2observation]);
+  int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
 
-  int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2observation];
-  int<lower=1,upper=Nexperiments> quant2experiment[Nquanted] = observation2experiment[quant2observation];
-  int<lower=1,upper=Niactions> miss2iaction[Nmissed] = observation2iaction[miss2observation];
-  int<lower=1,upper=Nexperiments> miss2experiment[Nmissed] = observation2experiment[miss2observation];
+  int<lower=1,upper=Nsubobjects> quant2subobj[Nquanted] = subobs2subobj[quant2subobs];
+  int<lower=1,upper=Nobservations> quant2obs[Nquanted] = subobs2obs[quant2subobs];
+  int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2obs];
+  int<lower=1,upper=Nexperiments> quant2experiment[Nquanted] = observation2experiment[quant2obs];
+
+  int<lower=1,upper=Nsubobjects> miss2subobj[Nmissed] = subobs2subobj[miss2subobs];
+  int<lower=1,upper=Nobservations> miss2obs[Nmissed] = subobs2obs[miss2subobs];
+  int<lower=1,upper=Niactions> miss2iaction[Nmissed] = observation2iaction[miss2obs];
+  int<lower=1,upper=Nexperiments> miss2experiment[Nmissed] = observation2experiment[miss2obs];
 
   int<lower=0,upper=NobjEffects> NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   int<lower=0,upper=NobjEffects> NobjEffectsOther = NobjEffects - NobjEffectsPos;
@@ -228,8 +234,6 @@ transformed data {
   int<lower=0,upper=NsubobjBatchEffects> NsubobjBatchEffectsOther = NsubobjBatchEffects - NsubobjBatchEffectsPos;
   int<lower=1,upper=NsubobjBatchEffects> subobj_batch_effect_reshuffle[NsubobjBatchEffects] =
       objeffects_reshuffle(subobj_batch_effect2quant_batch_effect, quant_batch_effect_is_positive);
-  int<lower=1,upper=Nsubobservations> quant2subobs[NsubobjBatchEffects > 0 ? Nquanted : 0];
-  int<lower=1,upper=Nsubobservations> miss2subobs[NsubobjBatchEffects > 0 ? Nmissed : 0];
   real<lower=0> subobj_batch_effect_c2 = square(quant_batch_effect_c);
 
   vector[Niactions] iactXobjbase_w = rep_vector(1.0, Niactions);
@@ -267,11 +271,11 @@ transformed data {
     }
   }
 
-  // collect quantifications of reliable object observations
+  // collect indices of reliable quantifications
   {
     int j = 1;
     for (i in 1:Nquanted) {
-      if (observation_reliable[quant2obs[i]]) {
+      if (quant_isreliable[i]) {
         reliable_quants[j] = i;
         j += 1;
       }
@@ -412,16 +416,6 @@ transformed data {
             subobj_shiftXsubobj_shift0_u[i+1] = subobj_shiftXsubobj_shift0_u[i] + nW;
             subobj_shiftXsubobj_shift0_offset += nW;
         }
-    }
-
-    if (NsubobjBatchEffects > 0) {
-      // all references to the 1st protocol are redirected to index 1 (this shift is always 0)
-      for (i in 1:Nquanted) {
-        quant2subobs[i] = (quant2observation[i]-1)*Nsubobjects + quant2subobj[i];
-      }
-      for (i in 1:Nmissed) {
-        miss2subobs[i] = (miss2observation[i]-1)*Nsubobjects + miss2subobj[i];
-      }
     }
   }
 }
@@ -608,8 +602,7 @@ model {
 
         // model quantitations and missing data
         logcompressv(exp(q_labu - qLogStd) - qDataNorm, 0.25) ~ double_exponential(0.0, 1);
-        // soft-lower-limit for subobject identification of reliable observations
-        // for non-reliable observations (false identifications) we rely on double exponentual to handle outliers
+        // soft-lower-limit for subobject intensities of reliable quantifications
         1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept)));
     }

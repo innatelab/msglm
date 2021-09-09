@@ -109,6 +109,7 @@ data {
   // map from labelXreplicateXobject to observed/missed data
   int<lower=0> Nquanted;        // total number of quantified objectsXexperiments
   int<lower=1,upper=Nobservations>  quant2obs[Nquanted];
+  int<lower=0,upper=1> quant_isreliable[Nquanted];
   int<lower=0> Nmissed;         // total number of missed objectsXexperiments
   int<lower=1,upper=Nobservations> miss2obs[Nmissed];
   vector<lower=0>[Nquanted] qData; // quanted data
@@ -180,6 +181,8 @@ transformed data {
   vector[Nquanted] zScore = (log(qData) - zShift) * zScale;
   vector[Nquanted] qLogStd; // log(sd(qData))-global_labu_shift
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
+  int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
+  int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
 
   int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2obs];
   int<lower=1,upper=Nexperiments> quant2experiment[Nquanted] = observation2experiment[quant2obs];
@@ -227,6 +230,17 @@ transformed data {
       qLogStd[i] = intensity_log_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
       qDataNorm[i] = exp(log(qData[i]) - qLogStd[i]);
       qLogStd[i] -= obj_labu_shift; // obs_labu is modeled without obj_base
+    }
+  }
+
+  // collect indices of reliable quantifications
+  {
+    int j = 1;
+    for (i in 1:Nquanted) {
+      if (quant_isreliable[i]) {
+        reliable_quants[j] = i;
+        j += 1;
+      }
     }
   }
 
@@ -442,7 +456,8 @@ model {
 
         // model quantitations and missing data
         logcompressv(exp(q_labu - qLogStd) - qDataNorm, 0.25) ~ double_exponential(0.0, 1);
-        1 ~ bernoulli_logit(q_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
+        // soft-lower-limit for object intensities of reliable quantifications
+        1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept)));
     }
 }

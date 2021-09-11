@@ -16,10 +16,9 @@ data {
   vector[Nmschannels]  mschannel_preshift; // fixed mschannel pre-shifts
   matrix<lower=0>[Nobjects, Nmschannels] qData;
 
-  // instrument calibrated parameters 
+  // instrument calibrated parameters
   real<lower=0> zDetectionFactor;
   real zDetectionIntercept;
-  real<lower=0, upper=1> detectionMax;
 
   real<lower=0> sigmaScaleHi;
   real<lower=0> sigmaScaleLo;

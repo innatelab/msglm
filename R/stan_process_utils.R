@@ -121,3 +121,11 @@ pvalue_compare <- function(xsamples, y=0, tail = c("both", "negative", "positive
   }
   return(res)
 }
+
+# quantiles for symmetric 50% and 95% credible intervals
+#' @export
+quantiles_ci <- function(x) { posterior::quantile2(x, probs=c(0.025, 0.25, 0.75, 0.975)) }
+
+# the default metrics the posterior::summary() function should calculate
+posterior_summary_metrics <- c("mean", "median", "sd", "mad", "quantiles_ci",
+                               "rhat", "ess_bulk", "ess_tail")

@@ -110,12 +110,13 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
                                     #init=function() list(shift_sigma=1.0, shift_shift0=as.array(rep.int(0.0, stan_input$Nshifts-1L))),
                                     adapt_delta=mcmc.adapt_delta, show_messages=verbose)
         neff_min <- neff_ratio.min * mcmc.iter
-        res <- norm_fit$summary(variables = out_params) %>%
+        res <- norm_fit$summary(variables = out_params, posterior_summary_metrics) %>%
           tidyr::extract("variable", "shift_ix", "^shift\\[(\\d+)\\]$", remove=FALSE, convert=TRUE) %>%
           dplyr::filter(!is.na(shift_ix)) %>%
           dplyr::mutate(condition = levels(mschan_df$condition)[shift_ix],
                         converged = (rhat <= Rhat.max) & (ess_bulk >= neff_min)) %>%
-          dplyr::select(condition, shift=mean, shift_sd=sd, shift_median=median, shift_mad=mad, shift_q5=q5, shift_q95=q95,
+          dplyr::select(condition, shift=mean, shift_sd=sd, shift_median=median, shift_mad=mad,
+                        shift_q25=q25, shift_q75=q75, shift_q2.5=q2.5, shift_q97.5=q97.5,
                         rhat, ess_bulk, ess_tail, converged)
         if (!all(res$converged)) {
             warning("Convergence problems for ", sum(!res$converged), " shift(s)")

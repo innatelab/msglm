@@ -207,9 +207,7 @@ vars_contrast_stats <- function(vars_draws, vargroups,
                             mlog10pvalue_hard_threshold_factor = mlog10pvalue_hard_threshold_factor,
                             summaryfun = function(draws) {
                               posterior::as_draws_array(draws) %>%
-                              posterior::summarise_draws(
-                                  c("mean", "median", "sd", "mad", "quantiles_ci",
-                                    "rhat", "ess_bulk", "ess_tail"))
+                              posterior::summarise_draws(posterior_summary_metrics)
                             }), by = "__contrast_ix__") %>%
     dplyr::select(-variable, -`__contrast_ix__`) %>%
     dplyr::mutate(mean_log2 = mean/log(2),
@@ -324,10 +322,6 @@ default_contrast_vars <- function(vars_info) {
   # obs_labu is skipped because it's much more expensive to compute and Rhat statistics doesn't make sense
 }
 
-# quantiles for symmetric 50% and 95% credible intervals
-#' @export
-quantiles_ci <- function(x) { posterior::quantile2(x, probs=c(0.025, 0.25, 0.75, 0.975)) }
-
 #' @export
 process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(model_data),
                              vars_info = attr(msglm.stan_fit, "msglm_vars_info"),
@@ -355,9 +349,7 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
   varspecs <- process_varspecs(dimnames(msglm.stan_draws)$variable, vars_info, dims_info)
 
   message('Computing variables summary statistics...')
-  msglm.stan_stats <- msglm.stan_fit$summary(variables = avail_vars,
-                                             c("mean", "median", "sd", "mad", "quantiles_ci",
-                                               "rhat", "ess_bulk", "ess_tail")) %>%
+  msglm.stan_stats <- msglm.stan_fit$summary(variables = avail_vars, posterior_summary_metrics) %>%
     # FIXME, min.iteration = min.iteration, chains=chains) %>%
     dplyr::rename(varspec = variable)
 

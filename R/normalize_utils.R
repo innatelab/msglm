@@ -5,7 +5,7 @@
 
 # calculate normalization shifts within one MS condition group
 #' @export
-norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
+norm_shifts.condgroup <- function(stan_norm_model, quantobj_mscalib,
         msdata_df, mschan_preshifts, condgroup_id, cond_col,
         max_objs=1000L, quant_ratio.max=NA,
         stan_method = c("optimizing", "mcmc", "vb"),
@@ -39,8 +39,11 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
     }
     msdata_df_orig <- msdata_df
     msdata_df <- dplyr::semi_join(msdata_df, dplyr::select(sel_objs, obj), by="obj")
-    stan_input <- stan_input_base
-    stan_input$Nobjects <- nrow(sel_objs)
+    stan_input <- list(
+      Nobjects = nrow(sel_objs)
+    )
+    stan_input <- modifyList(stan_input, quantobj_mscalib[mscalib_stan_varnames])
+
     if (nrow(msdata_df) == 0L) {
         # degenerated case, no data
         warning("No valid observations in group ", condgroup_id)
@@ -154,7 +157,7 @@ norm_shifts.condgroup <- function(stan_norm_model, stan_input_base,
 }
 
 #' @export
-normalize_experiments <- function(stan_input_base, msdata_df,
+normalize_experiments <- function(quantobj_mscalib, msdata_df,
                                   quant_col = "intensity", obj_col = "protgroup_id",
                                   mschan_col = "mschannel", cond_col="condition", condgroup_col = NULL, sumgroup_col = NULL,
                                   mschan_preshifts = NULL, preshift_col="shift",
@@ -227,7 +230,7 @@ normalize_experiments <- function(stan_input_base, msdata_df,
       dplyr::filter(n_mschannels > 1L & n_mschannels >= nmschan_ratio.min*n_max_mschannels &
                     n_conditions >= ncond_ratio.min*n_max_conditions)
     res <- dplyr::group_by(valid_objs, condgroup) %>%
-           dplyr::group_modify(.keep=TRUE, ~ norm_shifts.condgroup(stan_norm_model, stan_input_base,
+           dplyr::group_modify(.keep=TRUE, ~ norm_shifts.condgroup(stan_norm_model, quantobj_mscalib,
                               dplyr::inner_join(msdata_df_std, .x, by = c('obj', 'condgroup')), .y$condgroup,
                               cond_col=cond_col,
                               mschan_preshifts=mschan_preshifts,
@@ -253,7 +256,7 @@ normalize_experiments <- function(stan_input_base, msdata_df,
 }
 
 #' @export
-multilevel_normalize_experiments <- function(instr_calib,
+multilevel_normalize_experiments <- function(quantobj_mscalib,
                                              mschannels_df, msdata_df,
                                   quant_col = "intensity", obj_col = "protgroup_id",
                                   mschan_col = "mschannel",
@@ -270,10 +273,7 @@ multilevel_normalize_experiments <- function(instr_calib,
 {
   stan_method <- match.arg(stan_method)
   shifts_constraint <- match.arg(shifts_constraint)
-  stan_input_base <- instr_calib[c('zDetectionFactor', 'zDetectionIntercept',
-                               'detectionMax', 'sigmaScaleHi', 'sigmaScaleLo',
-                               'sigmaOffset', 'sigmaBend', 'sigmaSmooth',
-                               'zShift', 'zScale')]
+
   # FIXME compose msrun info
   lev_cols <- unique(c(unlist(lapply(norm_levels, function(lev) c(lev$cond_col, lev$condgroup_col, lev$sumgroup_col))), mschan_col))
   lev_cols <- lev_cols[!is.na(lev_cols)]
@@ -297,7 +297,7 @@ multilevel_normalize_experiments <- function(instr_calib,
     next_lev_info <- if (i < length(norm_levels)) norm_levels[[i+1]] else list()
     lev_name <- names(norm_levels)[[i]]
     if (verbose) message("Normalizing ", lev_name, " (level #", i, ")...")
-    lev_shifts_df <- normalize_experiments(stan_input_base, msdata_df,
+    lev_shifts_df <- normalize_experiments(quantobj_mscalib, msdata_df,
                                            obj_col = obj_col, quant_col = quant_col,
                                            mschan_col = mschan_col,
                                            cond_col = lev_info$cond_col,

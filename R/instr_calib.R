@@ -25,6 +25,11 @@ instrument.zscore_precision <- function(z, instr_calib) {
   exp(-instrument.zscore_logsd(z, instr_calib))
 }
 
+instrument.signal_logsd <- function(signal, instr_calib) {
+  if_else(!is.na(signal) & is.finite(signal),
+          instrument.zscore_logsd(instrument.signal2zscore(signal, instr_calib), instr_calib), NA_real_)
+}
+
 instrument.signal_sd <- function(signal, instr_calib) {
   if_else(!is.na(signal) & is.finite(signal),
           instrument.zscore_sd(instrument.signal2zscore(signal, instr_calib), instr_calib),

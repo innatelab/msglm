@@ -1,6 +1,8 @@
 # convert signal to zscore
 instrument.signal2zscore <- function(signal, instr_calib) {
-  if_else(!is.na(signal) & is.finite(signal), (log(signal) - instr_calib$zShift)*instr_calib$zScale, NA_real_ )
+  if_else(!is.na(signal) & is.finite(signal),
+          (log(signal) - instr_calib$zShift)*instr_calib$zScale,
+          NA_real_ )
 }
 
 # inverse of sigma
@@ -12,8 +14,8 @@ instrument.signal_precision <- function(signal, instr_calib) {
 instrument.zscore_logsd <- function(z, instr_calib) {
   zd = z - instr_calib$sigmaBend
   return (0.5 * (instr_calib$sigmaScaleHi + instr_calib$sigmaScaleLo) * zd +
-            0.5 * (instr_calib$sigmaScaleHi - instr_calib$sigmaScaleLo) * sqrt(zd*zd + instr_calib$sigmaSmooth) +
-            instr_calib$sigmaOffset)
+          0.5 * (instr_calib$sigmaScaleHi - instr_calib$sigmaScaleLo) * sqrt(zd*zd + instr_calib$sigmaSmooth) +
+          instr_calib$sigmaOffset)
 }
 
 instrument.zscore_sd <- function(z, instr_calib) {
@@ -25,7 +27,8 @@ instrument.zscore_precision <- function(z, instr_calib) {
 
 instrument.signal_sd <- function(signal, instr_calib) {
   if_else(!is.na(signal) & is.finite(signal),
-          instrument.zscore_std(instrument.signal2zscore(signal, instr_calib), instr_calib), NA_real_)
+          instrument.zscore_sd(instrument.signal2zscore(signal, instr_calib), instr_calib),
+          NA_real_)
 }
 
 instrument.signal_likelihood_log <- function(signal, expected, signalPrecision) {

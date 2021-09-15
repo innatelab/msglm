@@ -15,6 +15,6 @@ LazyData: true
 Imports: rlang, Matrix, cpp11, BH, dplyr, tidyr, tidyselect, stringr, purrr, posterior, cmdstanr, checkmate
 LinkingTo: cpp11, BH
 SystemRequirements: C++11
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
 Roxygen: list(markdown = TRUE, r6 = FALSE)
 Suggests: testthat (>= 2.1.0)

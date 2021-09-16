@@ -364,7 +364,7 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
       message('    - calculating P-values for: ',
               paste0(unique(cat_eff_varspecs.df$var), collapse=', '), '...')
       p_values.df <- vars_pvalues(msglm.stan_draws, dplyr::select(cat_eff_varspecs.df, varspec, any_of("prior_mean")))
-      res.df <- dplyr::left_join(res.df, p_values.df) %>%
+      res.df <- dplyr::left_join(res.df, dplyr::select(p_values.df, -any_of("prior_mean")), by="varspec") %>%
         dplyr::select(-index_varspec, -var_index)
     }
     list(stats = res.df)
@@ -413,14 +413,16 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
 
   metaconditionXcontrast.df <- as.data.frame.table(model_def$metaconditionXcontrast, responseName="weight") %>%
     dplyr::filter(weight != 0) %>%
-    dplyr::inner_join(contrasts.df)
+    dplyr::inner_join(contrasts.df, by="contrast")
   conditionXcontrast.df <- as.data.frame.table(model_def$conditionXmetacondition, responseName="part_of") %>%
     dplyr::filter(part_of) %>% dplyr::select(-part_of) %>%
     dplyr::inner_join(dplyr::select(metaconditionXcontrast.df, metacondition, contrast, weight, contrast_type),
                       by="metacondition")
   if (rlang::has_name(model_def, "conditionXcontrast")) {
     old_nrow <- nrow(conditionXcontrast.df)
-    conditionXcontrast.df <- dplyr::left_join(conditionXcontrast.df, model_def$conditionXcontrast)
+    join_cols <- intersect(intersect(colnames(conditionXcontrast.df), colnames(model_def$conditionXcontrast)),
+                           c("contrast", "contrast_type", "condition", "metacondition", "weight"))
+    conditionXcontrast.df <- dplyr::left_join(conditionXcontrast.df, model_def$conditionXcontrast, by=join_cols)
     if (old_nrow != nrow(conditionXcontrast.df)) {
       stop("Incompatible model_def$conditionXcontrast, check that it matches metaconditionXcondition and metaconditionXcontrast")
     }

@@ -46,6 +46,7 @@ nrows_cumsum <- function(df, group_col) {
 # convert object into a list of Stan variables for the "data" block
 to_standata <- function(obj, ...) UseMethod("to_standata")
 
+# TODO rename to "to_standata.msglm_data"
 #' Coverts the data and experimental design into Stan format.
 #'
 #' @param model_data the list with MS data an experimental design
@@ -234,6 +235,7 @@ msglm_stan_model <- function(model_name) {
   return (cmdstanr::cmdstan_model(file.path(stan_models_path, paste0(model_name, ".stan"))))
 }
 
+# TODO support supplying msglm_data directly (and implicitly converting it with to_standata())
 #' @export
 stan.sampling <- function(stan_input_data, iter=4000L, refresh=100L, chains=8L,
                           max_treedepth=12L, ...)

@@ -512,11 +512,11 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
   model_data$quantobj_mscalib <- msdata[[paste0(quantobj, "_mscalib")]]
   model_data$quantobj_labu_shift <- msdata[[paste0(quantobj, '_labu_shift')]]
   model_data$quantobj_labu_min <- msdata[[paste0(quantobj, '_labu_min')]]
-  logintensityBase <- mscalib_logintensityBase(model_data$quantobj_mscalib, silent=TRUE)
-  if (logintensityBase != 2) {
-    warning("msdata$", quantobj, "_mscalib logintensityBase=", logintensityBase,
+  logbase <- logintensityBase(model_data$quantobj_mscalib, silent=TRUE)
+  if (logbase != 2) {
+    warning("msdata$", quantobj, "_mscalib logintensityBase=", logbase,
             " converting mscalib model and log-intensities to log2-based ones")
-    model_data$quantobj_mscalib <- mscalib_convert_logintensityBase(model_data$quantobj_mscalib, new_base=2)
+    model_data$quantobj_mscalib <- convert_logintensityBase(model_data$quantobj_mscalib, new_base=2)
     k <- log(logintensityBase) / log(2)
     model_data$quantobj_labu_shift <- model_data$quantobj_labu_shift * k
     model_data$quantobj_labu_min <- model_data$quantobj_labu_min * k

@@ -5,7 +5,7 @@
 #'                    include in the reports.
 #' @returns The named list of data frames with the dimension information.
 #'          The element names are the names of the dimensions,
-#'          Each data frame has `index_<dimname>` key,
+#'          Each data frame has ``index_<dimname>`` key,
 #'          which matches the index along the corresponding dimension in
 #'          the MSGLM model.
 #'
@@ -79,10 +79,10 @@ msglm_dims <- function(model_data)
 #' and return the p-value for the significance of the difference (w.r.t `tail`)
 #'
 #' @param vars_draws MCMC draws from the posterior in `posterior::draws_array` format
-#' @param varspecs variables to calculate P-values for
+#' @param varspecs Stan variables (with indices specified) to calculate P-values for
 #' @param tail which comparison to do, one of `both` (the default),
-#'             `negative` (``P(x \leq t)``) or `positive` (``P(x \geq t)``),
-#'             where ``t`` is the `prior_mean` of the variable.
+#'             `negative` (\eqn{P(X \leq t)}) or `positive` (\eqn{P(X \geq t)}),
+#'             where \eqn{t} is the `prior_mean` of the variable \eqn{X}.
 #'             For `both` the double of the minimal of the two p-values is given.
 #' @param nsteps (defaults to 100) how many bins to use for the calculation of p-values
 #' @param maxBandwidth constrain the rule-of-thumb bandwidth for the posterior distribution
@@ -123,10 +123,10 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
 #' contrasts for all possible combinations of variables in the groups are being
 #' calculated and combined together to form the posterior distribution of the
 #' contrast.
-#' For example, consider the group ``A`` contains variables ``a_1`` and ``a_2``,
-#' and the group ``B`` is ``{b_1, b_2}``. For the ``A - B`` contrast,
-#' the procedure will calculate 4 linear combinations: ``a_1 - b_1``, ``a_1 - b_2``,
-#' ``a_2 - b_1`` and ``a_2 - b_2``, then it will combine the resulting 4 sets of
+#' For example, consider the group \eqn{A} contains variables \eqn{a_1} and \eqn{a_2},
+#' and the group \eqn{B} is \eqn{\{b_1, b_2\}}. For the \eqn{A - B} contrast,
+#' the procedure will calculate 4 linear combinations: \eqn{a_1 - b_1}, \eqn{a_1 - b_2},
+#' \eqn{a_2 - b_1} and \eqn{a_2 - b_2}, then it will combine the resulting 4 sets of
 #' MCMC draws and proceed with calculating the posterior summary.
 #'
 #' @param vars_draws MCMC draws for the model variables to use for contrast

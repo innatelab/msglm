@@ -10,6 +10,23 @@ read_mscalib_json <- function(filename) {
   return(structure(mscalib_json$mscalib, class="mscalib"))
 }
 
+to_standata.mscalib <- function(mscalib, convert_base=FALSE, silent=TRUE) {
+  logbase <- logintensityBase(mscalib, silent=silent)
+  if (logbase != 2) {
+    msg <- paste0(checkmate::vname(mscalib), "$logintensityBase=", logbase)
+    if (convert_base) {
+      if (!silent) warning(msg, " converting mscalib model to log2-based one")
+      mscalib <- convert_logintensityBase(mscalib, new_base=2)
+    } else {
+      stop(msg, ", 2 expected")
+    }
+  }
+  return(mscalib[c('zShift', 'zScale',
+                   'zDetectionFactor', 'zDetectionIntercept',
+                   'sigmaScaleHi', 'sigmaScaleLo',
+                   'sigmaOffset', 'sigmaBend', 'sigmaSmooth')])
+}
+
 # convert signal to zscore
 signal2zscore <- function(mscalib, signal) {
   logbase <- logintensityBase(mscalib, silent = TRUE)

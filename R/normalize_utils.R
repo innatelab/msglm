@@ -43,13 +43,7 @@ norm_shifts.condgroup <- function(stan_norm_model, quantobj_mscalib,
       Nobjects = nrow(sel_objs)
     )
 
-    logbase <- logintensityBase(quantobj_mscalib, silent=TRUE)
-    if (logbase != 2) {
-      warning("quantobj_mscalib logintensityBase=", logbase,
-              " converting mscalib model to log2-based one")
-      quantobj_mscalib <- convert_logintensityBase(quantobj_mscalib, new_base=2)
-    }
-    stan_input <- modifyList(stan_input, quantobj_mscalib[mscalib_stan_varnames])
+    stan_input <- modifyList(stan_input, to_standata(quantobj_mscalib, convert_base=TRUE, silent=!verbose))
 
     if (nrow(msdata_df) == 0L) {
         # degenerated case, no data

@@ -43,15 +43,11 @@ nrows_cumsum <- function(df, group_col) {
   }
 }
 
-# which variables from mscalib model to take for Stan model
-mscalib_stan_varnames <- c('zShift', 'zScale',
-                           'zDetectionFactor', 'zDetectionIntercept',
-                           'sigmaScaleHi', 'sigmaScaleLo',
-                           'sigmaOffset', 'sigmaBend', 'sigmaSmooth')
+# convert object into a list of Stan variables for the "data" block
+to_standata <- function(obj, ...) UseMethod("to_standata")
 
 #' Coverts the data and experimental design into Stan format.
 #'
-#' @param base_input_data input data already in Stan format (e.g. MS noise model parameters)
 #' @param model_data the list with MS data an experimental design
 #'
 #' @param obj_labu_shift the average log-abundance of model objects
@@ -149,7 +145,7 @@ stan.prepare_data <- function(model_data,
     hsprior_lambda_t_offset = hsprior_lambda_t_offset,
     iact_repl_shift_tau = iact_repl_shift_tau, iact_repl_shift_df = iact_repl_shift_df
   ) %>%
-    modifyList(model_data$quantobj_mscalib[mscalib_stan_varnames]) %>%
+    modifyList(to_standata(model_data$quantobj_mscalib, silent=!verbose)) %>%
     modifyList(matrix2csr("obsXobjbatcheff", model_data$obsXobjbatcheff))
 
   iact_data <- list(Niactions = nrow(model_data$interactions),

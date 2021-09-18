@@ -13,7 +13,7 @@ functions {
       return res;
     }
 
-    real intensity_log_std(real z, real scaleHi, real scaleLo, real offs, real bend, real smooth) {
+    real intensity_log2_std(real z, real scaleHi, real scaleLo, real offs, real bend, real smooth) {
         return 0.5*(scaleHi+scaleLo)*(z-bend) + 0.5*(scaleHi-scaleLo)*sqrt((z-bend)*(z-bend)+smooth) + offs;
     }
 
@@ -178,8 +178,8 @@ data {
 
 transformed data {
   real mzShift = zShift - obj_labu_shift; // zShift for the missing observation intensity
-  vector[Nquanted] zScore = (log(qData) - zShift) * zScale;
-  vector[Nquanted] qLogStd; // log(sd(qData))-global_labu_shift
+  vector[Nquanted] zScore = (log2(qData) - zShift) * zScale;
+  vector[Nquanted] qLog2Std; // log2(sd(qData))-obj_labu_shift
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
   int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
@@ -227,9 +227,9 @@ transformed data {
   // process the intensity data to optimize likelihood calculation
   {
     for (i in 1:Nquanted) {
-      qLogStd[i] = intensity_log_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
-      qDataNorm[i] = exp(log(qData[i]) - qLogStd[i]);
-      qLogStd[i] -= obj_labu_shift; // obs_labu is modeled without obj_base
+      qLog2Std[i] = intensity_log2_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
+      qDataNorm[i] = exp2(log2(qData[i]) - qLog2Std[i]);
+      qLog2Std[i] -= obj_labu_shift; // obs_labu is modeled without obj_base
     }
   }
 
@@ -447,15 +447,13 @@ model {
 
         q_labu = obs_labu[quant2obs] + mschannel_shift[quant2mschannel];
         m_labu = obs_labu[miss2obs] + mschannel_shift[miss2mschannel];
-        //qLogAbu = iaction_shift[quant2iaction] + mschannel_shift[quant2mschannel];
-        //mLogAbu = iaction_shift[miss2iaction] + mschannel_shift[miss2mschannel];
         if (NbatchEffects > 0) {
           q_labu += obs_batch_shift[quant2obs];
           m_labu += obs_batch_shift[miss2obs];
         }
 
         // model quantitations and missing data
-        logcompressv(exp(q_labu - qLogStd) - qDataNorm, 0.25) ~ double_exponential(0.0, 1);
+        logcompressv(exp2(q_labu - qLog2Std) - qDataNorm, 0.25) ~ double_exponential(0.0, 1);
         // soft-lower-limit for object intensities of reliable quantifications
         1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept)));

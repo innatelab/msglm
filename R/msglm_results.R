@@ -30,8 +30,7 @@ msglm_dims <- function(model_data)
     object = model_data$objects, # use full object information
     object_effect = model_data$object_effects %>%
         dplyr::inner_join(objs_df, by=c("index_object", "object_id")) %>%
-        dplyr::inner_join(model_def$effects, by=c("index_effect", "effect")) %>%
-        dplyr::mutate(prior_mean_log2=prior_mean/log(2)),
+        dplyr::inner_join(model_def$effects, by=c("index_effect", "effect")),
     object_batch_effect = model_data$object_batch_effects %>%
         dplyr::inner_join(objs_df, by=c("index_object", "object_id"))
   )
@@ -55,8 +54,6 @@ msglm_dims <- function(model_data)
       message("mixeffects$prior_mean missing, setting to 0")
       res$object_mixeffect$prior_mean <- 0.0
     }
-    res$object_mixeffect <- mutate(res$object_mixeffect,
-                                   prior_mean_log2=prior_mean/log(2))
     res$object_mixcoef <- dplyr::mutate(model_data$mixcoefs, tmp="a") %>%
       dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
       dplyr::select(-tmp)
@@ -210,10 +207,7 @@ vars_contrast_stats <- function(vars_draws, vargroups,
                               posterior::summarise_draws(posterior_summary_metrics)
                             }), by = "__contrast_ix__") %>%
     dplyr::select(-variable, -`__contrast_ix__`) %>%
-    dplyr::mutate(mean_log2 = mean/log(2),
-                  median_log2 = median/log(2),
-                  sd_log2 = sd/log(2),
-                  p_value = 2*pmin(prob_nonpos, prob_nonneg, 0.5))
+    dplyr::mutate(p_value = 2*pmin(prob_nonpos, prob_nonneg, 0.5))
   return (res)
 }
 
@@ -363,10 +357,7 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
     res.df <- msglm.stan_stats %>%
       dplyr::inner_join(cat_varspecs.df, by = "varspec") %>%
       dplyr::left_join(cat_info.df, by = "var_index") %>%
-      dplyr::select(-category) %>%
-      dplyr::mutate(mean_log2 = mean/log(2),
-                    median_log2 = median/log(2),
-                    sd_log2 = sd/log(2))
+      dplyr::select(-category)
     cat_eff_varspecs.df <- dplyr::filter(cat_varspecs.df, var %in% effect_vars) %>%
       dplyr::left_join(dplyr::select(cat_info.df, var_index, any_of("prior_mean")), by = "var_index")
     if (nrow(cat_eff_varspecs.df) > 0) {

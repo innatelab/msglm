@@ -1,0 +1,86 @@
+image: rocker/tidyverse
+
+variables:
+  # changing the snapshot will cause the rebuild of the msglm dependencies
+  R_DEPS_SNAPSHOT: RDeps-20210916
+  # msglm is installed to R_LIBS_USER
+  R_LIBS_USER: "$CI_PROJECT_DIR/.ci/lib/R/library"
+  # dependencies are installed to R_LIBS_SITE
+  R_LIBS_SITE: "$CI_PROJECT_DIR/.ci/lib/R/site-library"
+  # set the priority of user and site-library so that packages gets installed there
+  R_LIBS: "$CI_PROJECT_DIR/.ci/lib/R/library:$CI_PROJECT_DIR/.ci/lib/R/site-library:/usr/local/lib/R/site-library:/usr/local/lib/R/library"
+  CHECK_DIR: "$CI_PROJECT_DIR/.ci/logs"
+  BUILD_LOGS_DIR: "$CI_PROJECT_DIR/.ci/logs/$CI_PROJECT_NAME.Rcheck"
+  GITHUB_PAT: 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
+
+stages:
+  - prebuild
+  - build
+  - test
+  - deploy
+
+.artifacts-template: &artifacts
+  name: r-packages
+  expire_in: 2 weeks
+  when: always
+  paths:
+    - $R_LIBS_USER
+
+.cache-template: &rdeps_cache
+  key: $R_DEPS_SNAPSHOT
+  paths:
+    - $R_LIBS_SITE
+  policy: pull
+
+build_deps:
+  stage: prebuild
+  before_script:
+    - mkdir -p $R_LIBS_SITE $CHECK_DIR $BUILD_LOGS_DIR
+  script:
+    # override dependencies with custom versions not yet on CRAN
+    - Rscript -e "remotes::install_github(c('r-lib/cpp11', 'stan-dev/posterior', 'stan-dev/cmdstanr'))"
+    - Rscript -e "remotes::install_cran(c('decor', 'covr', 'DT'))"
+    - Rscript -e "remotes::install_deps(dependencies = TRUE, upgrade = 'never')"
+  cache:
+    <<: *rdeps_cache
+    policy: pull-push
+
+build:
+  stage: build
+  before_script:
+    - mkdir -p $R_LIBS_USER
+  script:
+    # FIXME towards the release remove error_on (would require fixing warnings)
+    - Rscript -e 'devtools::check(error_on="error")'
+    - Rscript -e 'devtools::install()'
+  cache:
+    <<: *rdeps_cache
+  artifacts:
+    <<: *artifacts
+
+# To have the coverage percentage appear as a gitlab badge follow these
+# instructions:
+# https://docs.gitlab.com/ee/user/project/pipelines/settings.html#test-coverage-parsing
+# The coverage parsing string is
+# Coverage: \d+\.\d+
+
+test:
+  stage: test
+  allow_failure: true
+  script:
+    - |
+      Rscript -e 'testthat::test_local()' \
+              -e 'covr_report <- covr::package_coverage()' \
+              -e 'covr::gitlab(coverage = covr_report, file = "coverage/coverage-report.html")' \
+              -e 'message("Coverage: ", sprintf("%0.2f", covr::percent_coverage(covr_report)))' \
+              -e 'covr::to_cobertura(covr_report, filename = "coverage-cobertura.xml")'
+  coverage: '/Coverage: \d+\.\d+/'
+  cache:
+    <<: *rdeps_cache
+  artifacts:
+    name: coverage_report
+    expose_as: 'Coverage Report'
+    expire_in: 2 weeks
+    paths: [coverage/coverage-report.html, coverage]
+    reports:
+      cobertura: coverage-cobertura.xml

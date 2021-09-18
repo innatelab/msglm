@@ -1,15 +1,20 @@
 Package: msglm
 Type: Package
 Title: GLM models for Mass Spectrometry Data
-Version: 0.2.0
-Author: Alexey Stukalov
-Maintainer: Alexey Stukalov <alexey.stukalov@tum.de>
+Version: 0.3.0
+Date: 2021-09-15
+Authors@R:
+    c(person(given = "Alexey", family = "Stukalov", role = c("aut", "cre"),
+             email = "alexey.stukalov@tum.de"))
+BugReports: https://github.com/innatelab/msglm/issues
 Description: Bayesian Generalized Linear Models for Protein- and
-    Peptide-Level Mass Spectrometry data
+    MS1-Level Mass Spectrometry data
 License: BSD?
 Encoding: UTF-8
 LazyData: true
-Imports: rlang, Matrix, cpp11, BH, posterior, cmdstanr, dplyr, tidyr, tidyselect, stringr, purrr
+Imports: rlang, Matrix, cpp11, BH, dplyr, tidyr, tidyselect, stringr, purrr, posterior, cmdstanr, checkmate
 LinkingTo: cpp11, BH
 SystemRequirements: C++11
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
+Roxygen: list(markdown = TRUE, r6 = FALSE)
+Suggests: testthat (>= 2.1.0)

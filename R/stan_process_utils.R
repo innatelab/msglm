@@ -24,12 +24,12 @@ process_varspecs <- function(varspecs, vars_info, dims_info) {
   all_vars.df <- bind_rows(lapply(names(vars_info), function(cat) tibble(category = cat,
                                                                          var = vars_info[[cat]]$names)))
   all_varspecs.df <- tibble(varspec = varspecs,
-                            varspec_ix = seq_along(varspecs)) %>%
-    tidyr::extract(varspec, c("var", "index_spec"),
+                            index_varspec = seq_along(varspecs)) %>%
+    tidyr::extract(varspec, c("var", "var_index"),
                    '^(\\w[^[]+)(?:\\[((?:\\d+\\,)*\\d+)\\])?$', remove=FALSE) %>%
-    dplyr::mutate(index_spec = ifelse(index_spec == '', NA_character_, index_spec)) %>%
+    dplyr::mutate(var_index = ifelse(var_index == '', NA_character_, var_index)) %>%
     dplyr::inner_join(all_vars.df, by = 'var')
-  cat_specs.df <- dplyr::distinct(all_varspecs.df, category, index_spec) %>%
+  cat_specs.df <- dplyr::distinct(all_varspecs.df, category, var_index) %>%
     dplyr::group_by(category)
   cats_info <- dplyr::group_map(cat_specs.df, function(cat_df, cat_row) {
       cat <- cat_row$category
@@ -46,14 +46,14 @@ process_varspecs <- function(varspecs, vars_info, dims_info) {
         warning('Category ', cat, ' dimensions ',
                 dims.df$name[dims.df$local_ix > 1], ' not unique, using suffixes')
       }
-      cat_df <- tidyr::separate(cat_df, index_spec, c(dims.df$col), remove=FALSE, convert=TRUE, sep=",")
+      cat_df <- tidyr::separate(cat_df, var_index, c(dims.df$col), remove=FALSE, convert=TRUE, sep=",")
       # append info of each dimension
       for (dim_ix in seq_len(nrow(dims.df))) {
         dim_name = dims.df$name
         if (!(dim_name %in% names(dims_info))) {
           warning('No information for dimension #', dim_ix, " (", dim_name, ")")
         } else {
-          dim_info = dims_info[[dim_name]]
+          dim_info = dplyr::select(dims_info[[dim_name]], -all_of(paste0('index_', dim_name)))
           ixs = cat_df[[dims.df$col[[dim_ix]]]]
           avail_ixs <- unique(ixs)
           def_ixs = 1:nrow(dim_info)
@@ -121,3 +121,11 @@ pvalue_compare <- function(xsamples, y=0, tail = c("both", "negative", "positive
   }
   return(res)
 }
+
+# quantiles for symmetric 50% and 95% credible intervals
+#' @export
+quantiles_ci <- function(x) { posterior::quantile2(x, probs=c(0.025, 0.25, 0.75, 0.975)) }
+
+# the default metrics the posterior::summary() function should calculate
+posterior_summary_metrics <- c("mean", "median", "sd", "mad", "quantiles_ci",
+                               "rhat", "ess_bulk", "ess_tail")

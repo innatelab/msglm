@@ -8,8 +8,8 @@ DifferenceStatistics <- function(X, Y, Deltas, nsteps, maxBandwidth, matchIterat
   .Call(`_msglm_DifferenceStatistics`, X, Y, Deltas, nsteps, maxBandwidth, matchIterations, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor)
 }
 
-ContrastStatistics <- function(X, var2group_var, var2group_group, var2group_contrast, contrastXvargroup, contrast_offsets, nsteps, maxBandwidth, summaryfun, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor) {
-  .Call(`_msglm_ContrastStatistics`, X, var2group_var, var2group_group, var2group_contrast, contrastXvargroup, contrast_offsets, nsteps, maxBandwidth, summaryfun, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor)
+ContrastStatistics <- function(X, var2group_var, var2group_group, var2group_contrast, vargroupXcontrast, contrast_offsets, nsteps, maxBandwidth, summaryfun, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor) {
+  .Call(`_msglm_ContrastStatistics`, X, var2group_var, var2group_group, var2group_contrast, vargroupXcontrast, contrast_offsets, nsteps, maxBandwidth, summaryfun, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor)
 }
 
 CloudsOverlap <- function(X, Y, maxBandwidth, nsteps, quant_probs) {

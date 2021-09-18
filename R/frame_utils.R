@@ -3,8 +3,16 @@
 # Author: Alexey Stukalov
 ###############################################################################
 
+#' Binds the rows of the data frames from the list
+#' @param frames_coll_list list of lists of data frames
+#'
+#' @param frame_names character vector of data frame names (subelements of `frames_coll_list` elements) to bind
+#' @param collection_idcol name of the additional column that will be set to the name of the `frames_coll_list`
+#'        element where the rows are coming from
+#' @param verbose produce verbose output
+#'
 #' @export
-rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NULL, verbose=FALSE)
+rbind_all_frames <- function(frames_coll_list, frame_names = NULL, collection_idcol = NULL, verbose=FALSE)
 {
   if (is.null(frame_names)) {
     if (verbose) message("Determining which frames to bind...")
@@ -26,8 +34,8 @@ rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NU
     if (verbose) message("Binding rows of ", fname)
     dplyr::bind_rows(lapply(seq_along(frames_coll_list), function(coll_ix) {
       res <- frames_coll_list[[coll_ix]][[fname]]
-      if (!is.null(link_col) && nrow(res)>0) {
-        res[[link_col]] <- if (!is.null(names(frames_coll_list))) {
+      if (!is.null(collection_idcol) && nrow(res)>0) {
+        res[[collection_idcol]] <- if (!is.null(names(frames_coll_list))) {
           names(frames_coll_list)[[coll_ix]]
         } else coll_ix
       }
@@ -38,6 +46,7 @@ rbind_all_frames <- function(frames_coll_list, frame_names = NULL, link_col = NU
   return (res)
 }
 
+# maybe rename the columns of the data.frame is they exist
 maybe_rename <- function(df, cols, verbose=FALSE) {
   for (i in seq_along(cols)) {
     old_col <- cols[[i]]
@@ -55,21 +64,155 @@ maybe_rename <- function(df, cols, verbose=FALSE) {
   return(df)
 }
 
-# converts data.frame df (long format) into a matrix
-# using row_col and col_col as its rows and columns and val_col as its values
+#' Creates a matrix filled with a given value.
+#'
+#' @param val value for the matrix elements
+#' @param ... matrix dimnames specification
+#'
 #' @export
-frame2matrix <- function(df, row_col, col_col, val_col="w", cols=NULL, rows=NULL) {
-  mtx_dims <- list(if (!is.null(rows) && length(rows) > 0) rows else if (is.factor(df[[row_col]])) levels(df[[row_col]]) else as.character(unique(df[[row_col]])),
-                   if (!is.null(cols) && length(cols) > 0) cols else if (is.factor(df[[col_col]])) levels(df[[col_col]]) else as.character(unique(df[[col_col]])))
-  names(mtx_dims) <- c(row_col, col_col)
-  mtx <- do.call(zero_matrix, mtx_dims)
-  row_vals <- df[[row_col]]
-  col_vals <- df[[col_col]]
-  w_vals <- df[[val_col]]
-  if (nrow(df) > 0L) {
-    for (i in 1:nrow(df)) {
-      mtx[row_vals[[i]], col_vals[[i]]] <- w_vals[[i]]
+constant_matrix <- function(val, dimnames, .var.name = varname(val))
+{
+  checkmate::assert_scalar(val, .var.name = .var.name)
+  checkmate::assert_list(dimnames, len=2, names="unique")
+  matrix(val, ncol = length(dimnames[[2]]), nrow = length(dimnames[[1]]),
+         dimnames = dimnames)
+}
+
+#' Converts data.frame into a matrix
+#' using row_col and col_col as its rows and columns and val_col as its values
+#'
+#' @param df data.frame (in a long format) to convert
+#' @param row_col the Id of the row in the resulting matrix
+#' @param col_col the Id of the column in the resulting matrix
+#' @param val_col the values of the matrix elements
+#' @param val_default the default value if no corresponding row in `df` exist
+#' @param cols (optional) column ids of the resulting matrix (in a specified order)
+#' @param rows (optional) row ids of the resulting matrix (in a specified order)
+#'
+#' @export
+frame2matrix <- function(df, row_col, col_col, val_col="w", val_default=0, cols=NULL, rows=NULL) {
+  # fix the rows/cols order
+  if (is.null(rows)) {
+    df_rows <- df[[row_col]]
+    rows <- if (is.factor(df_rows)) {
+      levels(df_rows)
+    } else {
+      sort(unique(df_rows))
     }
   }
+  if (is.null(cols)) {
+    df_cols <- df[[col_col]]
+    cols <- if (is.factor(df_cols)) {
+      levels(df_cols)
+    } else {
+      sort(unique(df_cols))
+    }
+  }
+  df_expanded <- tidyr::expand_grid(!!sym(col_col) := cols, !!sym(row_col) := rows) %>%
+    dplyr::left_join(df, by=c(col_col, row_col)) %>%
+    dplyr::mutate(!!sym(val_col) := coalesce(!!sym(val_col), val_default),
+                  !!sym(row_col) := factor(!!sym(row_col), levels=rows),
+                  !!sym(col_col) := factor(!!sym(col_col), levels=cols)) %>%
+    dplyr::arrange_at(c(col_col, row_col))
+  mtx <- stats::xtabs(as.formula(paste0(val_col, " ~ ", row_col, " + ", col_col)), data=df_expanded)
+  checkmate::assert_set_equal(names(dimnames(mtx)), c(row_col, col_col), ordered=TRUE)
+  if (nrow(mtx) == 0 || is.integer(rows) && vctrs::vec_equal(rows, seq_len(nrow(mtx)))) {
+    rownames(mtx) <- NULL
+  } else {
+    checkmate::assert_set_equal(rownames(mtx), rows, ordered=TRUE)
+  }
+  if (ncol(mtx) == 0 || is.integer(cols) && vctrs::vec_equal(cols, seq_len(ncol(mtx)))) {
+    colnames(mtx) <- NULL
+  } else {
+    checkmate::assert_set_equal(colnames(mtx), cols, ordered=TRUE)
+  }
   return(mtx)
+}
+
+#' Converts a matrix into a 3-column frame (matrix row, matrix column, cell value).
+#'
+#' @param mtx matrix to convert
+#' @param row_col the column of the result containing matrix row names
+#' @param col_col the column of the result containing matrix column names
+#' @param val_col the column of the result containing matrix element values
+#' @param skip_val if not null, the element of the matrix that have this value would not be exported into data frame
+#'
+#' @export
+matrix2frame <- function(mtx, row_col = NULL, col_col = NULL, val_col = "w", skip_val = 0) {
+  dnn <- names(dimnames(mtx))
+  if (is.null(row_col)) {
+    row_col <- dnn[[1]]
+    checkmate::assert_string(row_col, na.ok=FALSE, null.ok=FALSE)
+  } else {
+    dnn[[1]] <- row_col # overriding the existing name
+  }
+  if (is.null(col_col)) {
+    col_col <- dnn[[2]]
+    checkmate::assert_string(col_col, na.ok=FALSE, null.ok=FALSE)
+  } else {
+    dnn[[2]] <- col_col # overriding the existing name
+  }
+  df <- as.data.frame.table(mtx, dnn=dnn, stringsAsFactors=TRUE, responseName=val_col)
+  if (!is.null(skip_val)) {
+    df <- dplyr::filter(df, !!sym(val_col) != skip_val)
+  }
+
+  # fix that for empty matrices, rows/cols columns are not added
+  if (nrow(mtx) == 0) {
+    # add missing row column
+    df[[row_col]] <- if (is.na(names(dimnames(mtx))[[1]])) integer(0) else character(0)
+  } else if (any(rownames(mtx) == as.character(seq_len(nrow(mtx))))) {
+    # don't keep indices as factors
+    df[[row_col]] <- as.integer(df[[row_col]])
+  }
+  if (ncol(mtx) == 0) {
+    # add missing col column
+    df[[col_col]] <- if (is.na(names(dimnames(mtx))[[2]])) integer(0) else character(0)
+  } else if (any(colnames(mtx) == as.character(seq_len(ncol(mtx))))) {
+    # don't keep indices as factors
+    df[[col_col]] <- as.integer(df[[col_col]])
+  }
+  return(df)
+}
+
+# check if the index column exists and equals to 1:nrow
+# or create it otherwise
+ensure_primary_index_column <- function(df, index_col, id_col=NULL, ids_ordered=NULL,
+                                        create=FALSE, .var.name=checkmate::vname(df)) {
+  checkmate::assert_data_frame(df, .var.name=.var.name)
+  if (!is.null(id_col)) {
+    colname <- str_c(.var.name, "$", id_col)
+    checkmate::assert_character(ids_ordered, any.missing=FALSE, names="unnamed", unique=TRUE)
+    if (rlang::has_name(df, id_col)) {
+      if (is.factor(df[[id_col]])) df[[id_col]] <- as.character(df[[id_col]])
+      checkmate::assert_set_equal(df[[id_col]], ids_ordered, ordered=FALSE, .var.name = colname)
+    } else {
+      stop("ID column '", id_col, "' not found in ", .var.name)
+    }
+  }
+  if (rlang::has_name(df, index_col)) {
+    colname <- str_c(.var.name, "$", index_col)
+    checkmate::assert_integer(df[[index_col]], .var.name=colname)
+    checkmate::assert_set_equal(df[[index_col]], seq_len(nrow(df)),
+                                ordered=FALSE, .var.name=colname)
+    if (!is.null(id_col)) {
+      # check the order of the ids
+      df_ids_ordered <- df[[id_col]]
+      df_ids_ordered[df[[index_col]]] <- df_ids_ordered
+      checkmate::assert_set_equal(df_ids_ordered, ids_ordered)
+      df <- dplyr::arrange_at(df, index_col)
+    }
+  } else {
+    if (create) {
+      if (!is.null(id_col)) {
+        df[[index_col]] <- match(df[[id_col]], ids_ordered)
+        df <- dplyr::arrange_at(df, index_col)
+      } else {
+        df[[index_col]] <- seq_len(nrow(df))
+      }
+    } else {
+      stop('data.frame ', .var.name, ' doesn\'t have ', index_col, ' primary index')
+    }
+  }
+  return(df)
 }

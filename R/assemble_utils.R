@@ -1,6 +1,6 @@
 #' @export
 load_fit_chunk <- function(chunk, chunks = fit_files.df, chunks_path = fit_path,
-                           load_vars = c("msglm_results", "results_info", "dims_info"),
+                           load_vars = c("msglm_results", "results_info"),
                            process.f = NULL) {
   chunk_file <- chunks[chunk, 'filename']
   message('Loading ', chunk_file, '...')
@@ -15,33 +15,28 @@ load_fit_chunk <- function(chunk, chunks = fit_files.df, chunks_path = fit_path,
 }
 
 #' @export
-combine_fit_chunk_section <- function(section, chunks, type, dims_info, report_var="msglm_results") {
+combine_fit_chunk_section <- function(section, chunks, type, objs_df, report_var="msglm_results") {
   message('Combining ', type, ' reports for ', section, '...')
-  obj_id_cols <- str_subset(colnames(dims_info$object), "_id$")
-  #message('  object ID columns: ', paste0(obj_id_cols, collapse=", "))
-  report_df <- dplyr::bind_rows(lapply(chunks, function(chunk) {
+  report_df <- purrr::map2_df(seq_along(chunks), chunks, function(chunk_ix, chunk) {
+    chunk <- chunks[[chunk_ix]]
     frame <- chunk[[report_var]][[section]][[type]]
     if (!is.null(frame)) {
-      obj_info = chunk$dims_info$object
-      for (col in setdiff(obj_id_cols, colnames(frame))) {
-        frame[[col]] <- rep_len(obj_info[[col]][[1]], nrow(frame))
-      }
+      frame$index_chunk <- chunk_ix
     }
     return (frame)
-  }))
+  })
   # attach extra object information columns to the report
   if (length(report_df) > 0) {
-    if (length(obj_id_cols) > 0) {
-      objs_df <- bind_rows(lapply(chunks[sapply(chunks, function(chunk) is.data.frame(chunk$dims_info$object))],
-                                  function(chunk) chunk$dims_info$object))
-      obj_info_cols <- setdiff(colnames(objs_df), colnames(report_df))
-      if (length(obj_info_cols) > 0) {
-        message('  attaching object info: ', paste0(obj_info_cols, collapse=", "))
-        report_df <- dplyr::left_join(report_df, dplyr::select_at(objs_df, c(obj_id_cols, obj_info_cols)), by=obj_id_cols)
+    if (!is.null(objs_df)) {
+      extra_info_cols <- setdiff(colnames(objs_df), c(colnames(report_df), "index_chunk"))
+      if (length(extra_info_cols) > 0) {
+        message('  attaching object info: ', paste0(extra_info_cols, collapse=", "))
+        report_df <- dplyr::left_join(report_df,
+                                      dplyr::select_at(objs_df, c(extra_info_cols, "index_chunk")),
+                                      by="index_chunk")
       }
-    } else {
-      warning("No object id columns for the ", type, " reports for ", section)
     }
+    report_df$index_chunk <- NULL
   } else {
     report_df <- NULL
   }
@@ -49,11 +44,32 @@ combine_fit_chunk_section <- function(section, chunks, type, dims_info, report_v
 }
 
 #' @export
-combine_fit_chunks <- function(reports, type, report_var="msglm_results") {
-  dims_info <- reports[[1]]$dims_info
-  sections <- names(reports[[1]][[report_var]])
+combine_fit_chunks <- function(chunks, type, report_var="msglm_results") {
+  hasobj_mask <- purrr::map_lgl(chunks, ~is.data.frame(.[[report_var]]$objects$stats))
+  if (any(hasobj_mask)) {
+    report1 <- chunks[[which(hasobj_mask)[[1]]]][[report_var]]
+    # detect columns with object metadata
+    obj_info_cols <- str_subset(setdiff(colnames(report1$objects$stats), colnames(report1$global$stats)),
+                                "^is_|_(id|label)$")
+    # detect object ID columns
+    obj_id_cols <- str_subset(obj_info_cols, "_id$")
+    #message('  object ID columns: ', paste0(obj_id_cols, collapse=", "))
+
+    objs_df <- purrr::map2_df(chunks[hasobj_mask], which(hasobj_mask),
+                              ~ dplyr::select_at(.x[[report_var]]$objects$stats, obj_info_cols) %>%
+                                dplyr::distinct() %>% dplyr::mutate(index_chunk = .y))
+    if (nrow(objs_df) != sum(hasobj_mask)) {
+      warning("Problems extracting objects information")
+      objs_df <- NULL
+    }
+  } else {
+    report1 <- chunks[[1]][[report_var]]
+    objs_df <- NULL
+  }
+
+  sections <- names(report1)
   res <- rlang::set_names(lapply(sections, combine_fit_chunk_section,
-                                 reports, type, dims_info, report_var=report_var),
+                                 chunks, type, objs_df, report_var=report_var),
                           sections)
   res <- res[!sapply(res, is.null)]
   return(res)

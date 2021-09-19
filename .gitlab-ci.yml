@@ -92,7 +92,9 @@ pages:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
     - Rscript -e 'devtools::document()'
-    - R CMD Rd2pdf --output=${CI_PROJECT_NAME}_${CI_COMMIT_BRANCH}.pdf
+    - R CMD Rd2pdf --output=${CI_PROJECT_NAME}-${CI_COMMIT_BRANCH}.pdf
+  cache:
+    <<: *rdeps_cache
   artifacts:
     paths:
-      - ${CI_PROJECT_NAME}_${CI_COMMIT_BRANCH}.pdf
+      - ${CI_PROJECT_NAME}-${CI_COMMIT_BRANCH}.pdf

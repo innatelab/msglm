@@ -1,8 +1,8 @@
-#' Read JSON file with MS noise model calibration data
+#' Read JSON file with MS noise model calibration data.
 #'
 #' @param filename MS calibration JSON filename
 #'
-#' @return mscalib object
+#' @return *mscalib* object
 #' @export
 read_mscalib_json <- function(filename) {
   mscalib_json <- read_json(filename)
@@ -88,11 +88,13 @@ detection_loglikelihood <- function(mscalib, is_detected, expected_log) {
                         -log1pexp(.y)))) #logsumexp( -Distributions.log1pexp(z)+mscalib.logDetectionMax, params.log1mDetectionMax ) ) # invlogit(-z)*detMax+(1-detMax)
 }
 
-#' Get the base of the logarithm that is used
-#' for log-tranforming the intensities for the given
-#' MS noise model.
+#' Get the base of the intensities log-transform.
 #'
-#' @return logintensityBase property of mscalib
+#' Get the \eqn{b} of \eqn{\log_b(\mathrm{Intensity})},
+#' which was used to define the MS noise model parameters.
+#'
+#' @return *logintensityBase* property of mscalib
+#' @seealso [convert_logintensityBase()]
 #' @export
 logintensityBase <- function(mscalib, silent=FALSE) {
   if (rlang::has_name(mscalib, "logintensityBase")) {
@@ -103,13 +105,16 @@ logintensityBase <- function(mscalib, silent=FALSE) {
   }
 }
 
-#' Convert MS noise calibration model for the log_a-transformed intensities
-#' to the one for log_b-transformed intensities (b is `new_base`).
+#' Convert the base of log-intensity transform for MS noise model.
 #'
-#' @param mscalib noise model for natural log intensities
+#' Convert MS noise calibration model for the \eqn{\log_a}-transformed intensities
+#' to the one for \eqn{\log_b}-transformed intensities (\eqn{b} is `new_base`).
+#'
+#' @param mscalib MS noise model (*mscalib* object)
 #' @param new_base new base for the log-transformed intensities
 #'
-#' @return updated mscalib noise model
+#' @return *mscalib* object with updated `logintensityBase`
+#' @seealso [logintensityBase()]
 #' @export
 convert_logintensityBase <- function(mscalib, new_base, verbose=FALSE) {
   old_base <- logintensityBase(mscalib, silent=!verbose)

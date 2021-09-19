@@ -7,7 +7,7 @@ effect_factor <- function(effects, factor_name, factor_levels, default = factor_
     factor(factor_vals, levels=factor_levels)
 }
 
-#' Define the experimental design of the MSGLM model
+#' Define the experimental design of the MSGLM model.
 #'
 #' @param conditionXeffect experimental design matrix,
 #'        the rows are conditions, the columns are the effects
@@ -21,7 +21,7 @@ effect_factor <- function(effects, factor_name, factor_levels, default = factor_
 #' @param quantobject name of the MS object to take the intensity information from
 #' @param verbose
 #'
-#' @return msglm_model object
+#' @return *msglm_model* object
 #' @export
 #'
 #' @examples

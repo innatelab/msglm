@@ -3,7 +3,7 @@
 # Author: astukalov
 ###############################################################################
 
-# calculate normalization shifts within one MS condition group
+#' Calculate normalization shifts within one MS condition group.
 #' @export
 norm_shifts.condgroup <- function(stan_norm_model, quantobj_mscalib,
         msdata_df, mschan_preshifts, condgroup_id, cond_col,

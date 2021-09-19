@@ -404,7 +404,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
   return(model_data)
 }
 
-#' Title
+#' Prepare *MSGLM* model input data for specified objects.
 #'
 #' @param model_def
 #' @param msdata

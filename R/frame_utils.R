@@ -3,9 +3,9 @@
 # Author: Alexey Stukalov
 ###############################################################################
 
-#' Binds the rows of the data frames from the list
-#' @param frames_coll_list list of lists of data frames
+#' Binds the rows of the data frames from the list.
 #'
+#' @param frames_coll_list list of lists of data frames
 #' @param frame_names character vector of data frame names (subelements of `frames_coll_list` elements) to bind
 #' @param collection_idcol name of the additional column that will be set to the name of the `frames_coll_list`
 #'        element where the rows are coming from
@@ -64,13 +64,16 @@ maybe_rename <- function(df, cols, verbose=FALSE) {
   return(df)
 }
 
-#' Creates a matrix filled with a given value.
+#' Create a matrix filled with a given value.
+#'
+#' Create a constant matrix with all elements equal to *val*.
 #'
 #' @param val value for the matrix elements
-#' @param ... matrix dimnames specification
+#' @param ... matrix dimnames specification (as in [base::matrix()])
+#' @param .var.name name of the matrix to use in diagnostic messages
 #'
 #' @export
-constant_matrix <- function(val, dimnames, .var.name = varname(val))
+constant_matrix <- function(val, dimnames, .var.name = checkmate::varname(val))
 {
   checkmate::assert_scalar(val, .var.name = .var.name)
   checkmate::assert_list(dimnames, len=2, names="unique")
@@ -78,10 +81,15 @@ constant_matrix <- function(val, dimnames, .var.name = varname(val))
          dimnames = dimnames)
 }
 
-#' Converts data.frame into a matrix
-#' using row_col and col_col as its rows and columns and val_col as its values
+#' Convert "long" format data frame into a matrix.
 #'
-#' @param df data.frame (in a long format) to convert
+#' Convert *data.frame* into a matrix. The data frame is assumed to be
+#' in a "long" format, i.e. each row of *df* should correspond to a single
+#' element of the resulting matrix. The row and column of the element are
+#' specified by the values in *row_col* and *col_col*, correspondingly,
+#' and the value is taken from the *val_col* column.
+#'
+#' @param df *data.frame* (in a long format) to convert
 #' @param row_col the Id of the row in the resulting matrix
 #' @param col_col the Id of the column in the resulting matrix
 #' @param val_col the values of the matrix elements
@@ -129,7 +137,13 @@ frame2matrix <- function(df, row_col, col_col, val_col="w", val_default=0, cols=
   return(mtx)
 }
 
-#' Converts a matrix into a 3-column frame (matrix row, matrix column, cell value).
+#' Convert a matrix into a data frame.
+#'
+#' Convert a matrix into a "long" format data frame.
+#' The resulting *data.frame* object will have three columns
+#' (*row_col*, *col_col*, *val_col*) and for each matrix element there would
+#' be exactly one row with values id of matrix row, id of matrix column
+#' and the cell value, correspondingly.
 #'
 #' @param mtx matrix to convert
 #' @param row_col the column of the result containing matrix row names

@@ -90,11 +90,13 @@ pages:
   needs: [build]
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  before_script:
+    - mkdir public
   script:
     - Rscript -e 'devtools::document()'
-    - R CMD Rd2pdf --output=${CI_PROJECT_NAME}-${CI_COMMIT_BRANCH}.pdf .
+    - R CMD Rd2pdf --output=public/${CI_PROJECT_NAME}-${CI_COMMIT_BRANCH}.pdf --no-preview --batch .
   cache:
     <<: *rdeps_cache
   artifacts:
     paths:
-      - ${CI_PROJECT_NAME}-${CI_COMMIT_BRANCH}.pdf
+      - public

@@ -1,4 +1,4 @@
-image: rocker/tidyverse
+image: rocker/verse
 
 variables:
   # changing the snapshot will cause the rebuild of the msglm dependencies
@@ -90,8 +90,6 @@ pages:
   needs: [build]
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  before_script:
-    - apt-get install texlive
   script:
     - Rscript -e 'devtools::document()'
     - R CMD Rd2pdf --output=${CI_PROJECT_NAME}-${CI_COMMIT_BRANCH}.pdf .

@@ -84,3 +84,15 @@ test:
     paths: [coverage/coverage-report.html, coverage]
     reports:
       cobertura: coverage-cobertura.xml
+
+pages:
+  stage: deploy
+  needs: [build]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - Rscript -e 'devtools::document()'
+    - R CMD Rd2pdf --output=${CI_PROJECT_NAME}_${CI_COMMIT_BRANCH}.pdf
+  artifacts:
+    paths:
+      - ${CI_PROJECT_NAME}_${CI_COMMIT_BRANCH}.pdf

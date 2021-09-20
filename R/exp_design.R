@@ -115,7 +115,7 @@ msglm_model <- function(conditionXeffect,
     conditions = conditions,
     conditionXeffect = conditionXeffect,
     verbose = verbose
-  ), class="msglm_model")
+  ), class = "msglm_model")
   if (!is.null(msexperimentXeffect)) {
     if (verbose) message("MS experiment-specific experimental design specified")
     checkmate::assert_matrix(msexperimentXeffect, mode="numeric", any.missing = FALSE)
@@ -128,15 +128,18 @@ msglm_model <- function(conditionXeffect,
   return(model_def)
 }
 
-#' Title
+
+#' Set batch effects to the MSGLM model.
 #'
-#' @param model_def
-#' @param mschannelXbatchEffect
+#' TODO longer description
+#'
+#' @param model_def *msglm_model* object
+#' @param msexperimentXbatchEffect
 #' @param batch_effects
 #' @param applies_to
 #' @param verbose
 #'
-#' @return updated msglm_model object
+#' @return updated *msglm_model* object
 #' @export
 #'
 #' @examples

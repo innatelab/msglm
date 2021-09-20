@@ -113,7 +113,7 @@ msglm_model <- function(conditionXeffect,
     modelobject = modelobject, quantobject = quantobject,
     effects = effects,
     conditions = conditions,
-    conditionXeffect = conditionXeffect.mtx,
+    conditionXeffect = conditionXeffect,
     verbose = verbose
   )
   if (!is.null(msexperimentXeffect)) {

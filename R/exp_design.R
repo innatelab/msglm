@@ -53,7 +53,7 @@ msglm_model <- function(conditionXeffect,
                        ncol(conditionXeffect), " effect(s)")
 
   # process effects
-  checkmate::assert_tibble(effects)
+  checkmate::assert_data_frame(effects)
   # TODO remove automatic sounds-like column renames?
   effects <- maybe_rename(effects, c("prior_mean" = "mean", "prior_tau" = "tau"))
   checkmate::assert_names(names(effects), must.include = 'effect')
@@ -96,7 +96,7 @@ msglm_model <- function(conditionXeffect,
   }
 
   # process conditions
-  checkmate::assert_tibble(conditions)
+  checkmate::assert_data_frame(conditions)
   checkmate::assert_names(names(conditions), must.include = 'condition')
   conditions <- dplyr::mutate(conditions, condition = as.character(condition))
   checkmate::assert_character(conditions$condition, unique=TRUE)

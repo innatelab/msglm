@@ -47,7 +47,6 @@ nrows_cumsum <- function(df, group_col) {
 #' @export
 to_standata <- function(obj, ...) UseMethod("to_standata")
 
-# TODO rename to "to_standata.msglm_data"
 #' Coverts the data and experimental design into Stan format.
 #'
 #' @param model_data the list with MS data an experimental design
@@ -68,7 +67,7 @@ to_standata <- function(obj, ...) UseMethod("to_standata")
 #' @param empty_observation_sigmoid_scale
 #'
 #' @export
-stan.prepare_data <- function(model_data,
+to_standata.msglm_model_data <- function(model_data,
                               effect_slab_df = 4, effect_slab_scale = 2.5,
                               obj_labu_min_scale = 1,
                               iact_repl_shift_tau=0.03, iact_repl_shift_df=4.0,
@@ -81,19 +80,15 @@ stan.prepare_data <- function(model_data,
 {
   model_def <- model_data$model_def
   if (verbose) message('Converting MSGLM model data to Stan-readable format...')
-  is_glmm <- rlang::has_name(model_def, "mixeffects")
   ensure_primary_index_column(model_def$effects, 'index_effect')
   ensure_primary_index_column(model_data$mschannels, 'index_mschannel')
 
-  xaction_ix_col <- if (is_glmm) "glm_supaction_ix" else "index_interaction"
-  obs_df <- dplyr::select(model_data$observations, index_observation, index_mschannel, index_msrun, index_object, !!xaction_ix_col) %>%
-    dplyr::distinct()
+  is_glmm <- rlang::inherits_all(model_def, "msglmm_model")
+  xaction_ix_col <- if (is_glmm) "index_superaction" else "index_interaction"
+  obs_df <- dplyr::select(model_data$observations, index_observation, index_mschannel, index_msrun,
+                          index_object, !!xaction_ix_col)
   if (any(obs_df$index_observation != seq_len(nrow(obs_df)))) {
     stop("model_data$msdata not ordered by observations / have missing observations")
-  }
-  if (is_glmm) {
-    ensure_primary_index_column(model_def$mixeffects, 'index_mixeffect')
-    # FIXME remove model_def$mixeffects <- maybe_rename(model_def$mixeffects, c("prior_mean" = "mean", "prior_tau" = "tau"))
   }
   msdata_obs_flags.df <- dplyr::group_by(model_data$msdata, index_observation) %>%
     dplyr::transmute(is_empty_observation = all(is.na(intensity))) %>%
@@ -136,6 +131,9 @@ stan.prepare_data <- function(model_data,
     obj_labu_min = rlang::set_names(model_data$quantobj_labu_min, NULL),
     obj_labu_min_scale = obj_labu_min_scale,
 
+    Niactions = nrow(model_data$interactions),
+    iaction2obj = as.array(model_data$interactions$index_object),
+
     Nquanted = sum(!missing_mask),
     Nmissed = sum(missing_mask),
     missing_sigmoid_scale = as.array(if_else(msdata_obs_flags.df$is_empty_observation[missing_mask],
@@ -148,35 +146,12 @@ stan.prepare_data <- function(model_data,
     iact_repl_shift_tau = iact_repl_shift_tau, iact_repl_shift_df = iact_repl_shift_df
   ) %>%
     modifyList(to_standata(model_data$quantobj_mscalib, silent=!verbose)) %>%
+    modifyList(matrix2stancsr(model_data$iactXobjeff, "iactXobjeff")) %>%
     modifyList(matrix2stancsr(model_data$obsXobjbatcheff, "obsXobjbatcheff"))
 
-  iact_data <- list(Niactions = nrow(model_data$interactions),
-                    iaction2obj = as.array(model_data$interactions$index_object))
-  iact_data <- modifyList(iact_data, matrix2stancsr(model_data$iactXobjeff, "iactXobjeff"))
+  res <- modifyList(res, observationXiaction_to_standata(model_data))
 
-  if (is_glmm) {
-    message("Setting GLMM interaction data...")
-    res$Nmix <- nrow(model_def$mixcoefXeff)
-    res$NmixEffects <- nrow(model_def$mixeffects)
-    res$mixeffect_mean <- as.array(model_def$mixeffects$prior_mean)
-    res$mixeffect_tau <- as.array(model_def$mixeffects$prior_tau)
-    res$mixcoefXeff <- as.matrix(model_def$mixcoefXeff)
-
-    iact_data <- modifyList(iact_data,
-                 list(Nsupactions = nrow(model_data$superactions),
-                      observation2supaction = as.array(obs_df$glm_supaction_ix),
-                      supaction2obj = as.array(model_data$superactions$index_object),
-                      Nmixtions = nrow(model_data$mixtions),
-                      mixt2iact = as.array(model_data$mixtions$index_interaction),
-                      mixt2mix = as.array(model_data$mixtions$mixcoef_ix)))
-    iact_data <- modifyList(iact_data, matrix2stancsr(model_data$supactXmixt, "supactXmixt"))
-  } else {
-    iact_data <- modifyList(iact_data, matrix2stancsr(model_data$obsXobjeff, "obsXobjeff"))
-    iact_data$observation2iaction <- as.array(obs_df$index_interaction)
-  }
-  res <- modifyList(res, iact_data)
-
-  if ("subobjects" %in% names(model_data)) {
+  if (rlang::has_name(model_data, "subobjects")) {
     # data have subobjects
     subobj_data <- list(
       Nsubobjects = nrow(model_data$subobjects),
@@ -207,11 +182,11 @@ stan.prepare_data <- function(model_data,
     res$quant2obs <- as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_qdata)])
     res$miss2obs <- as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_mdata)])
   }
-  if ('index_mscalib' %in% names(model_data$mschannels)) {
+  if (rlang::has_name(model_data, 'index_mscalib')) {
     res$Nmsprotocols <- n_distinct(model_data$mschannels$index_mscalib)
     res$mschannel2msproto <- as.array(model_data$mschannels$index_mscalib)
   }
-  if ("Nsubobjects" %in% names(res)) {
+  if (rlang::has_name(res, "Nsubobjects")) {
     message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s) with ",
             res$Nsubobjects, " subobject(s), ",
             res$Nquanted, " quantitation(s) (", sum(res$quant_isreliable), " reliable), ",
@@ -221,6 +196,40 @@ stan.prepare_data <- function(model_data,
             res$Nquanted, " quantitation(s) (", sum(res$quant_isreliable), " reliable), ",
             res$Nmissed, " missed (", sum(msdata_obs_flags.df$is_empty_observation), " in empty observations)")
   }
+  return(structure(res, class="msglm_standata", msglm_model_data=model_data))
+}
+
+observationXiaction_to_standata <- function(model_data) {
+  UseMethod("observationXiaction_to_standata")
+}
+
+observationXiaction_to_standata.msglm_model_data <- function(model_data) {
+  res <- matrix2stancsr(model_data$obsXobjeff, "obsXobjeff")
+  res$observation2iaction <- as.array(model_data$observations$index_interaction)
+  return(res)
+}
+
+observationXiaction_to_standata.msglmm_model_data <- function(model_data) {
+  model_def <- model_data$model_def
+  ensure_primary_index_column(model_def$mixeffects, 'index_mixeffect')
+
+  # FIXME remove model_def$mixeffects <- maybe_rename(model_def$mixeffects, c("prior_mean" = "mean", "prior_tau" = "tau"))
+  message("Setting GLMM interaction data...")
+  res <- list(
+    Nsupactions = nrow(model_data$superactions),
+    observation2supaction = as.array(model_data$observations$index_superaction),
+    supaction2obj = as.array(model_data$superactions$index_object),
+
+    Nmix = nrow(model_def$mixcoefXeff),
+    NmixEffects = nrow(model_def$mixeffects),
+    mixeffect_mean = as.array(model_def$mixeffects$prior_mean),
+    mixeffect_tau = as.array(model_def$mixeffects$prior_tau),
+    mixcoefXeff = as.matrix(model_def$mixcoefXeff),
+
+    Nmixtions = nrow(model_data$mixtions),
+    mixt2iact = as.array(model_data$mixtions$index_interaction),
+    mixt2mix = as.array(model_data$mixtions$mixcoef_ix)
+  )
   return(res)
 }
 

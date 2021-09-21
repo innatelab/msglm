@@ -3,14 +3,16 @@
 # Author: astukalov
 ###############################################################################
 
-# converts matrix to compressed row storage (CSR) and
+# converts matrix to Stan-compatible compressed sparse row storage (CSR) and
 # return a list of <mtx_name>_Nw, <mtx_name>_u, <mtx_name>_v, <mtx_name>_w
-matrix2csr <- function(mtx_name, mtx) {
-    spmtx <- Matrix::Matrix(t(mtx), sparse=TRUE, doDiag=FALSE)
+matrix2stancsr <- function(mtx, mtx_name) to_standata(as(Matrix::Matrix(mtx), "RsparseMatrix"), mtx_name)
+
+#' @export
+to_standata.RsparseMatrix <- function(spmtx, mtx_name) {
     mtx_csr <- list(
       Nw = length(spmtx@x),
       u = as.array(spmtx@p + 1L),
-      v = as.array(spmtx@i + 1L),
+      v = as.array(spmtx@j + 1L),
       w = as.array(spmtx@x))
     names(mtx_csr) <- paste0(mtx_name, "_", names(mtx_csr))
     return(mtx_csr)

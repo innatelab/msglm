@@ -44,6 +44,7 @@ nrows_cumsum <- function(df, group_col) {
 }
 
 # convert object into a list of Stan variables for the "data" block
+#' @export
 to_standata <- function(obj, ...) UseMethod("to_standata")
 
 # TODO rename to "to_standata.msglm_data"
@@ -147,11 +148,11 @@ stan.prepare_data <- function(model_data,
     iact_repl_shift_tau = iact_repl_shift_tau, iact_repl_shift_df = iact_repl_shift_df
   ) %>%
     modifyList(to_standata(model_data$quantobj_mscalib, silent=!verbose)) %>%
-    modifyList(matrix2csr("obsXobjbatcheff", model_data$obsXobjbatcheff))
+    modifyList(matrix2stancsr(model_data$obsXobjbatcheff, "obsXobjbatcheff"))
 
   iact_data <- list(Niactions = nrow(model_data$interactions),
                     iaction2obj = as.array(model_data$interactions$index_object))
-  iact_data <- modifyList(iact_data, matrix2csr("iactXobjeff", model_data$iactXobjeff))
+  iact_data <- modifyList(iact_data, matrix2stancsr(model_data$iactXobjeff, "iactXobjeff"))
 
   if (is_glmm) {
     message("Setting GLMM interaction data...")
@@ -168,9 +169,9 @@ stan.prepare_data <- function(model_data,
                       Nmixtions = nrow(model_data$mixtions),
                       mixt2iact = as.array(model_data$mixtions$index_interaction),
                       mixt2mix = as.array(model_data$mixtions$mixcoef_ix)))
-    iact_data <- modifyList(iact_data, matrix2csr("supactXmixt", model_data$supactXmixt))
+    iact_data <- modifyList(iact_data, matrix2stancsr(model_data$supactXmixt, "supactXmixt"))
   } else {
-    iact_data <- modifyList(iact_data, matrix2csr("obsXobjeff", model_data$obsXobjeff))
+    iact_data <- modifyList(iact_data, matrix2stancsr(model_data$obsXobjeff, "obsXobjeff"))
     iact_data$observation2iaction <- as.array(obs_df$index_interaction)
   }
   res <- modifyList(res, iact_data)
@@ -200,7 +201,7 @@ stan.prepare_data <- function(model_data,
       NsubobjBatchEffects = nrow(model_data$subobject_batch_effects),
       subobj_batch_effect2quant_batch_effect = as.array(model_data$subobject_batch_effects$index_quant_batch_effect)
     ) %>%
-    modifyList(matrix2csr("subobsXsubobjbatcheff", model_data$subobsXsubobjbatcheff))
+    modifyList(matrix2stancsr(model_data$subobsXsubobjbatcheff, "subobsXsubobjbatcheff"))
     res <- modifyList(res, subobj_data)
   } else {
     res$quant2obs <- as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_qdata)])

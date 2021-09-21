@@ -255,10 +255,20 @@ stan_model_name <- function(standata) {
   return(res)
 }
 
-# TODO support supplying msglm_data directly (and implicitly converting it with to_standata())
+#' @param model_data either *msglm_stan_data* or *msglm_model_data* object
+#' @seealso [prepare_stan_data()], [msglm_data()]
 #' @export
-stan.sampling <- function(standata, iter=4000L, refresh=100L, chains=8L,
-                          max_treedepth=12L, ...)
+fit_model <- function(model_data, ...) UseMethod("fit_model")
+
+#' @export
+fit_model.msglm_model_data <- function(model_data, standata_options=list(), ...) {
+  standata <- do.call(to_standata, modifyList(list(model_data), standata_options))
+  fit_model(standata, ...)
+}
+
+#' @export
+fit_model.msglm_standata <- function(standata, iter=4000L, refresh=100L, chains=8L,
+                                     max_treedepth=12L, ...)
 {
     # TODO convert "if" into virtual method(s)
     vars_info <- if (rlang::has_name(standata, "Nsupactions")) {
@@ -276,7 +286,7 @@ stan.sampling <- function(standata, iter=4000L, refresh=100L, chains=8L,
     message("Running Stan MCMC...")
     stanmodel <- msglm_stan_model(stan_model_name(standata))
     res <- stanmodel$sample(
-              data = standata,
+              data = structure(standata, class="list"),
               #pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,
               #init = function() { pcp_peaks_glm.generate_init_params(pcp_peaks_glm.model_data) },
               iter_warmup=0.5*iter, iter_sampling=0.5*iter,

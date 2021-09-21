@@ -530,5 +530,5 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
   model_data <- prepare_msdata(model_data, msdata, verbose=verbose, ...)
   model_data <- prepare_expanded_effects(model_data, verbose=verbose)
 
-  return (model_data)
+  return (structure(model_data, class="msglm_model_data"))
 }

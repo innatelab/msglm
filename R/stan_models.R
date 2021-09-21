@@ -246,36 +246,37 @@ msglm_stan_model <- function(model_name) {
                                   include_paths = stan_models_path))
 }
 
+stan_model_name <- function(standata) {
+  model_data <- attr(standata, "msglm_model_data")
+  model_def <- model_data$model_def
+  res <- c(msglm_model = "msglm_local",
+           msglmm_model = "msglmm_local")[class(model_def)[[1]]]
+  if (isSubobjectQuanted(model_def)) res <- paste0(res, '_subobjects')
+  return(res)
+}
+
 # TODO support supplying msglm_data directly (and implicitly converting it with to_standata())
 #' @export
-stan.sampling <- function(stan_input_data, iter=4000L, refresh=100L, chains=8L,
+stan.sampling <- function(standata, iter=4000L, refresh=100L, chains=8L,
                           max_treedepth=12L, ...)
 {
-    message("Running Stan MCMC...")
-    if ("Nsubobjects" %in% names(stan_input_data)) {
-      if ("Nsupactions" %in% names(stan_input_data)) {
-        vars_info <- msglmm.vars_info
-        stanmodel <- msglm_stan_model("msglmm_local_subobjects")
-      } else {
-        vars_info <- msglm.vars_info
-        stanmodel <- msglm_stan_model("msglm_local_subobjects")
-      }
+    # TODO convert "if" into virtual method(s)
+    vars_info <- if (rlang::has_name(standata, "Nsupactions")) {
+      msglmm.vars_info
     } else {
-      if ("Nsupactions" %in% names(stan_input_data)) {
-        vars_info <- msglmm.vars_info
-        stanmodel <- msglm_stan_model("msglmm_local")
-      } else {
-        vars_info <- msglm.vars_info
-        stanmodel <- msglm_stan_model("msglm_local")
-      }
+      msglm.vars_info
+    }
+    if (!rlang::has_name(standata, "Nsubobjects")) {
       # exclude subobject-related
       vars_info$subobjects <- NULL
       vars_info$subobject_subbatch_effects <- NULL
       vars_info$global$names <- setdiff(vars_info$global$names,
                                         c('subobj_shift_sigma'))
     }
+    message("Running Stan MCMC...")
+    stanmodel <- msglm_stan_model(stan_model_name(standata))
     res <- stanmodel$sample(
-              data = stan_input_data,
+              data = standata,
               #pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,
               #init = function() { pcp_peaks_glm.generate_init_params(pcp_peaks_glm.model_data) },
               iter_warmup=0.5*iter, iter_sampling=0.5*iter,

@@ -232,7 +232,8 @@ msglm_model_names <- function() {
 msglm_stan_model <- function(model_name) {
   stan_models_path <- system.file('stan_models', package="msglm", mustWork=FALSE)
   message("Loading ", model_name, " Stan model")
-  return (cmdstanr::cmdstan_model(file.path(stan_models_path, paste0(model_name, ".stan"))))
+  return (cmdstanr::cmdstan_model(file.path(stan_models_path, paste0(model_name, ".stan")),
+                                  include_paths = stan_models_path))
 }
 
 # TODO support supplying msglm_data directly (and implicitly converting it with to_standata())

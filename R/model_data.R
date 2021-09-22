@@ -514,6 +514,7 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
     dplyr::mutate(index_observation = row_number(),
                   observation_id = paste0(object_id, '_', mschannel))
 
+  quantobj <- model_def$quantobject
   model_data$quantobj_mscalib <- msdata[[paste0(quantobj, "_mscalib")]]
   model_data$quantobj_labu_shift <- msdata[[paste0(quantobj, '_labu_shift')]]
   model_data$quantobj_labu_min <- msdata[[paste0(quantobj, '_labu_min')]]

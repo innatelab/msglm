@@ -269,7 +269,8 @@ fit_model.msglm_model_data <- function(model_data, standata_options=list(), ...)
 #' @export
 fit_model.msglm_standata <- function(standata, method = c("mcmc", "variational"),
                                      iter=4000L, refresh=100L, chains=8L,
-                                     max_treedepth=12L, ...)
+                                     max_treedepth=12L,
+                                     advi_iter=NULL, ...)
 {
     method <- match.arg(method)
     # TODO convert "if" into virtual method(s)
@@ -298,7 +299,7 @@ fit_model.msglm_standata <- function(standata, method = c("mcmc", "variational")
       # FIXME take thin into account
       res <- stanmodel$variational(
                 data = structure(standata, class="list"),
-                output_samples=0.5*iter*chains, ...)
+                iter=advi_iter, output_samples=0.5*iter*chains, ...)
     }
     attr(res, "msglm_vars_info") <- vars_info
     return(res)

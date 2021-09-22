@@ -5,15 +5,16 @@ functions {
 }
 
 data {
-  int<lower=1> Nmschannels;     // number of mschannels
   int<lower=1> Nconditions;     // number of experimental conditions
   int<lower=0> Nobjects;        // number of objects (proteins/peptides/sites etc)
+
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
-  int<lower=0> Nobservations;   // number of observations of interactions (objectXmschannel pairs for all iactions and mschannels of its condition)
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
 
+  int<lower=1> Nmschannels;     // number of mschannels
   vector[Nmschannels] mschannel_shift;
 
+  int<lower=0> Nobservations;   // number of observations of interactions (objectXmschannel pairs for all iactions and mschannels of its condition)
   int<lower=1,upper=Nmschannels> observation2mschannel[Nobservations];
   int<lower=1,upper=Niactions> observation2iaction[Nobservations];
 
@@ -28,12 +29,12 @@ data {
 
   // linear model specification
   int<lower=0> Neffects;        // number of effects (that define conditions)
-  int<lower=0> NbatchEffects;   // number of batch effects (that define assay experimental variation, but not biology)
   int<lower=0> NobjEffects;
   int<lower=1,upper=Neffects> obj_effect2effect[NobjEffects];
   int<lower=0,upper=1> effect_is_positive[Neffects];
   vector[Neffects] effect_mean;
 
+  int<lower=0> NbatchEffects;   // number of batch effects (that define assay experimental variation, but not biology)
   int<lower=0> NobjBatchEffects;
   int<lower=1,upper=NbatchEffects> obj_batch_effect2batch_effect[NobjBatchEffects];
   int<lower=0,upper=1> batch_effect_is_positive[NbatchEffects];

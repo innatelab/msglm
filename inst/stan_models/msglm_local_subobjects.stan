@@ -5,25 +5,27 @@ functions {
 }
 
 data {
-  int<lower=1> Nmschannels;     // number of mschannels
   int<lower=1> Nconditions;     // number of experimental conditions
   int<lower=0> Nobjects;        // number of objects (proteins/peptides/sites etc)
+
   int<lower=0> Nsubobjects;     // number of objects subcomponents (peptides of proteins etc), 0 if not supported
-  int<lower=0> Nmsprotocols;    // number of MS protocols used
-  int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
-  int<lower=0> Nobservations;   // number of observations of interactions (objectXmschannel pairs for all iactions and mschannels of its condition)
-  int<lower=0> Nsubobservations;// number of subobject observations (observation X subobject)
   int<lower=1,upper=Nobjects> subobj2obj[Nsubobjects];
+
+  int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
 
+  int<lower=0> Nmsprotocols;    // number of MS protocols used
+  int<lower=1> Nmschannels;     // number of mschannels
   vector[Nmschannels] mschannel_shift;
 
-  int<lower=1,upper=Nobservations> subobs2obs[Nsubobservations];
-  int<lower=1,upper=Nsubobjects> subobs2subobj[Nsubobservations];
-
+  int<lower=0> Nobservations;   // number of observations of interactions (objectXmschannel pairs for all iactions and mschannels of its condition)
   int<lower=1,upper=Nmschannels> observation2mschannel[Nobservations];
   int<lower=1,upper=Niactions> observation2iaction[Nobservations];
-  int<lower=1,upper=Nmsprotocols> mschannel2msproto[Nmsprotocols > 0 ? Nmschannels : 0];
+  int<lower=1,upper=Nmsprotocols> mschannel2msproto[Nmsprotocols > 0 ? Nmschannels : 0]; // TODO support by the model
+
+  int<lower=0> Nsubobservations;// number of subobject observations (observation X subobject)
+  int<lower=1,upper=Nobservations> subobs2obs[Nsubobservations];
+  int<lower=1,upper=Nsubobjects> subobs2subobj[Nsubobservations];
 
   // map from labelXreplicateXobject to observed/missed data
   int<lower=0> Nquanted;        // total number of quantified subobjectsXmschannels
@@ -36,17 +38,17 @@ data {
 
   // linear model specification
   int<lower=0> Neffects;        // number of effects (that define conditions)
-  int<lower=0> NbatchEffects;   // number of batch effects (that define assay experimental variation, but not biology)
-  int<lower=0> NquantBatchEffects;// number of quantification batch effects (that define subobject-level quantification variation, but not biology)
   int<lower=0> NobjEffects;
   int<lower=1,upper=Neffects> obj_effect2effect[NobjEffects];
   int<lower=0,upper=1> effect_is_positive[Neffects];
   vector[Neffects] effect_mean;
 
+  int<lower=0> NbatchEffects;   // number of batch effects (that define assay experimental variation, but not biology)
   int<lower=0> NobjBatchEffects;
   int<lower=1,upper=NbatchEffects> obj_batch_effect2batch_effect[NobjBatchEffects];
   int<lower=0,upper=1> batch_effect_is_positive[NbatchEffects];
 
+  int<lower=0> NquantBatchEffects;// number of quantification batch effects (that define subobject-level quantification variation, but not biology)
   int<lower=0> NsubobjBatchEffects;
   int<lower=1,upper=NquantBatchEffects> subobj_batch_effect2quant_batch_effect[NsubobjBatchEffects];
   int<lower=0,upper=1> quant_batch_effect_is_positive[NquantBatchEffects];

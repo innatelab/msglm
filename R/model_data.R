@@ -147,7 +147,7 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
   model_data$obsXobjbatcheff <- frame2matrix(obsXobjbatcheff_df, row_col="index_observation", col_col="object_batch_effect",
                                              rows=model_data$observations$index_observation,
                                              cols=model_data$object_batch_effects$object_batch_effect)
-  if ("subobjects" %in% names(model_data)) {
+  if (rlang::has_name(model_data, "subobjects")) {
     if (rlang::has_name(model_def, "msexperimentXquantBatchEffect")) {
       msexpXquantBatchEffect <- model_def$msexperimentXquantBatchEffect
       msexp_idcol <- names(dimnames(msexpXquantBatchEffect))[[1]]
@@ -249,7 +249,7 @@ cluster_msprofiles <- function(msdata, msrun_stats, obj_col="pepmodstate_id", ms
     dplyr::mutate(profile_cluster = row_number())
 
   return(inner_join(res, res_clustats, by="tmp_profile_cluster") %>%
-           dplyr::select(-tmp_profile_cluster))
+           dplyr::select(-tmp_profile_cluster, -`__index_msobject__`))
 }
 
 # annotate msdata (full subobject X msrun Cartesian product)
@@ -365,7 +365,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                                                  obj_col='subobject_id', msrun_col=msexp_idcol)) %>%
           dplyr::ungroup(),
         by = c("subobject_id", "index_object")) %>%
-      dplyr::left_join(dplyr::select(subobjs_df, subobject_id, pepmod_id, is_specific, charge), by = 'subobject_id') %>%
+      dplyr::left_join(dplyr::select(subobjs_df, subobject_id, pepmodstate_id, pepmod_id, is_specific, charge), by = 'subobject_id') %>%
       dplyr::arrange(index_object, profile_cluster, desc(is_specific), desc(n_quants), desc(intensity_med),
                      pepmod_id, charge) %>%
       dplyr::group_by(index_object, profile_cluster) %>%

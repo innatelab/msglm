@@ -42,7 +42,7 @@ data {
 
   real protein_base;
 
-  // instrument calibrated parameters 
+  // instrument calibrated parameters
   real<lower=0> zDetectionFactor;
   real zDetectionIntercept;
   real<lower=0, upper=1> detectionMax;
@@ -61,10 +61,10 @@ transformed data {
   int<lower=0> NreplEffects; // number of replicate effects
   real mzShift; // zShift for the missing observation intensity (zShift shifted by protein_base)
   vector[Nquanted] zScore;
-  vector[Nquanted] qLogStd;
+  vector[Nquanted] qLog2Std;
   vector<lower=0>[Nquanted] qDataNorm;
   real<lower=0> min_intensity;
-  real log_min_intensity;
+  real log2_min_intensity;
   matrix[Nexperiments, Nconditions] experimentXcondition;
 
   int<lower=1> NconditionExperiments[Nconditions];
@@ -76,14 +76,14 @@ transformed data {
   int<lower=1,upper=Nexperiments> miss2experiment[Nmissed];
 
   NreplEffects = Nexperiments-Nconditions;
-  zScore = (log(qData) - zShift) * zScale;
+  zScore = (log2(qData) - zShift) * zScale;
   mzShift = zShift - protein_base;
 
   // process the intensity data to optimize likelihood calculation
   for (i in 1:Nquanted) {
-    qLogStd[i] = intensity_log_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
-    qDataNorm[i] = qData[i] * exp(-qLogStd[i]);
-    qLogStd[i] = qLogStd[i] - protein_base;
+    qLog2Std[i] = intensity_log2_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
+    qDataNorm[i] = qData[i] * exp2(-qLog2Std[i]);
+    qLog2Std[i] = qLog2Std[i] - protein_base;
   }
   quant2experiment = observation2experiment[quant2observation];
   quant2iaction = observation2iaction[quant2observation];
@@ -134,12 +134,12 @@ transformed data {
     }
   }
 
-  log_min_intensity = -100;
-  min_intensity = exp(log_min_intensity);
+  log2_min_intensity = -100;
+  min_intensity = exp2(log2_min_intensity);
 
   print("experimentXrepl_effect=", experimentXrepl_effect);
   print("min(qDataNorm)=", min(qDataNorm), " max(qDataNorm)=", max(qDataNorm) );
-  print("min(qLogStd)=", min(qLogStd), " max(qLogStd)=", max(qLogStd) );
+  print("min(qLog2Std)=", min(qLog2Std), " max(qLog2Std)=", max(qLog2Std) );
 
   {
     matrix[Nproteins, Neffects] proteinXeffect;
@@ -197,10 +197,10 @@ transformed parameters {
       iaction_shift[i] = protein_shift[iaction2protein[i]] + proteinXcondition[iaction2protein[i], iaction2condition[i]];
     }
   }
-  // calculate log_observation
+  // calculate log2_observation
   // {
   //   matrix[Nproteins, Nexperiments] proteinXexperiment;
-  // 
+  //
   //   proteinXexperiment = csr_to_dense_matrix(Nproteins, NbatchEffects, protein_batch_effect,
   //                                            protein_batch_effect2batch_effect, NbatchEffectsPerProteinCumsum) * batchEffectXexperiment;
   //   for (i in 1:Nobservations) {
@@ -216,11 +216,11 @@ transformed parameters {
   //print("min(protein_effect_lambda)=", min(protein_effect_lambda), " max(protein_effect_lambda)=", max(protein_effect_lambda));
   //print("min(condition_shift_unscaled)=", min(condition_shift_unscaled), " max(condition_shift_unscaled)=", max(condition_shift_unscaled));
   //print("min(experiment_shift_unscaled)=", min(experiment_shift_unscaled), " max(experiment_shift_unscaled)=", max(experiment_shift_unscaled));
-  //print("min(log_protein_base_unscaled)=", min(log_protein_base_unscaled), " max(log_protein_base_unscaled)=", max(log_protein_base_unscaled));
-  //print("min(log_protein_effect)=", min(log_protein_effect), " max(log_protein_effect)=", max(log_protein_effect));
-  //print("min(log_protein_condition)=", min(log_protein_condition), " max(log_protein_condition)=", max(log_protein_condition));
-  //print("min(log_protein_repl_effect_unscaled)=", min(log_protein_repl_effect_unscaled),
-  //      " max(log_protein_repl_effect_unscaled)=", max(log_protein_repl_effect_unscaled));
+  //print("min(log2_protein_base_unscaled)=", min(log2_protein_base_unscaled), " max(log2_protein_base_unscaled)=", max(log2_protein_base_unscaled));
+  //print("min(log2_protein_effect)=", min(log2_protein_effect), " max(log2_protein_effect)=", max(log2_protein_effect));
+  //print("min(log2_protein_condition)=", min(log2_protein_condition), " max(log2_protein_condition)=", max(log2_protein_condition));
+  //print("min(log2_protein_repl_effect_unscaled)=", min(log2_protein_repl_effect_unscaled),
+  //      " max(log2_protein_repl_effect_unscaled)=", max(log2_protein_repl_effect_unscaled));
 }
 
 model {
@@ -245,22 +245,22 @@ model {
 
     // calculate the likelihood
     {
-        vector[Nquanted] qLogAbu;
-        vector[Nmissed] mLogAbu;
+        vector[Nquanted] qLog2Abu;
+        vector[Nmissed] mLog2Abu;
 
-        //qLogAbu = iaction_repl_shift[quant2observation] + experiment_shift[observation2experiment[quant2observation]];
-        //mLogAbu = iaction_repl_shift[miss2observation] + experiment_shift[observation2experiment[miss2observation]];
-        qLogAbu = iaction_shift[quant2iaction] + experiment_shift[observation2experiment[quant2observation]];
-        mLogAbu = iaction_shift[miss2iaction] + experiment_shift[observation2experiment[miss2observation]];
-        //print( dot_self(to_vector(log_oData) - oAbu - oAdjust) );
+        //qLog2Abu = iaction_repl_shift[quant2observation] + experiment_shift[observation2experiment[quant2observation]];
+        //mLog2Abu = iaction_repl_shift[miss2observation] + experiment_shift[observation2experiment[miss2observation]];
+        qLog2Abu = iaction_shift[quant2iaction] + experiment_shift[observation2experiment[quant2observation]];
+        mLog2Abu = iaction_shift[miss2iaction] + experiment_shift[observation2experiment[miss2observation]];
+        //print( dot_self(to_vector(log2_oData) - oAbu - oAdjust) );
         //print("oAbu=", oAbu);
         //oAbuNorm = oAbu .* oInvDataSigma - oDataNorm;
         //print("oAbuNorm=", oAbuNorm );
         //print("min(oAbuNorm)=", min(oAbuNorm), " max(oAbuNorm)=", max(oAbuNorm) );
-        exp(qLogAbu - qLogStd) - qDataNorm ~ double_exponential(0, 1);
+        exp2(qLog2Abu - qLog2Std) - qDataNorm ~ double_exponential(0, 1);
         //print("after oAbu: ", get_lp())
         // model missing data
-        0 ~ bernoulli_logit(mLogAbu * (zScale * zDetectionFactor) - mzShift * zScale * zDetectionFactor + zDetectionIntercept);
+        0 ~ bernoulli_logit(mLog2Abu * (zScale * zDetectionFactor) - mzShift * zScale * zDetectionFactor + zDetectionIntercept);
         //print("after mZscore: ", get_lp())
     }
 }

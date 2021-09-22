@@ -195,7 +195,7 @@ ensure_primary_index_column <- function(df, index_col, id_col=NULL, ids_ordered=
                                         create=FALSE, .var.name=checkmate::vname(df)) {
   checkmate::assert_data_frame(df, .var.name=.var.name)
   if (!is.null(id_col)) {
-    colname <- str_c(.var.name, "$", id_col)
+    colname <- paste0(.var.name, "$", id_col)
     checkmate::assert_character(ids_ordered, any.missing=FALSE, names="unnamed", unique=TRUE)
     if (rlang::has_name(df, id_col)) {
       if (is.factor(df[[id_col]])) df[[id_col]] <- as.character(df[[id_col]])
@@ -205,7 +205,7 @@ ensure_primary_index_column <- function(df, index_col, id_col=NULL, ids_ordered=
     }
   }
   if (rlang::has_name(df, index_col)) {
-    colname <- str_c(.var.name, "$", index_col)
+    colname <- paste0(.var.name, "$", index_col)
     checkmate::assert_integer(df[[index_col]], .var.name=colname)
     checkmate::assert_set_equal(df[[index_col]], seq_len(nrow(df)),
                                 ordered=FALSE, .var.name=colname)

@@ -420,14 +420,14 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
                        msexperiment_shift_col = "total_shift", ...) {
   model_data <- list(model_def = model_def, object_id = object_ids)
   modelobj <- model_def$modelobject
-  modelobj_idcol <- str_c(modelobj, "_id")
+  modelobj_idcol <- paste0(modelobj, "_id")
 
   if (!rlang::has_name(msdata, paste0(modelobj, "s"))) {
     stop("No model object (", modelobj, ") information found in MS data")
   }
   modelobjs_df <- dplyr::mutate(msdata[[paste0(modelobj, "s")]],
                                 object_id = !!sym(modelobj_idcol),
-                                object_label = !!sym(str_c(modelobj, "_label")))
+                                object_label = !!sym(paste0(modelobj, "_label")))
   modelobj_cols <- model_def$object_cols %||%
       (c(intersect(c("majority_protein_acs", "protein_acs",
                      "gene_names", "protein_names"), colnames(modelobjs_df)),
@@ -512,7 +512,7 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
                                                by = c("index_condition", "condition")) %>%
     dplyr::arrange(index_object, index_interaction, index_mschannel) %>%
     dplyr::mutate(index_observation = row_number(),
-                  observation_id = str_c(object_id, '_', mschannel))
+                  observation_id = paste0(object_id, '_', mschannel))
 
   model_data$quantobj_mscalib <- msdata[[paste0(quantobj, "_mscalib")]]
   model_data$quantobj_labu_shift <- msdata[[paste0(quantobj, '_labu_shift')]]

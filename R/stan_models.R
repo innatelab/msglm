@@ -267,9 +267,11 @@ fit_model.msglm_model_data <- function(model_data, standata_options=list(), ...)
 }
 
 #' @export
-fit_model.msglm_standata <- function(standata, iter=4000L, refresh=100L, chains=8L,
+fit_model.msglm_standata <- function(standata, method = c("mcmc", "variational"),
+                                     iter=4000L, refresh=100L, chains=8L,
                                      max_treedepth=12L, ...)
 {
+    method <- match.arg(method)
     # TODO convert "if" into virtual method(s)
     vars_info <- if (rlang::has_name(standata, "Nsupactions")) {
       msglmm.vars_info
@@ -285,13 +287,19 @@ fit_model.msglm_standata <- function(standata, iter=4000L, refresh=100L, chains=
     }
     message("Running Stan MCMC...")
     stanmodel <- msglm_stan_model(stan_model_name(standata))
-    res <- stanmodel$sample(
-              data = structure(standata, class="list"),
-              #pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,
-              #init = function() { pcp_peaks_glm.generate_init_params(pcp_peaks_glm.model_data) },
-              iter_warmup=0.5*iter, iter_sampling=0.5*iter,
-              refresh=refresh, chains=chains, parallel_chains=chains,
-              max_treedepth=max_treedepth, ...)
+    if (method == "mcmc") {
+      res <- stanmodel$sample(
+                data = structure(standata, class="list"),
+                #pars=unlist(lapply(vars_info, function(vi) vi$names)), include=TRUE,
+                iter_warmup=0.5*iter, iter_sampling=0.5*iter,
+                refresh=refresh, chains=chains, parallel_chains=chains,
+                max_treedepth=max_treedepth, ...)
+    } else if (method == "variational") {
+      # FIXME take thin into account
+      res <- stanmodel$variational(
+                data = structure(standata, class="list"),
+                output_samples=0.5*iter*chains, ...)
+    }
     attr(res, "msglm_vars_info") <- vars_info
     return(res)
 }

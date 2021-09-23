@@ -41,13 +41,16 @@ msglm_model <- function(conditionXeffect,
                            any.missing = FALSE, nrows = nrow(conditions),
                            min.cols = nrow(effects), max.cols=nrow(effects)+1L, min.rows = 1)
 
-     # Check rank of the conditionXeffect matrix
+  # Check rank of the conditionXeffect matrix
   rank_conditionXeffect <- if (length(conditionXeffect) > 0) Matrix::rankMatrix(conditionXeffect) else 0
   if (rank_conditionXeffect < nrow(effects)) {
     warning('The rank of conditionXeffect matrix (', rank_conditionXeffect,
             ') is lower than the number of effects (', nrow(effects), '), i.e. there are redundant effects')
   }
 
+  if (nrow(effects)< 1) {
+    warning('The number of effects is (', nrow(effects), ')')
+  }
 
   # remove intercept if it's in the design matrix
   if ("(Intercept)" %in% rownames(conditionXeffect)) {

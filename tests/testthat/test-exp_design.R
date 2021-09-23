@@ -31,6 +31,9 @@ test_that("msglm_model()", {
   expect_equal(twoconditions_model$effects$prior_mean, 0.0)
   expect_equal(c(twoconditions_model$effects$prior_tau, twoconditions_model$effects$prior_df1, twoconditions_model$effects$prior_df2), rep(1.0, 3))
 
+  expect_warning(empty_model <- msglm_model(constant_matrix(1, list(condition = c(), effect = c())),
+                            conditions = data.frame(condition = character()),
+                            effects = data.frame(effect = character())), "At least one condition must be defined", "The matrix conditionXeffect does not contain effects")
 })
 
 

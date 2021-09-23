@@ -39,22 +39,19 @@ msglm_model <- function(conditionXeffect,
 
   checkmate::assert_matrix(conditionXeffect, mode="numeric",
                            any.missing = FALSE, nrows = nrow(conditions),
-                           min.cols = nrow(effects), max.cols=nrow(effects)+1L)
+                           min.cols = nrow(effects), max.cols=nrow(effects)+1L, min.rows = 1)
 
-  if(rlang::is_empty(conditions$condition)) {
-    warning('At least one condition must be defined')
-  }
      # Check rank of the conditionXeffect matrix
-      if(all(is.na(conditionXeffect))) {
-        rank_conditionXeffect <- 0
-        checkmate::assert_count(nrow(conditions > rank_conditionXeffect))
-        warning('The matrix conditionXeffect does not contain effects')
-        }
-      else{
-      if(rank_conditionXeffect <- Matrix::rankMatrix(conditionXeffect)[1] < nrow(effects)){
-         warning('The rank of conditionXeffect matrix is lower than the number of effects, this may be be due to redundant effects')
-        }
+  if(all(is.na(conditionXeffect))) {
+      rank_conditionXeffect <- 0
+      checkmate::assert_count(nrow(conditions > rank_conditionXeffect))
+      warning('The matrix conditionXeffect does not contain effects')
       }
+  else{
+  if(rank_conditionXeffect <- Matrix::rankMatrix(conditionXeffect)[1] < nrow(effects)){
+     warning('The rank of conditionXeffect matrix is lower than the number of effects, this may be be due to redundant effects')
+      }
+   }
 
 
   # remove intercept if it's in the design matrix

@@ -14,6 +14,10 @@ test_that("msglm_model()", {
                                                     conditions = data.frame(condition = "mock"),
                                                   effects = data.frame(effect = c("a", "b")))
   checkmate::expect_class(twoeffects_model, "msglm_model")
+  expect_warning(msglm_model(constant_matrix(0, list(condition = "mock", effect = c("a", "b"))),
+                             conditions = data.frame(condition = "mock"),
+                             effects = data.frame(effect = c("a", "b"))), 'The rank of conditionXeffect matrix is lower than the number of effects, this may be be due to redundant effects')
+
 
   expect_error(msglm_model(constant_matrix(1, list(condition = "mock", effect = c("a", "a"))),
                             conditions = data.frame(condition = "mock"),

@@ -132,6 +132,7 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
 #'
 #' @param vars_draws MCMC draws for the model variables to use for contrast
 #'     calculation in `posterior::draws_array` 3D array format.
+#' @param vars_stats pre-calculated summary statistics for MCMC draws
 #' @param vargroups grouped data frame that defines how variables are grouped.
 #'     The variables are identified by `index_varspec` column, which corresponds
 #'     to the index of the variable in `vars_draws` array.
@@ -153,7 +154,7 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
 #'       if it is above the specified limit
 #'
 #' @export
-vars_contrast_stats <- function(vars_draws, vargroups,
+vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
                                 vargroupXcontrast, contrasts,
                                 nsteps = 100L, maxBandwidth = NA_real_,
                                 mlog10pvalue_threshold = 10.0,
@@ -249,7 +250,7 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
 }
 
 #
-append_contrasts_stats <- function(vars_results, standraws, varspecs,
+append_contrasts_stats <- function(vars_results, standraws, stanstats, varspecs,
         metaconditionXcontrast, contrasts.df, conditionXcontrast.df,
         condition_agg_col = "condition", # filtering is based on pregrouping quantiles in metacondition using this column (per contrast)
         object_cols = 'index_object', metacondition_cols = c(),
@@ -295,7 +296,7 @@ append_contrasts_stats <- function(vars_results, standraws, varspecs,
       dplyr::inner_join(dplyr::filter(conditionXcontrast_pregroup_stats.df, is_accepted), by = c("var", group_cols, condition_col)) %>%
       dplyr::select_at(c("var", "index_varspec", "category", group_cols, contrast_col, metacondition_col, condition_col)) %>%
       dplyr::group_by_at(c("var", "category", group_cols)) %>%
-      dplyr::group_modify(~ vars_contrast_stats(standraws,
+      dplyr::group_modify(~ vars_contrast_stats(standraws, stanstats,
                               vargroups = dplyr::group_by_at(.x, c(metacondition_col, contrast_col)),
                               vargroupXcontrast = metaconditionXcontrast,
                               contrasts = contrasts.df))
@@ -387,7 +388,7 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
     iactions_diag <- diag(nrow = nrow(iactions.df), ncol = nrow(iactions.df))
     dimnames(iactions_diag) <- list(index_interaction = iactions.df$index_interaction,
                                     contrast = iactions.df$index_interaction)
-    res$iactions_obsCI <- list(stats = vars_contrast_stats(msglm.stan_draws,
+    res$iactions_obsCI <- list(stats = vars_contrast_stats(msglm.stan_draws, msglm.stan_stats,
                                                            dplyr::filter(varspecs$spec_info, var == 'obs_labu') %>%
                                                            dplyr::inner_join(varspecs$cats_info$observations, by="var_index") %>%
                                                            dplyr::group_by(condition, index_object, index_interaction),
@@ -442,7 +443,7 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
   # filter for vars that have condition associated with them
   #contrast_varspecs$cats_info = varspecs$cats_info[sapply(varspecs$cats_info, function(df) rlang::has_name(df, condition_agg_col)]
   #contrast_varspecs$spec_info = dplyr::filter(contrast_varspecs$spec_info, category %in% names(contrast_varspecs$cats_info))
-  res <- append_contrasts_stats(res, msglm.stan_draws, contrast_varspecs,
+  res <- append_contrasts_stats(res, msglm.stan_draws, msglm.stan_stats, contrast_varspecs,
             model_def$metaconditionXcontrast, contrasts.df, conditionXcontrast.df,
             condition_agg_col = condition_agg_col,
             object_cols = object_cols, metacondition_cols = c(),

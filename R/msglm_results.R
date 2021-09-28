@@ -205,9 +205,10 @@ vars_contrast_stats <- function(vars_draws, vargroups,
                             mlog10pvalue_hard_threshold_factor = mlog10pvalue_hard_threshold_factor,
                             summaryfun = function(draws) {
                               posterior::as_draws_array(draws) %>%
-                              posterior::summarise_draws(posterior_summary_metrics)
+                              posterior::summarise_draws(posterior_summary_metrics) %>%
+                              dplyr::select(-variable)
                             }), by = "__contrast_ix__") %>%
-    dplyr::select(-variable, -`__contrast_ix__`) %>%
+    dplyr::select(-`__contrast_ix__`) %>%
     dplyr::mutate(p_value = 2*pmin(prob_nonpos, prob_nonneg, 0.5))
   return (res)
 }

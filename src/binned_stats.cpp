@@ -9,9 +9,6 @@
 #include <Rmath.h>
 
 #include <boost/functional/hash.hpp>
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/stats.hpp>
-#include <boost/accumulators/statistics/extended_p_square.hpp>
 
 #include "logging.h"
 #include "pvalue_utils.h"
@@ -22,8 +19,6 @@ typedef std::pair<r_index_t, r_index_t> vargroup_id_t;
 typedef std::unordered_map<vargroup_id_t, var_set_t, boost::hash<vargroup_id_t>> vargroup_map_t;
 
 using namespace cpp11;
-
-namespace bacc = boost::accumulators;
 
 // Probability that random X-distributed variable would
 // be less or equal than the given value.

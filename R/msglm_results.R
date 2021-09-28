@@ -198,7 +198,7 @@ vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
   }
   contrast_offsets <- rlang::set_names(contrasts$offset, contrasts$contrast)
   res <- dplyr::left_join(dplyr::select(contrasts, -dplyr::matches("^[lr]hs_quantile")),
-        ContrastStatistics(vars_draws,
+        ContrastStatistics_draws(vars_draws,
                             vargroups$index_varspec, vargroups$`__vargroup_ix__`, vargroups$`__contrast_ix__`,
                             vargroupXcontrast, contrast_offsets[colnames(vargroupXcontrast)],
                             nsteps = nsteps, maxBandwidth = maxBandwidth,

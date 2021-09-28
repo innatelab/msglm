@@ -5,8 +5,8 @@ ProbabilityLessSmoothed <- function(X, Y, nsteps, bandwidth, mlog10_threshold, m
 }
 
 
-ContrastStatistics <- function(X, var2group_var, var2group_group, var2group_contrast, vargroupXcontrast, contrast_offsets, nsteps, maxBandwidth, summaryfun, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor) {
-  .Call(`_msglm_ContrastStatistics`, X, var2group_var, var2group_group, var2group_contrast, vargroupXcontrast, contrast_offsets, nsteps, maxBandwidth, summaryfun, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor)
+ContrastStatistics_draws <- function(draws, var2group_var, var2group_group, var2group_contrast, vargroupXcontrast, contrast_offsets, nsteps, maxBandwidth, summaryfun, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor) {
+  .Call(`_msglm_ContrastStatistics_draws`, draws, var2group_var, var2group_group, var2group_contrast, vargroupXcontrast, contrast_offsets, nsteps, maxBandwidth, summaryfun, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor)
 }
 
 CloudsOverlap <- function(X, Y, maxBandwidth, nsteps, quant_probs) {

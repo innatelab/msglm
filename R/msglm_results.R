@@ -76,46 +76,6 @@ msglm_dims <- function(model_data)
   return(res)
 }
 
-#' Compare the posterior of each variable in varspecs with its `prior_mean`
-#' and return the p-value for the significance of the difference (w.r.t `tail`)
-#'
-#' @param vars_draws MCMC draws from the posterior in `posterior::draws_array` format
-#' @param varspecs Stan variables (with indices specified) to calculate P-values for
-#' @param tail which comparison to do, one of `both` (the default),
-#'             `negative` (\eqn{P(X \leq t)}) or `positive` (\eqn{P(X \geq t)}),
-#'             where \eqn{t} is the `prior_mean` of the variable \eqn{X}.
-#'             For `both` the double of the minimal of the two p-values is given.
-#' @param nsteps (defaults to 100) how many bins to use for the calculation of p-values
-#' @param maxBandwidth constrain the rule-of-thumb bandwidth for the posterior distribution
-#'       if it is above the specified limit
-#' @returns data frame with the p-value per each varspec
-#' @export
-vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "positive"),
-                         nsteps = 100L, maxBandwidth = NA_real_,
-                         mlog10pvalue_threshold = 10.0,
-                         mlog10pvalue_hard_threshold_factor = 3.0
-){
-  tail = match.arg(tail)
-  if (!rlang::has_name(varspecs, "prior_mean")) {
-    varspecs$prior_mean <- 0.0
-  }
-  res.df <- dplyr::mutate(varspecs,
-                          has_mcmc_draws = varspec %in% dimnames(vars_draws)$variable) %>%
-    dplyr::rowwise() %>%
-    dplyr::mutate(p_value = if (has_mcmc_draws) {
-                        pvalue_compare(rlang::as_double(posterior::subset_draws(vars_draws, variable = varspec)),
-                                       prior_mean, tail = tail, nsteps = nsteps, bandwidth = maxBandwidth,
-                                       mlog10_threshold = mlog10pvalue_threshold,
-                                       mlog10_hard_threshold_factor = mlog10pvalue_hard_threshold_factor)
-                      } else { NA_real_ }) %>%
-    dplyr::ungroup()
-  if (!all(res.df$has_mcmc_draws)) {
-    warning("Missing MCMC samples for vars: ", paste0(res.df$varspec[!res.df$has_mcmc_draws], collapse=" "))
-  }
-  res.df <- dplyr::select(res.df, -has_mcmc_draws)
-  return(res.df)
-}
-
 #' Calculate contrasts (linear combination of model effects) using the posterior
 #' MCMC draws.
 #'
@@ -230,6 +190,61 @@ vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
                                   tail == "both" ~ 2*pmin(0.5, prob_nonneg, prob_nonpos),
                                   TRUE ~ NA_real_))
   return (res)
+}
+
+vars_identity_contrast_stats <- function(vars_draws, vars_stats,
+                                         varspecs, groups_info,
+                                         group_idcol, group_cols=character(),
+                                         offset_col='offset',
+                                         ...) {
+    groups_df <- dplyr::select(groups_info, !!group_idcol, any_of(offset_col)) %>% dplyr::distinct()
+    if (!rlang::has_name(groups_df, offset_col)) {
+      groups_df <- dplyr::mutate(groups_df, !!sym(offset_col):=0)
+    }
+    group_ids <- dplyr::pull(groups_df, !!group_idcol)
+    groups_diag <- diag(nrow = length(group_ids), ncol = length(group_ids))
+    dimnames(groups_diag) <- list(group_ids, group_ids) %>%
+        rlang::set_names(c(group_idcol, "contrast"))
+    res <- vars_contrast_stats(vars_draws, vars_stats,
+                        dplyr::inner_join(varspecs, groups_info,
+                                          by=c("var_index",
+                                               intersect(colnames(varspecs), colnames(groups_info))) %>%
+                                              unique()) %>%
+                        dplyr::group_by_at(c(group_idcol, group_cols)),
+                        vargroupXcontrast = groups_diag,
+                        contrasts = dplyr::rename(groups_df, contrast=!!group_idcol),
+                        offset_col=offset_col,
+                        ...) %>%
+                        dplyr::rename(!!group_idcol := contrast)
+    if (!rlang::has_name(groups_df, offset_col)) {
+      res <- dplyr::select(res, -!!sym(offset_col))
+    }
+    return(res)
+}
+
+#' Compare the posterior of each variable in varspecs with its `prior_mean`
+#' and return the p-value for the significance of the difference (w.r.t `tail`)
+#'
+#' @param vars_draws MCMC draws from the posterior in `posterior::draws_array` format
+#' @param varspecs Stan variables (with indices specified) to calculate P-values for
+#' @param ... p-value calculate options to pass to [vars_contrast_stats()]
+#'
+#' @returns data frame with the p-value per each varspec
+#' @seealso [vars_contrast_stats()]
+#' @export
+vars_pvalues <- function(vars_draws, vars_stats, varspecs, ...){
+  varspecs <- dplyr::mutate(varspecs,
+                            has_mcmc_draws = varspec %in% dimnames(vars_draws)$variable)
+  if (!all(varspecs$has_mcmc_draws)) {
+    warning("Missing MCMC samples for vars: ",
+            paste0(varspecs$varspec[!varspecs$has_mcmc_draws], collapse=" "))
+  }
+
+  res_df <- vars_identity_contrast_stats(vars_draws, vars_stats,
+              dplyr::filter(varspecs, has_mcmc_draws), varspecs,
+              group_idcol = "varspec", offset_col = "prior_mean",
+              summary=FALSE, ...)
+  return(res_df)
 }
 
 vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
@@ -384,7 +399,8 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
     if (nrow(cat_eff_varspecs.df) > 0) {
       message('    - calculating P-values for: ',
               paste0(unique(cat_eff_varspecs.df$var), collapse=', '), '...')
-      p_values.df <- vars_pvalues(msglm.stan_draws, dplyr::select(cat_eff_varspecs.df, varspec, any_of("prior_mean")))
+      p_values.df <- vars_pvalues(msglm.stan_draws, msglm.stan_stats,
+                                  cat_eff_varspecs.df)
       res.df <- dplyr::left_join(res.df, dplyr::select(p_values.df, -any_of("prior_mean")), by="varspec") %>%
         dplyr::select(-index_varspec, -var_index)
     }
@@ -402,18 +418,12 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
     # we reuse(abuse) the contrast calculation for that -- just to group the appropriate draws
     # and get the summary statistics, but we don't need the contrasts
     message("  * obs_labu aggregate statistics...")
-    iactions.df <- dplyr::select(varspecs$cats_info$observations, index_interaction) %>% dplyr::distinct()
-    iactions_diag <- diag(nrow = nrow(iactions.df), ncol = nrow(iactions.df))
-    dimnames(iactions_diag) <- list(index_interaction = iactions.df$index_interaction,
-                                    contrast = iactions.df$index_interaction)
-    res$iactions_obsCI <- list(stats = vars_contrast_stats(msglm.stan_draws, msglm.stan_stats,
-                                                           dplyr::filter(varspecs$spec_info, var == 'obs_labu') %>%
-                                                           dplyr::inner_join(varspecs$cats_info$observations, by="var_index") %>%
-                                                           dplyr::group_by(condition, index_object, index_interaction),
-                                                           vargroupXcontrast = iactions_diag,
-                                                           contrasts = dplyr::mutate(iactions.df, contrast=index_interaction, offset=0)) %>%
-                                      # actually, we don't need contrasts
-                                      dplyr::select(-contrast, -offset))
+    res$iactions_obsCI <- list(stats = vars_identity_contrast_stats(
+            msglm.stan_draws, msglm.stan_stats,
+            dplyr::filter(varspecs$spec_info, var == 'obs_labu'),
+            varspecs$cats_info$observations,
+            group_idcol = "index_interaction",
+            method=contrast_method))
   }
 
   message("Calculating contrasts...")

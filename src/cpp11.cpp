@@ -6,13 +6,6 @@
 #include <R_ext/Visibility.h>
 
 // binned_stats.cpp
-double ProbabilityLessSmoothed(doubles  X, doubles  Y, int   nsteps, double bandwidth, double mlog10_threshold, double mlog10_hard_threshold_factor);
-extern "C" SEXP _msglm_ProbabilityLessSmoothed(SEXP X, SEXP Y, SEXP nsteps, SEXP bandwidth, SEXP mlog10_threshold, SEXP mlog10_hard_threshold_factor) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(ProbabilityLessSmoothed(cpp11::as_cpp<cpp11::decay_t<doubles >>(X), cpp11::as_cpp<cpp11::decay_t<doubles >>(Y), cpp11::as_cpp<cpp11::decay_t<int  >>(nsteps), cpp11::as_cpp<cpp11::decay_t<double>>(bandwidth), cpp11::as_cpp<cpp11::decay_t<double>>(mlog10_threshold), cpp11::as_cpp<cpp11::decay_t<double>>(mlog10_hard_threshold_factor)));
-  END_CPP11
-}
-// binned_stats.cpp
 data_frame ContrastStatistics_draws(doubles   draws, integers  var2group_var, integers  var2group_group, integers  var2group_contrast, doubles_matrix<by_column>  vargroupXcontrast, doubles  contrast_offsets, int   nsteps, double maxBandwidth, sexp      summaryfun, double mlog10pvalue_threshold, double mlog10pvalue_hard_threshold_factor);
 extern "C" SEXP _msglm_ContrastStatistics_draws(SEXP draws, SEXP var2group_var, SEXP var2group_group, SEXP var2group_contrast, SEXP vargroupXcontrast, SEXP contrast_offsets, SEXP nsteps, SEXP maxBandwidth, SEXP summaryfun, SEXP mlog10pvalue_threshold, SEXP mlog10pvalue_hard_threshold_factor) {
   BEGIN_CPP11
@@ -39,7 +32,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_msglm_CloudsOverlap",             (DL_FUNC) &_msglm_CloudsOverlap,              5},
     {"_msglm_ContrastStatistics_draws",  (DL_FUNC) &_msglm_ContrastStatistics_draws,  11},
     {"_msglm_GammaMethodPValuesCombine", (DL_FUNC) &_msglm_GammaMethodPValuesCombine,  2},
-    {"_msglm_ProbabilityLessSmoothed",   (DL_FUNC) &_msglm_ProbabilityLessSmoothed,    6},
     {NULL, NULL, 0}
 };
 }

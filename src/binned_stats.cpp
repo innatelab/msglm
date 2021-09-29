@@ -238,7 +238,7 @@ data_frame ContrastStatistics(
     auto rbind = package("base")["rbind"];
 
     // generate contrast samples for all relevant columns combinations
-    LOG_DEBUG1( "Calculating the probabilities that contrast is non-positive and non-negative" );
+    LOG_DEBUG1("Calculating the probabilities that contrast is non-positive and non-negative");
     writable::doubles contrast_draws{na<double>()}; // init to something as otherwise it is null
     writable::integers contrast_draws_dims{(int)niters, (int)nchains, 1};
     contrast_draws.attr("class") = writable::strings{"array"};
@@ -270,7 +270,7 @@ data_frame ContrastStatistics(
             LOG_DEBUG1(" skipping contrast #%d computation since some groups were empty", contr_ix);
             continue;
         }
-        LOG_DEBUG1( "  " << nperm << " permutations" );
+        LOG_DEBUG1("  %d permutations", nperm);
         if (nperm == 0) { // should not happen as checked before
             THROW_EXCEPTION(std::invalid_argument, "No variable combinations for contrast #%d", contr_ix);
         }
@@ -351,7 +351,10 @@ data_frame ContrastStatistics(
         //           " P[<=0]=" << prob_nonpos );
         LOG_DEBUG2("%d-th contrast done", contr_ix);
     }
+    LOG_DEBUG2("contrasts done");
+
     if (!is_na(mlog10pvalue_threshold)) {
+        LOG_DEBUG2("compressing p-values");
         for (auto it = prob_nonneg.begin(); it != prob_nonneg.end(); ++it) {
             *it = pvalue_sqrt_compress(*it, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor);
         }
@@ -359,6 +362,7 @@ data_frame ContrastStatistics(
             *it = pvalue_sqrt_compress(*it, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor);
         }
     }
+    LOG_DEBUG2("composing resulting data.frame");
     return as_cpp<data_frame>(package("base")["cbind"](writable::data_frame{
            "__contrast_ix__"_nm = index_contrast
         },

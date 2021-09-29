@@ -98,32 +98,6 @@ mlog10pvalue_compress <- function(x, threshold = 10) {
   }
 }
 
-pvalue_compare <- function(xsamples, y=0, tail = c("both", "negative", "positive"),
-                           nsteps = 100, bandwidth = NA,
-                           mlog10_threshold = 10,
-                           mlog10_hard_threshold_factor = 3)
-{
-  tail = match.arg(tail)
-  if (length(xsamples) == 0L) {
-    warning("No samples provided, returning P-value=NA")
-    return(NA_real_)
-  } else if (tail == "negative") {
-    res <- ProbabilityLessSmoothed(xsamples, y, nsteps = nsteps, bandwidth = bandwidth)
-  } else if (tail == "positive") {
-    res <- ProbabilityLessSmoothed(-xsamples, -y, nsteps = nsteps, bandwidth = bandwidth)
-  } else if (tail == "both") {
-    # 2x correction as both tails are tested
-    res <- 2 * min(c(0.5,
-                     ProbabilityLessSmoothed(xsamples, y, nsteps = nsteps, bandwidth = bandwidth,
-                                             mlog10_threshold = mlog10_threshold,
-                                             mlog10_hard_threshold_factor = mlog10_hard_threshold_factor),
-                     ProbabilityLessSmoothed(-xsamples, -y, nsteps = nsteps, bandwidth = bandwidth,
-                                             mlog10_threshold = mlog10_threshold,
-                                             mlog10_hard_threshold_factor = mlog10_hard_threshold_factor)))
-  }
-  return(res)
-}
-
 # quantiles for symmetric 50% and 95% credible intervals
 #' @export
 quantiles_ci <- function(x) { posterior::quantile2(x, probs=c(0.025, 0.25, 0.75, 0.975)) }

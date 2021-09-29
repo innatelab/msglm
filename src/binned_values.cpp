@@ -70,7 +70,7 @@ BinnedValues::BinnedValues(const ImportedValues& values, double binWidth,
 // @return P(X<=y) if negative, P(X>=y) if !negative
 double BinnedValues::probabilityCompareWith(double y, double bandwidth, bool negative) const
 {
-    LOG_DEBUG2("minmax=[%g, %g] step=%g size=%d", val_min, val_max, step, size())
+    LOG_DEBUG2("minmax=[%g, %g] step=%g size=%d", val_min, val_max, step, size());
 
     if ( val_max == val_min ) {
         // distribution is degenerated

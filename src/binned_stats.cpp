@@ -61,7 +61,7 @@ writable::data_frame ContrastStatistics(
 //
 // @return E(X), D(X), P(X>=0), P(X<=0)
 //
-// @seealso [ContrastStatistics_draws()]
+// @seealso [ContrastStatistics_draws(), ContrastStatistics_normal()]
 template<typename T>
 data_frame ContrastStatistics(
     T         contrast_calculator,
@@ -391,6 +391,8 @@ public:
 // @param mlog10pvalue_threshold if `-log10(pvalue)` is above this threshold, compresses p-value using `pvalue_sqrt_compress()`
 //
 // @return E(X), D(X), P(X>=0), P(X<=0)
+//
+// @seealso [ContrastStatistics_normal()]
 [[cpp11::register]]
 data_frame ContrastStatistics_draws(
     doubles   draws,
@@ -409,4 +411,134 @@ data_frame ContrastStatistics_draws(
                               var2group_var, var2group_group, var2group_contrast,
                               vargroupXcontrast, contrast_offsets,
                               mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor);
+}
+
+// contrast_calculator for independent normal distributions
+class NormalContrastCalculator {
+private:
+  doubles  var_means_;
+  std::vector<double> var_variances_;
+  sexp     summaryfun_;
+
+  double offset_;
+  size_t nperms_;
+
+  size_t perm_i_;
+  std::vector<double> contrast_means_;
+  std::vector<double> contrast_variances_;
+  std::vector<double> contrast_prob_nonpos_;
+  std::vector<double> contrast_prob_nonneg_;
+
+public:
+  NormalContrastCalculator(doubles var_means, doubles var_sds, sexp summaryfun) :
+    var_means_(var_means), summaryfun_(summaryfun),
+    offset_(na<double>()), nperms_(0),
+    perm_i_(0)
+  {
+    if (var_means.size() == 0) {
+      THROW_EXCEPTION(std::length_error, "var_means are empty");
+    }
+    if (var_sds.size() != var_means.size()) {
+      THROW_EXCEPTION(std::length_error, "var_sds length (%ld) differs from var_means (%ld)",
+                      var_sds.size(), var_means.size());
+    }
+    std::transform(var_sds.begin(), var_sds.end(),
+                   std::back_inserter(var_variances_),
+                   [](double sd){
+                     if (sd < 0) THROW_EXCEPTION(std::domain_error, "SD cannot be negative (%g)", sd);
+                     return sd*sd;
+                   });
+  }
+
+  R_xlen_t nvars() const {
+    return var_means_.size();
+  }
+
+  void init_contrast(double offset, size_t nperms) {
+    offset_ = offset;
+    nperms_ = nperms;
+
+    contrast_means_.resize(0);
+    contrast_variances_.resize(0);
+    contrast_prob_nonneg_.resize(0);
+    contrast_prob_nonpos_.resize(0);
+    perm_i_ = 0;
+  }
+
+  void begin_permutation() {
+    if (perm_i_ >= nperms_) THROW_EXCEPTION(std::domain_error, "permutation #%ld out of range (%ld)",
+                                            perm_i_+1, nperms_);
+
+    contrast_means_.push_back(0);
+    contrast_variances_.push_back(0);
+  }
+  void end_permutation() {
+    if (is_na<double>(offset_)) throw std::runtime_error("contrast is not initialized");
+    // calculate probabilities for the current permutation
+    const double zero_delta = contrast_means_.back() - offset_;
+    const double contrast_sd = sqrt(contrast_variances_.back());
+    contrast_prob_nonneg_.push_back(Rf_pnorm5(0.0, zero_delta, contrast_sd, false, 0));
+    contrast_prob_nonpos_.push_back(Rf_pnorm5(0.0, zero_delta, contrast_sd, true, 0));
+    perm_i_++;
+    if (perm_i_ > nperms_) THROW_EXCEPTION(std::domain_error, "permutation #%ld out of range (%ld)",
+                                           perm_i_+1, nperms_);
+  }
+  void add_variable(r_index_t var_ix, double w) {
+    if (is_na<double>(offset_)) throw std::runtime_error("contrast is not initialized");
+
+    contrast_means_.back() += var_means_[var_ix] * w;
+    contrast_variances_.back() += var_variances_[var_ix] * (w * w);
+  }
+  std::tuple<double, double, sexp> calculate() const {
+    if (contrast_means_.size() != nperms_ ||
+        contrast_prob_nonneg_.size() != nperms_)
+          throw std::runtime_error("incomplete permutations");
+
+    // calculate the contrast p-value
+    double prob_nonpos = std::accumulate(contrast_prob_nonpos_.begin(),
+                                         contrast_prob_nonpos_.end(), 0.0) / contrast_prob_nonpos_.size();
+    double prob_nonneg = std::accumulate(contrast_prob_nonneg_.begin(),
+                                         contrast_prob_nonneg_.end(), 0.0) / contrast_prob_nonneg_.size();
+
+    const sexp summary_df = !Rf_isNull(summaryfun_) ?
+        (as_cpp<function>(summaryfun_))(contrast_means_, contrast_variances_) :
+        sexp();
+    return std::make_tuple(prob_nonpos, prob_nonneg, summary_df);
+  }
+};
+
+// Calculates average probabilities that given contrasts would be
+// be less or equal than zero assuming that variables are normally distributed.
+// The probability is averaged across all possible combinations of
+// the columns of the relevant groups.
+//
+// @param var_means vector of means of random variables
+// @param var_sds vector of std.dev of random variables
+// @param var2group_var index of the variable (X column) in many-to-many var <-> group map
+// @param var2group_group index of the group in many-to-many var <-> group map
+// @param var2group_contrast index of the contrast in many-to-many var <-> group map (group contents could be contrast-specific)
+// @param vargroupXcontrast contrast matrix, rows are contrasts, columns are variable groups
+// @param contrast_offsets vector of contrast offsets, i.e. the reported difference is not X-Y, it's X-Y+offset
+// @param mlog10pvalue_threshold if `-log10(pvalue)` is above this threshold, compresses p-value using `pvalue_sqrt_compress()`
+//
+// @return E(X), D(X), P(X>=0), P(X<=0)
+//
+// @seealso [ContrastStatistics_draws()]
+[[cpp11::register]]
+data_frame ContrastStatistics_normal(
+    doubles   var_means,
+    doubles   var_sds,
+    integers  var2group_var,
+    integers  var2group_group,
+    integers  var2group_contrast,
+    doubles_matrix<by_column>  vargroupXcontrast,
+    doubles   contrast_offsets,
+    sexp      summaryfun,
+    double    mlog10pvalue_threshold,
+    double    mlog10pvalue_hard_threshold_factor
+){
+  return ContrastStatistics(NormalContrastCalculator(var_means, var_sds, summaryfun),
+                            var2group_var, var2group_group, var2group_contrast,
+                            vargroupXcontrast, contrast_offsets,
+                            mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor);
 }

@@ -12,6 +12,13 @@ extern "C" SEXP _msglm_ContrastStatistics_draws(SEXP draws, SEXP var2group_var, 
     return cpp11::as_sexp(ContrastStatistics_draws(cpp11::as_cpp<cpp11::decay_t<doubles  >>(draws), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_var), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_group), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_contrast), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<by_column> >>(vargroupXcontrast), cpp11::as_cpp<cpp11::decay_t<doubles  >>(contrast_offsets), cpp11::as_cpp<cpp11::decay_t<int      >>(nsteps), cpp11::as_cpp<cpp11::decay_t<double   >>(maxBandwidth), cpp11::as_cpp<cpp11::decay_t<sexp     >>(summaryfun), cpp11::as_cpp<cpp11::decay_t<double   >>(mlog10pvalue_threshold), cpp11::as_cpp<cpp11::decay_t<double   >>(mlog10pvalue_hard_threshold_factor)));
   END_CPP11
 }
+// binned_stats.cpp
+data_frame ContrastStatistics_normal(doubles   var_means, doubles   var_sds, integers  var2group_var, integers  var2group_group, integers  var2group_contrast, doubles_matrix<by_column>  vargroupXcontrast, doubles   contrast_offsets, sexp      summaryfun, double    mlog10pvalue_threshold, double    mlog10pvalue_hard_threshold_factor);
+extern "C" SEXP _msglm_ContrastStatistics_normal(SEXP var_means, SEXP var_sds, SEXP var2group_var, SEXP var2group_group, SEXP var2group_contrast, SEXP vargroupXcontrast, SEXP contrast_offsets, SEXP summaryfun, SEXP mlog10pvalue_threshold, SEXP mlog10pvalue_hard_threshold_factor) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(ContrastStatistics_normal(cpp11::as_cpp<cpp11::decay_t<doubles  >>(var_means), cpp11::as_cpp<cpp11::decay_t<doubles  >>(var_sds), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_var), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_group), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_contrast), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<by_column> >>(vargroupXcontrast), cpp11::as_cpp<cpp11::decay_t<doubles  >>(contrast_offsets), cpp11::as_cpp<cpp11::decay_t<sexp     >>(summaryfun), cpp11::as_cpp<cpp11::decay_t<double   >>(mlog10pvalue_threshold), cpp11::as_cpp<cpp11::decay_t<double   >>(mlog10pvalue_hard_threshold_factor)));
+  END_CPP11
+}
 // cloud_stats.cpp
 writable::data_frame CloudsOverlap(doubles_matrix<by_column>  X, doubles_matrix<by_column>  Y, double maxBandwidth, int   nsteps, doubles quant_probs);
 extern "C" SEXP _msglm_CloudsOverlap(SEXP X, SEXP Y, SEXP maxBandwidth, SEXP nsteps, SEXP quant_probs) {
@@ -31,6 +38,7 @@ extern "C" {
 static const R_CallMethodDef CallEntries[] = {
     {"_msglm_CloudsOverlap",             (DL_FUNC) &_msglm_CloudsOverlap,              5},
     {"_msglm_ContrastStatistics_draws",  (DL_FUNC) &_msglm_ContrastStatistics_draws,  11},
+    {"_msglm_ContrastStatistics_normal", (DL_FUNC) &_msglm_ContrastStatistics_normal, 10},
     {"_msglm_GammaMethodPValuesCombine", (DL_FUNC) &_msglm_GammaMethodPValuesCombine,  2},
     {NULL, NULL, 0}
 };

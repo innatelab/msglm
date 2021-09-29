@@ -117,6 +117,9 @@ msglm_dims <- function(model_data)
 #'             where \eqn{t} is the `prior_mean` of the variable \eqn{X}.
 #'             For `both` the double of the minimal of the two p-values is given.
 #' @param summary also calculate summary statistic (mean, quartiles etc)
+#' @param method which method for P-value calculation to use:
+#'               * `draws` (approximate contrast distribution by MCMC samples; slow)
+#'               * `normal` (approximate contrast distribution by normal distribution; fast)
 #' @param nsteps (defaults to 100) how many bins to use for the calculation of p-values
 #' @param maxBandwidth constrain the rule-of-thumb bandwidth for the posterior distribution
 #'       if it is above the specified limit
@@ -127,10 +130,12 @@ vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
                                 offset_col="offset",
                                 tail = c("both", "negative", "positive"),
                                 summary=TRUE,
+                                method=c("draws", "normal"),
                                 nsteps = 100L, maxBandwidth = NA_real_,
                                 mlog10pvalue_threshold = 10.0,
                                 mlog10pvalue_hard_threshold_factor = 3.0)
 {
+  method <- match.arg(method)
   tail <- match.arg(tail)
 
   if (dplyr::n_groups(vargroups) < nrow(vargroupXcontrast)) {
@@ -170,18 +175,42 @@ vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
          paste0(dplyr::filter(vargroup_info.df, is.na(`__vargroup_ix__`)), collapse=", "))
   }
   contrast_offsets <- rlang::set_names(dplyr::pull(contrasts, !!offset_col), contrasts$contrast)
-  res <- dplyr::left_join(dplyr::select(contrasts, -dplyr::matches("^[lr]hs_quantile")),
+  contrast_stats <- if (method == "draws") {
         ContrastStatistics_draws(vars_draws,
-                            vargroups$index_varspec, vargroups$`__vargroup_ix__`, vargroups$`__contrast_ix__`,
-                            vargroupXcontrast, contrast_offsets[colnames(vargroupXcontrast)],
-                            nsteps = nsteps, maxBandwidth = maxBandwidth,
-                            mlog10pvalue_threshold = mlog10pvalue_threshold,
-                            mlog10pvalue_hard_threshold_factor = mlog10pvalue_hard_threshold_factor,
-                            summaryfun = if (summary) function(draws) {
-                              posterior::as_draws_array(draws) %>%
-                              posterior::summarise_draws(posterior_summary_metrics) %>%
-                              dplyr::select(-variable)
-                            } else NULL), by = "__contrast_ix__") %>%
+            vargroups$index_varspec, vargroups$`__vargroup_ix__`, vargroups$`__contrast_ix__`,
+            vargroupXcontrast, contrast_offsets[colnames(vargroupXcontrast)],
+            nsteps = nsteps, maxBandwidth = maxBandwidth,
+            mlog10pvalue_threshold = mlog10pvalue_threshold,
+            mlog10pvalue_hard_threshold_factor = mlog10pvalue_hard_threshold_factor,
+            summaryfun = if (summary) function(draws) {
+                posterior::as_draws_array(draws) %>%
+                posterior::summarise_draws(posterior_summary_metrics) %>%
+                dplyr::select(-variable)
+            } else NULL)
+  } else if (method == "normal") {
+        summaryfun = if (summary) function(perm_means, perm_variances) {
+          mean_means <- mean(perm_means)
+          mean_sds <- mean(sqrt(perm_variances))
+          qtls = qnorm(c(0.025, 0.25, 0.75, 0.975), mean_means, mean_sds)
+          tibble(mean = mean_means,
+                 median = mean_means,
+                 sd = mean_sds,
+                 mad = mean_sds*qnorm(0.75),
+                 sd_of_means = sd(perm_means),
+                 q2.5 = qtls[[1]],
+                 q25 = qtls[[2]],
+                 q75 = qtls[[3]],
+                 q97.5 = qtls[[4]])
+        } else NULL
+        ContrastStatistics_normal(vars_stats$mean, vars_stats$sd,
+            vargroups$index_varspec, vargroups$`__vargroup_ix__`, vargroups$`__contrast_ix__`,
+            vargroupXcontrast, contrast_offsets[colnames(vargroupXcontrast)],
+            mlog10pvalue_threshold = mlog10pvalue_threshold,
+            mlog10pvalue_hard_threshold_factor = mlog10pvalue_hard_threshold_factor,
+            summaryfun = summaryfun)
+  }
+  res <- dplyr::left_join(dplyr::select(contrasts, -dplyr::matches("^[lr]hs_quantile")),
+                          contrast_stats, by = "__contrast_ix__") %>%
     dplyr::select(-`__contrast_ix__`) %>%
     dplyr::mutate(p_value = dplyr::case_when(
                                   tail == "negative" ~ prob_nonpos,
@@ -287,8 +316,9 @@ append_contrasts_stats <- function(vars_results, standraws, stanstats, varspecs,
         metaconditionXcontrast, contrasts.df, conditionXcontrast.df,
         condition_agg_col = "condition", # filtering is based on pregrouping quantiles in metacondition using this column (per contrast)
         object_cols = 'index_object', metacondition_cols = c(),
-        group_cols = c()
+        group_cols = c(), method = c("draws", "normal")
 ){
+  method <- match.arg(method)
   metacondition_col <- names(dimnames(metaconditionXcontrast))[[1]]
   contrast_col <- names(dimnames(metaconditionXcontrast))[[2]]
   condition_col <- 'condition'
@@ -332,7 +362,7 @@ append_contrasts_stats <- function(vars_results, standraws, stanstats, varspecs,
       dplyr::group_modify(~ vars_contrast_stats(standraws, stanstats,
                               vargroups = dplyr::group_by_at(.x, c(metacondition_col, contrast_col)),
                               vargroupXcontrast = metaconditionXcontrast,
-                              contrasts = contrasts.df))
+                              contrasts = contrasts.df, method = method))
     return (vargroups.df)
   })
   # add contrast reports to the var_results
@@ -358,8 +388,10 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
                              effect_vars = unlist(lapply(vars_info, function(vi) str_subset(vi$names, "_(?:mix)?effect(?:_replCI)?$"))),
                              contrast_vars = default_contrast_vars(vars_info), contrast_group_cols = c(),
                              condition_agg_col = "condition", object_cols = setdiff(colnames(dims_info$object), "index_object"),
-                             min.iteration=NA, chains=NA, verbose=model_data$model_def$verbose)
+                             min.iteration=NA, chains=NA, verbose=model_data$model_def$verbose,
+                             contrast_method = c("draws", "normal"))
 {
+  contrast_method <- match.arg(contrast_method)
   model_def <- model_data$model_def
   message('Extracting MCMC samples...')
   all_vars <- unlist(sapply(vars_info, function(vi) vi$names))
@@ -400,7 +432,7 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
       message('    - calculating P-values for: ',
               paste0(unique(cat_eff_varspecs.df$var), collapse=', '), '...')
       p_values.df <- vars_pvalues(msglm.stan_draws, msglm.stan_stats,
-                                  cat_eff_varspecs.df)
+                                  cat_eff_varspecs.df, method=contrast_method)
       res.df <- dplyr::left_join(res.df, dplyr::select(p_values.df, -any_of("prior_mean")), by="varspec") %>%
         dplyr::select(-index_varspec, -var_index)
     }
@@ -475,6 +507,7 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
             model_def$metaconditionXcontrast, contrasts.df, conditionXcontrast.df,
             condition_agg_col = condition_agg_col,
             object_cols = object_cols, metacondition_cols = c(),
-            group_cols = contrast_group_cols)
+            group_cols = contrast_group_cols,
+            method = contrast_method)
   return (res)
 }

@@ -159,8 +159,8 @@ vars_contrast_stats <- function(vars_draws, vargroups,
                                 mlog10pvalue_threshold = 10.0,
                                 mlog10pvalue_hard_threshold_factor = 3.0)
 {
-  if (n_groups(vargroups) < nrow(vargroupXcontrast)) {
-    stop("Number of vargroups (", n_groups(vargroups),
+  if (dplyr::n_groups(vargroups) < nrow(vargroupXcontrast)) {
+    stop("Number of vargroups (", dplyr::n_groups(vargroups),
          ") less than the rows of vargroupXcontrast (", nrow(vargroupXcontrast), ")")
   }
   contrasts <- dplyr::mutate(contrasts,

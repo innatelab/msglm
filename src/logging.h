@@ -23,20 +23,20 @@
 #define LOG_RCOUT(msg, ...) cpp11::message(msg, ##__VA_ARGS__)
 
 #if LOG_LEVEL >= 0
-#define LOG_DEBUG0(msg, ...) LOG_RCOUT(msg, __VA_ARGS__)
+#define LOG_DEBUG0(msg, ...) LOG_RCOUT(msg, ##__VA_ARGS__)
 #else
 #define LOG_DEBUG0(msg, ...)
 #endif
 
 #if LOG_LEVEL >= 1
-#define LOG_DEBUG1(msg, ...) LOG_RCOUT(msg, __VA_ARGS__)
+#define LOG_DEBUG1(msg, ...) LOG_RCOUT(msg, ##__VA_ARGS__)
 #else
 #define LOG_DEBUG1(msg, ...)
 #endif
-#define LOG_DEBUG(msg, ...) LOG_DEBUG1(msg, __VA_ARGS__)
+#define LOG_DEBUG(msg, ...) LOG_DEBUG1(msg, ##__VA_ARGS__)
 
 #if LOG_LEVEL >= 2
-#define LOG_DEBUG2(msg, ...) LOG_RCOUT(msg, __VA_ARGS__)
+#define LOG_DEBUG2(msg, ...) LOG_RCOUT(msg, ##__VA_ARGS__)
 #else
 #define LOG_DEBUG2(msg, ...)
 #endif

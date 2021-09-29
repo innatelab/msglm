@@ -152,6 +152,10 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
 #' @param offset_col (defaults to `offset`) column of the `contrasts` frame with the offsets that
 #'       should be used for significance testing (i.e. the resuling
 #'       contrast is adjusted by `-offset`)
+#' @param tail which comparison to do, one of `both` (the default),
+#'             `negative` (\eqn{P(X \leq t)}) or `positive` (\eqn{P(X \geq t)}),
+#'             where \eqn{t} is the `prior_mean` of the variable \eqn{X}.
+#'             For `both` the double of the minimal of the two p-values is given.
 #' @param summary also calculate summary statistic (mean, quartiles etc)
 #' @param nsteps (defaults to 100) how many bins to use for the calculation of p-values
 #' @param maxBandwidth constrain the rule-of-thumb bandwidth for the posterior distribution
@@ -161,11 +165,14 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
 vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
                                 vargroupXcontrast, contrasts,
                                 offset_col="offset",
+                                tail = c("both", "negative", "positive"),
                                 summary=TRUE,
                                 nsteps = 100L, maxBandwidth = NA_real_,
                                 mlog10pvalue_threshold = 10.0,
                                 mlog10pvalue_hard_threshold_factor = 3.0)
 {
+  tail <- match.arg(tail)
+
   if (dplyr::n_groups(vargroups) < nrow(vargroupXcontrast)) {
     stop("Number of vargroups (", dplyr::n_groups(vargroups),
          ") less than the rows of vargroupXcontrast (", nrow(vargroupXcontrast), ")")
@@ -216,7 +223,12 @@ vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
                               dplyr::select(-variable)
                             } else NULL), by = "__contrast_ix__") %>%
     dplyr::select(-`__contrast_ix__`) %>%
-    dplyr::mutate(p_value = 2*pmin(prob_nonpos, prob_nonneg, 0.5))
+    dplyr::mutate(p_value = dplyr::case_when(
+                                  tail == "negative" ~ prob_nonpos,
+                                  tail == "positive" ~ prob_nonneg,
+                                  # 2x correction as both tails are tested
+                                  tail == "both" ~ 2*pmin(0.5, prob_nonneg, prob_nonpos),
+                                  TRUE ~ NA_real_))
   return (res)
 }
 

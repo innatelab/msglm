@@ -214,7 +214,7 @@ data_frame ContrastStatistics(
   writable::doubles probs_nonneg;
   writable::doubles nperms;
 
-  writable::list_of<data_frame> extracols_dfs(0);
+  writable::list extra_dfs{};
 
   // generate contrast samples for all relevant columns combinations
   LOG_DEBUG1("Calculating the probabilities that contrast is non-positive and non-negative");
@@ -290,13 +290,13 @@ data_frame ContrastStatistics(
 
     // calculate the contrast
     double prob_nonpos, prob_nonneg;
-    data_frame extra_df;
+    sexp extra_df;
     std::tie(prob_nonpos, prob_nonneg, extra_df) = contrast_calculator.calculate();
     index_contrast.push_back(contr_ix + 1);
     probs_nonpos.push_back(prob_nonpos);
     probs_nonneg.push_back(prob_nonneg);
     nperms.push_back(nperm);
-    extracols_dfs.push_back(extra_df);
+    extra_dfs.push_back(extra_df);
     LOG_DEBUG2("%d-th contrast done", contr_ix);
   }
   LOG_DEBUG2("contrasts done");
@@ -316,23 +316,29 @@ data_frame ContrastStatistics(
   LOG_DEBUG2("composing resulting data.frame");
   static auto bindcols = package("dplyr")["bind_cols"];
   static auto bindrows = package("dplyr")["bind_rows"];
-
-  return as_cpp<data_frame>(bindcols(
-    writable::data_frame{
+  data_frame res_df = writable::data_frame{
       "__contrast_ix__"_nm = index_contrast,
       "prob_nonneg"_nm = probs_nonneg,
       "prob_nonpos"_nm = probs_nonpos,
       "nperms"_nm = nperms
-    },
-    bindrows(extracols_dfs)
-  ));
+    };
+  R_xlen_t nextra_dfs = std::accumulate(extra_dfs.cbegin(), extra_dfs.cend(), 0,
+                                    [](R_xlen_t n, sexp df) -> R_xlen_t
+                                    { return !Rf_isNull(df) ? n+1 : n; });
+  LOG_DEBUG2("%ld contrast(s) have extra data frames", nextra_dfs);
+  if (nextra_dfs > 0 && nextra_dfs < res_df.nrow()) {
+    cpp11::warning("Some summary data frames are null, summary is ignored");
+  }
+  return nextra_dfs == res_df.nrow() ?
+    as_cpp<data_frame>(bindcols(res_df, bindrows(extra_dfs))) :
+    res_df;
 }
 
 // contrast_calculator based on MCMC draws
 class DrawsContrastCalculator {
 private:
   doubles  draws_;
-  function summaryfun_;
+  sexp     summaryfun_;
   const int      nsteps_;
   const double   maxBandwidth_;
 
@@ -348,7 +354,7 @@ private:
   writable::integers contrast_draws_dims_;
 
 public:
-  DrawsContrastCalculator(doubles draws, function summaryfun,
+  DrawsContrastCalculator(doubles draws, sexp summaryfun,
                           int nsteps, double maxBandwidth) :
     draws_(draws), summaryfun_(summaryfun),
     nsteps_(nsteps), maxBandwidth_(maxBandwidth),
@@ -429,7 +435,6 @@ public:
     double prob_nonpos = contrast_bins.probabilityLessOrEqual(offset_, cur_bw);
     double prob_nonneg = contrast_bins.probabilityGreaterOrEqual(offset_, cur_bw);
 
-    writable::data_frame summary_df = as_cpp<writable::data_frame>(summaryfun_(contrast_draws_));
     //LOG_RCOUT("step=" << contrast_bins.step << " min=" << contrast_bins.val_min << " max=" << contrast_bins.val_max);
     //Rcpp::Rcout << "bins=";
     //for ( int i = 0; i < contrast_bins.bins.size(); i++ ) {
@@ -442,13 +447,16 @@ public:
 
     static auto bindcols = package("dplyr")["bind_cols"];
 
-    return std::make_tuple(prob_nonpos, prob_nonneg,
-                           as_cpp<data_frame>(bindcols(
-                            summary_df,
-                            writable::data_frame{
-                              "bandwidth"_nm = cur_bw,
-                              "bin_width"_nm = contrast_bins.step,
-                            })));
+    const data_frame bw_df = writable::data_frame{
+                                "bandwidth"_nm = cur_bw,
+                                "bin_width"_nm = contrast_bins.step};
+    const data_frame summary_df = !Rf_isNull(summaryfun_) ?
+        as_cpp<data_frame>(bindcols(
+            as_cpp<data_frame>((as_cpp<function>(summaryfun_))(contrast_draws_)),
+            bw_df)) :
+        bw_df;
+
+    return std::make_tuple(prob_nonpos, prob_nonneg, summary_df);
   }
 };
 
@@ -476,12 +484,12 @@ data_frame ContrastStatistics_draws(
     integers  var2group_group,
     integers  var2group_contrast,
     doubles_matrix<by_column>  vargroupXcontrast,
-    doubles  contrast_offsets,
-    int   nsteps,
-    double maxBandwidth,
-    function summaryfun,
-    double mlog10pvalue_threshold,
-    double mlog10pvalue_hard_threshold_factor
+    doubles   contrast_offsets,
+    int       nsteps,
+    double    maxBandwidth,
+    sexp      summaryfun,
+    double    mlog10pvalue_threshold,
+    double    mlog10pvalue_hard_threshold_factor
 ){
     return ContrastStatistics(DrawsContrastCalculator(draws, summaryfun, nsteps, maxBandwidth),
                               var2group_var, var2group_group, var2group_contrast,

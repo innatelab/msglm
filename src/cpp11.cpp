@@ -13,10 +13,10 @@ extern "C" SEXP _msglm_ProbabilityLessSmoothed(SEXP X, SEXP Y, SEXP nsteps, SEXP
   END_CPP11
 }
 // binned_stats.cpp
-data_frame ContrastStatistics_draws(doubles   draws, integers  var2group_var, integers  var2group_group, integers  var2group_contrast, doubles_matrix<by_column>  vargroupXcontrast, doubles  contrast_offsets, int   nsteps, double maxBandwidth, function summaryfun, double mlog10pvalue_threshold, double mlog10pvalue_hard_threshold_factor);
+data_frame ContrastStatistics_draws(doubles   draws, integers  var2group_var, integers  var2group_group, integers  var2group_contrast, doubles_matrix<by_column>  vargroupXcontrast, doubles  contrast_offsets, int   nsteps, double maxBandwidth, sexp      summaryfun, double mlog10pvalue_threshold, double mlog10pvalue_hard_threshold_factor);
 extern "C" SEXP _msglm_ContrastStatistics_draws(SEXP draws, SEXP var2group_var, SEXP var2group_group, SEXP var2group_contrast, SEXP vargroupXcontrast, SEXP contrast_offsets, SEXP nsteps, SEXP maxBandwidth, SEXP summaryfun, SEXP mlog10pvalue_threshold, SEXP mlog10pvalue_hard_threshold_factor) {
   BEGIN_CPP11
-    return cpp11::as_sexp(ContrastStatistics_draws(cpp11::as_cpp<cpp11::decay_t<doubles  >>(draws), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_var), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_group), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_contrast), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<by_column> >>(vargroupXcontrast), cpp11::as_cpp<cpp11::decay_t<doubles >>(contrast_offsets), cpp11::as_cpp<cpp11::decay_t<int  >>(nsteps), cpp11::as_cpp<cpp11::decay_t<double>>(maxBandwidth), cpp11::as_cpp<cpp11::decay_t<function>>(summaryfun), cpp11::as_cpp<cpp11::decay_t<double>>(mlog10pvalue_threshold), cpp11::as_cpp<cpp11::decay_t<double>>(mlog10pvalue_hard_threshold_factor)));
+    return cpp11::as_sexp(ContrastStatistics_draws(cpp11::as_cpp<cpp11::decay_t<doubles  >>(draws), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_var), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_group), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_contrast), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<by_column> >>(vargroupXcontrast), cpp11::as_cpp<cpp11::decay_t<doubles  >>(contrast_offsets), cpp11::as_cpp<cpp11::decay_t<int      >>(nsteps), cpp11::as_cpp<cpp11::decay_t<double   >>(maxBandwidth), cpp11::as_cpp<cpp11::decay_t<sexp     >>(summaryfun), cpp11::as_cpp<cpp11::decay_t<double   >>(mlog10pvalue_threshold), cpp11::as_cpp<cpp11::decay_t<double   >>(mlog10pvalue_hard_threshold_factor)));
   END_CPP11
 }
 // cloud_stats.cpp

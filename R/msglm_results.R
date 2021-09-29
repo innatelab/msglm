@@ -149,6 +149,7 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
 #' @param contrasts data frame with all contrasts. The `contrast` is the
 #'       obligatory contrast identifier, the obligatory `offset` specifies
 #'       what the contrast should be compared with for significance testing.
+#' @param summary also calculate summary statistic (mean, quartiles etc)
 #' @param nsteps (defaults to 100) how many bins to use for the calculation of p-values
 #' @param maxBandwidth constrain the rule-of-thumb bandwidth for the posterior distribution
 #'       if it is above the specified limit
@@ -156,6 +157,7 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
 #' @export
 vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
                                 vargroupXcontrast, contrasts,
+                                summary=TRUE,
                                 nsteps = 100L, maxBandwidth = NA_real_,
                                 mlog10pvalue_threshold = 10.0,
                                 mlog10pvalue_hard_threshold_factor = 3.0)
@@ -204,11 +206,11 @@ vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
                             nsteps = nsteps, maxBandwidth = maxBandwidth,
                             mlog10pvalue_threshold = mlog10pvalue_threshold,
                             mlog10pvalue_hard_threshold_factor = mlog10pvalue_hard_threshold_factor,
-                            summaryfun = function(draws) {
+                            summaryfun = if (summary) function(draws) {
                               posterior::as_draws_array(draws) %>%
                               posterior::summarise_draws(posterior_summary_metrics) %>%
                               dplyr::select(-variable)
-                            }), by = "__contrast_ix__") %>%
+                            } else NULL), by = "__contrast_ix__") %>%
     dplyr::select(-`__contrast_ix__`) %>%
     dplyr::mutate(p_value = 2*pmin(prob_nonpos, prob_nonneg, 0.5))
   return (res)

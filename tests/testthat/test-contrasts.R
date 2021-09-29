@@ -10,7 +10,7 @@ test_that("basic vars_pvalue() is correct", {
   # generate draws.array object by randomly sampling from vars_ref
   vars_draws_raw <- do.call(cbind,
                             dplyr::group_map(dplyr::rowwise(vars_ref),
-                                             ~rnorm(50000, mean=.x$mean, sd=.x$sd)) %>%
+                                             ~rnorm(100000, mean=.x$mean, sd=.x$sd)) %>%
                               rlang::set_names(vars_ref$varspec))
   vars_draws <- array(vars_draws_raw,
                       dim = c(nrow(vars_draws_raw), 1L, ncol(vars_draws_raw)),

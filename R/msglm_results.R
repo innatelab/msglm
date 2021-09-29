@@ -147,8 +147,11 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
 #'       the columns are variable groups (the column names should match the
 #'       corresponding column of `vargroups`)
 #' @param contrasts data frame with all contrasts. The `contrast` is the
-#'       obligatory contrast identifier, the obligatory `offset` specifies
+#'       obligatory contrast identifier, the `offset_col` column specifies
 #'       what the contrast should be compared with for significance testing.
+#' @param offset_col (defaults to `offset`) column of the `contrasts` frame with the offsets that
+#'       should be used for significance testing (i.e. the resuling
+#'       contrast is adjusted by `-offset`)
 #' @param summary also calculate summary statistic (mean, quartiles etc)
 #' @param nsteps (defaults to 100) how many bins to use for the calculation of p-values
 #' @param maxBandwidth constrain the rule-of-thumb bandwidth for the posterior distribution
@@ -157,6 +160,7 @@ vars_pvalues <- function(vars_draws, varspecs, tail = c("both", "negative", "pos
 #' @export
 vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
                                 vargroupXcontrast, contrasts,
+                                offset_col="offset",
                                 summary=TRUE,
                                 nsteps = 100L, maxBandwidth = NA_real_,
                                 mlog10pvalue_threshold = 10.0,
@@ -198,7 +202,7 @@ vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
     stop(sum(is.na(vargroup_info.df$`__vargroup_ix__`)), " vargroup(s) not defined: ",
          paste0(dplyr::filter(vargroup_info.df, is.na(`__vargroup_ix__`)), collapse=", "))
   }
-  contrast_offsets <- rlang::set_names(contrasts$offset, contrasts$contrast)
+  contrast_offsets <- rlang::set_names(dplyr::pull(contrasts, !!offset_col), contrasts$contrast)
   res <- dplyr::left_join(dplyr::select(contrasts, -dplyr::matches("^[lr]hs_quantile")),
         ContrastStatistics_draws(vars_draws,
                             vargroups$index_varspec, vargroups$`__vargroup_ix__`, vargroups$`__contrast_ix__`,

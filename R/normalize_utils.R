@@ -8,7 +8,7 @@
 norm_shifts.condgroup <- function(stan_norm_model, quantobj_mscalib,
         msdata_df, mschan_preshifts, condgroup_id, cond_col,
         max_objs=1000L, quant_ratio.max=NA,
-        stan_method = c("optimizing", "mcmc", "vb"),
+        stan_method = c("mcmc", "variational", "optimizing"),
         mcmc.iter=2000L, mcmc.chains=getOption("mc.cores", 4), mcmc.thin=1L, mcmc.adapt_delta=0.9,
         vb.iter=100000L,
         Rhat.max = 1.1, neff_ratio.min = 0.25,
@@ -126,7 +126,7 @@ norm_shifts.condgroup <- function(stan_norm_model, quantobj_mscalib,
         if (!all(res$converged)) {
             warning("Convergence problems for ", sum(!res$converged), " shift(s)")
         }
-    } else if (stan_method == 'vb') {
+    } else if (stan_method == 'variational') {
         norm_fit <- stan_norm_model$variational(stan_input, iter=vb.iter,
                               #pars=out_params, include=TRUE,
                               init=function() list(shift_sigma=1.0, shift0=as.array(rep.int(0.0, stan_input$Nshifts-1L))) )
@@ -162,7 +162,7 @@ normalize_experiments <- function(quantobj_mscalib, msdata_df,
                                   quant_col = "intensity", obj_col = "protgroup_id",
                                   mschan_col = "mschannel", cond_col="condition", condgroup_col = NULL, sumgroup_col = NULL,
                                   mschan_preshifts = NULL, preshift_col="shift",
-                                  stan_method = c("mcmc", "optimizing", "vb"),
+                                  stan_method = c("mcmc", "variational", "optimizing"),
                                   max_objs=1000L,
                                   quant_ratio.max=NA, mschan_shift.min = -0.5,
                                   nmschan_ratio.min=0.9, ncond_ratio.min=if (mschan_col==cond_col) nmschan_ratio.min else 1.0,

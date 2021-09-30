@@ -286,7 +286,7 @@ fit_model.msglm_standata <- function(standata, method = c("mcmc", "variational")
       vars_info$global$names <- setdiff(vars_info$global$names,
                                         c('subobj_shift_sigma'))
     }
-    message("Running Stan MCMC...")
+    message("Running Stan (", method, " mode)...")
     stanmodel <- msglm_stan_model(stan_model_name(standata))
     if (method == "mcmc") {
       res <- stanmodel$sample(

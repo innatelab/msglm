@@ -11,7 +11,3 @@ ContrastStatistics_draws <- function(draws, var2group_var, var2group_group, var2
 ContrastStatistics_normal <- function(var_means, var_sds, var2group_var, var2group_group, var2group_contrast, vargroupXcontrast, contrast_offsets, summaryfun, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor) {
   .Call(`_msglm_ContrastStatistics_normal`, var_means, var_sds, var2group_var, var2group_group, var2group_contrast, vargroupXcontrast, contrast_offsets, summaryfun, mlog10pvalue_threshold, mlog10pvalue_hard_threshold_factor)
 }
-
-GammaMethodPValuesCombine <- function(pvalues, stt) {
-  .Call(`_msglm_GammaMethodPValuesCombine`, pvalues, stt)
-}

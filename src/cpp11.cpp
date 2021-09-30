@@ -26,20 +26,12 @@ extern "C" SEXP _msglm_ContrastStatistics_normal(SEXP var_means, SEXP var_sds, S
     return cpp11::as_sexp(ContrastStatistics_normal(cpp11::as_cpp<cpp11::decay_t<doubles  >>(var_means), cpp11::as_cpp<cpp11::decay_t<doubles  >>(var_sds), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_var), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_group), cpp11::as_cpp<cpp11::decay_t<integers >>(var2group_contrast), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<by_column> >>(vargroupXcontrast), cpp11::as_cpp<cpp11::decay_t<doubles  >>(contrast_offsets), cpp11::as_cpp<cpp11::decay_t<sexp     >>(summaryfun), cpp11::as_cpp<cpp11::decay_t<double   >>(mlog10pvalue_threshold), cpp11::as_cpp<cpp11::decay_t<double   >>(mlog10pvalue_hard_threshold_factor)));
   END_CPP11
 }
-// pvalue_combine.cpp
-double GammaMethodPValuesCombine(doubles pvalues, double stt);
-extern "C" SEXP _msglm_GammaMethodPValuesCombine(SEXP pvalues, SEXP stt) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(GammaMethodPValuesCombine(cpp11::as_cpp<cpp11::decay_t<doubles>>(pvalues), cpp11::as_cpp<cpp11::decay_t<double>>(stt)));
-  END_CPP11
-}
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
     {"_msglm_CloudsOverlap",             (DL_FUNC) &_msglm_CloudsOverlap,              5},
     {"_msglm_ContrastStatistics_draws",  (DL_FUNC) &_msglm_ContrastStatistics_draws,  11},
     {"_msglm_ContrastStatistics_normal", (DL_FUNC) &_msglm_ContrastStatistics_normal, 10},
-    {"_msglm_GammaMethodPValuesCombine", (DL_FUNC) &_msglm_GammaMethodPValuesCombine,  2},
     {NULL, NULL, 0}
 };
 }

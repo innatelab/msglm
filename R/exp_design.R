@@ -109,13 +109,13 @@ msglm_model <- function(conditionXeffect,
     conditions <- dplyr::mutate(conditions, is_virtual = FALSE)
   }
 
-  model_def <- list(
+  model_def <- structure(list(
     modelobject = modelobject, quantobject = quantobject,
     effects = effects,
     conditions = conditions,
     conditionXeffect = conditionXeffect,
     verbose = verbose
-  )
+  ), class="msglm_model")
   if (!is.null(msexperimentXeffect)) {
     if (verbose) message("MS experiment-specific experimental design specified")
     checkmate::assert_matrix(msexperimentXeffect, mode="numeric", any.missing = FALSE)
@@ -146,7 +146,9 @@ set_batch_effects <- function(model_def,
                               applies_to = c('modelobject', 'quantobject'),
                               verbose = model_def$verbose
 ){
+  checkmate::assert_class(model_def, "msglm_model")
   applies_to <- match.arg(applies_to)
+
   id_col <- c(modelobject="batch_effect", quantobject="quant_batch_effect")[applies_to]
   df_name <- paste0(id_col, 's')
   checkmate::assert_matrix(msexperimentXbatchEffect, mode="numeric", any.missing=FALSE,
@@ -209,6 +211,7 @@ set_contrasts <- function(model_def,
                           conditionXcontrast = NULL,
                           verbose = model_def$verbose
 ){
+  checkmate::assert_class(model_def, "msglm_model")
   checkmate::assert_matrix(metaconditionXcontrast, mode="numeric", any.missing = FALSE,
                            row.names = "unique", col.names = "unique")
   metacond_dim <- names(dimnames(metaconditionXcontrast))[[1]]

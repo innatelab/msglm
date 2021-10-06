@@ -418,6 +418,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
 msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbose,
                        msexperiment_extra_cols = character(0),
                        msexperiment_shift_col = "total_shift", ...) {
+  checkmate::assert_class(model_def, "msglm_model")
   model_data <- list(model_def = model_def, object_id = object_ids)
   modelobj <- model_def$modelobject
   modelobj_idcol <- paste0(modelobj, "_id")

@@ -115,29 +115,29 @@ norm_shifts.condgroup <- function(stan_norm_model, quantobj_mscalib,
                                     #init=function() list(shift_sigma=1.0, shift_shift0=as.array(rep.int(0.0, stan_input$Nshifts-1L))),
                                     adapt_delta=mcmc.adapt_delta, show_messages=verbose)
         neff_min <- neff_ratio.min * mcmc.iter
-        res <- norm_fit$summary(variables = out_params, posterior_summary_metrics) %>%
-          tidyr::extract("variable", "shift_ix", "^shift\\[(\\d+)\\]$", remove=FALSE, convert=TRUE) %>%
-          dplyr::filter(!is.na(shift_ix)) %>%
-          dplyr::mutate(condition = levels(mschan_df$condition)[shift_ix],
-                        converged = (rhat <= Rhat.max) & (ess_bulk >= neff_min)) %>%
-          dplyr::select(condition, shift=mean, shift_sd=sd, shift_median=median, shift_mad=mad,
-                        shift_q25=q25, shift_q75=q75, shift_q2.5=q2.5, shift_q97.5=q97.5,
-                        rhat, ess_bulk, ess_tail, converged)
-        if (!all(res$converged)) {
-            warning("Convergence problems for ", sum(!res$converged), " shift(s)")
-        }
     } else if (stan_method == 'variational') {
-        norm_fit <- stan_norm_model$variational(stan_input, iter=vb.iter,
-                              #pars=out_params, include=TRUE,
-                              init=function() list(shift_sigma=1.0, shift0=as.array(rep.int(0.0, stan_input$Nshifts-1L))) )
-        norm_fit_stat <- norm_fit$summary(pars=out_params)
-        shift_mask <- str_detect(rownames(norm_fit_stat), "^shift\\[\\d+\\]$")
-        shift_pars <- norm_fit_stat[shift_mask, 'mean']
-        shift_ixs <- as.integer(str_match(rownames(norm_fit_stat)[shift_mask], "\\[(\\d+)\\]$")[,2])
-        res <- tibble(condition = levels(mschan_df$condition)[shift_ixs],
-                      shift = as.numeric(shift_pars))
+      for (i in 1:10) {
+        norm_fit <- stan_norm_model$variational(stan_input, iter=vb.iter, tol_rel_obj=0.01,
+                                                algorithm="meanfield", eta=0.1,
+                                                init=function() list(data_sigma_a=1.0, data_sigma_t=1.0,
+                                                                     shift_sigma_a=1.0, shift_sigma_t=1.0,
+                                                                     shift0_unscaled=as.array(rnorm(stan_input$Nshifts-1L, sd=0.1))))
+        if (!rlang::inherits_any(try(norm_fit$metadata()), "try-error")) break
+      }
+      neff_min <- neff_ratio.min * vb.iter
     } else {
-        stop('Unknown method ', stan_method)
+      stop('Unknown method ', stan_method)
+    }
+    res <- norm_fit$summary(variables = out_params, posterior_summary_metrics) %>%
+      tidyr::extract("variable", "shift_ix", "^shift\\[(\\d+)\\]$", remove=FALSE, convert=TRUE) %>%
+      dplyr::filter(!is.na(shift_ix)) %>%
+      dplyr::mutate(condition = levels(mschan_df$condition)[shift_ix],
+                    converged = (rhat <= Rhat.max) & (ess_bulk >= neff_min)) %>%
+      dplyr::select(condition, shift=mean, shift_sd=sd, shift_median=median, shift_mad=mad,
+                    shift_q25=q25, shift_q75=q75, shift_q2.5=q2.5, shift_q97.5=q97.5,
+                    rhat, ess_bulk, ess_tail, converged)
+    if (!all(res$converged)) {
+        warning("Convergence problems for ", sum(!res$converged), " shift(s)")
     }
     if (shifts_constraint == "median=0") {
         res <- dplyr::mutate(res, shift = shift - median(shift))

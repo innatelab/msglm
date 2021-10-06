@@ -310,7 +310,8 @@ annotate_msdata <- function(msdata_df, model_def, verbose = model_def$verbose,
 
 # select relevant msdata and subobjects from msdata_df
 # and define model_data$subobjects and model_data$observations
-prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$verbose, ...) {
+prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$verbose,
+                           max_subobjects = 20L, ...) {
   model_def <- model_data$model_def
   intensities_dfname <- paste0(model_def$quantobject, "_",
                                if (any(coalesce(model_data$mschannels$mstag, "F") == "F")) "" else "tag",
@@ -352,7 +353,6 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
     msdata_df <- annotate_msdata(msdata_df, model_def, verbose=verbose, ...)
 
     # arrange pepmodstates by object, by profile cluster and by the number of quantitations
-    max_subobjects <- model_def$max_subobjects %||% 20L
     subobject_group_size <- model_def$subobject_group_size %||% (max_subobjects %/% 2)
     subobj_stats_df <- msdata_df %>%
       dplyr::group_by(index_object, subobject_id) %>%
@@ -417,7 +417,8 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
 #' @examples
 msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbose,
                        msexperiment_extra_cols = character(0),
-                       msexperiment_shift_col = "total_shift", ...) {
+                       msexperiment_shift_col = "total_shift",
+                       max_subobjects = 20L, ...) {
   checkmate::assert_class(model_def, "msglm_model")
   model_data <- list(model_def = model_def, object_id = object_ids)
   modelobj <- model_def$modelobject
@@ -529,7 +530,8 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
     model_data$quantobj_labu_min <- model_data$quantobj_labu_min * k
   }
 
-  model_data <- prepare_msdata(model_data, msdata, verbose=verbose, ...)
+  model_data <- prepare_msdata(model_data, msdata, max_subobjects=max_subobjects,
+                               verbose=verbose, ...)
   model_data <- prepare_expanded_effects(model_data, verbose=verbose)
 
   return (structure(model_data, class="msglm_model_data"))

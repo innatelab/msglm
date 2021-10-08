@@ -325,7 +325,6 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
   quantobj_idcol <- paste0(model_def$quantobject, "_id")
   intensities_df <- dplyr::select(intensities_df, !!sym(quantobj_idcol), !!sym(msexp_idcol), intensity)
 
-
   if (model_def$modelobject == model_def$quantobject) {
     # modelobj is quanted directly
     msdata_df <- dplyr::left_join(model_data$observations,
@@ -334,12 +333,12 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
         dplyr::arrange(index_observation)
   } else if (model_def$quantobject == "pepmodstate") {
     # quant specific pepmodstates of modelobj
-    modelobj2pepmod_df <- msdata[[paste0(model_def$modelobj, "2pepmod")]]
-    subobjs_df <- dplyr::inner_join(modelobj2pepmod_df,
+    modelobj2pepmodstate_df <- msdata[[paste0(model_def$modelobj, "2pepmodstate")]]
+    subobjs_df <- dplyr::inner_join(modelobj2pepmodstate_df,
                                     dplyr::select(model_data$objects, !!sym(modelobj_idcol), object_id, index_object),
                                     by=modelobj_idcol) %>%
       dplyr::filter(is_specific) %>%
-      dplyr::inner_join(dplyr::select(msdata$pepmodstates, pepmod_id, charge, pepmodstate_id), by="pepmod_id") %>%
+      dplyr::inner_join(dplyr::select(msdata$pepmodstates, charge, pepmodstate_id), by="pepmodstate_id") %>%
       dplyr::mutate(subobject_id = pepmodstate_id)
     if (nrow(subobjs_df) == 0L) stop("No specific ", model_def$quantobject, "s found for ", modelobj_idcol, "=", model_data$modelobj_id)
     if (verbose) message(nrow(subobjs_df), " specific ", model_def$quantobject, "(s) found")
@@ -420,6 +419,7 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
                        msexperiment_shift_col = "total_shift",
                        max_subobjects = 20L, ...) {
   checkmate::assert_class(model_def, "msglm_model")
+  checkmate::assert_class(msdata, "msglm_data_collection")
   model_data <- list(model_def = model_def, object_id = object_ids)
   modelobj <- model_def$modelobject
   modelobj_idcol <- paste0(modelobj, "_id")
@@ -427,9 +427,7 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
   if (!rlang::has_name(msdata, paste0(modelobj, "s"))) {
     stop("No model object (", modelobj, ") information found in MS data")
   }
-  modelobjs_df <- dplyr::mutate(msdata[[paste0(modelobj, "s")]],
-                                object_id = !!sym(modelobj_idcol),
-                                object_label = !!sym(paste0(modelobj, "_label")))
+  modelobjs_df <- msdata$modelobjects
   modelobj_cols <- model_def$object_cols %||%
       (c(intersect(c("majority_protein_acs", "protein_acs",
                      "gene_names", "protein_names"), colnames(modelobjs_df)),

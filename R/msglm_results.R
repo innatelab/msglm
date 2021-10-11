@@ -451,12 +451,12 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
     # we reuse(abuse) the contrast calculation for that -- just to group the appropriate draws
     # and get the summary statistics, but we don't need the contrasts
     message("  * obs_labu aggregate statistics...")
-    res$iactions_obsCI <- list(stats = vars_identity_contrast_stats(
+    res$interactions_obsCI <- list(stats = vars_identity_contrast_stats(
             msglm.stan_draws, msglm.stan_stats,
             dplyr::filter(varspecs$spec_info, var == 'obs_labu'),
             varspecs$cats_info$observations,
             group_idcol = "index_interaction",
-            method=contrast_method))
+            method=contrast_method) %>% dplyr::mutate(var = 'obs_labu'))
   }
 
   message("Calculating contrasts...")

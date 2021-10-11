@@ -356,9 +356,10 @@ append_contrasts_stats <- function(vars_results, standraws, stanstats, varspecs,
                                    (!is_lhs & is_preserved_condition)))
 
     vargroups.df <- dplyr::inner_join(cat_varspecs, cat_info, by = "var_index") %>%
-      dplyr::inner_join(dplyr::filter(conditionXcontrast_pregroup_stats.df, is_accepted), by = c("var", group_cols, condition_col)) %>%
-      dplyr::select_at(c("var", "index_varspec", "category", group_cols, contrast_col, metacondition_col, condition_col)) %>%
-      dplyr::group_by_at(c("var", "category", group_cols)) %>%
+      dplyr::inner_join(dplyr::filter(conditionXcontrast_pregroup_stats.df, is_accepted),
+                        by = c("var", group_cols, condition_col)) %>%
+      dplyr::select_at(c("var", "ci_target", "index_varspec", "category", group_cols, contrast_col, metacondition_col, condition_col)) %>%
+      dplyr::group_by_at(c("var", "ci_target", "category", group_cols)) %>%
       dplyr::group_modify(~ vars_contrast_stats(standraws, stanstats,
                               vargroups = dplyr::group_by_at(.x, c(metacondition_col, contrast_col)),
                               vargroupXcontrast = metaconditionXcontrast,

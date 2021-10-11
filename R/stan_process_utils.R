@@ -23,8 +23,13 @@ extract_var <- function(varspecs) {
 }
 
 process_varspecs <- function(varspecs, vars_info, dims_info) {
-  all_vars.df <- bind_rows(lapply(names(vars_info), function(cat) tibble(category = cat,
-                                                                         var = vars_info[[cat]]$names)))
+  all_vars.df <- bind_rows(lapply(names(vars_info), function(cat) {
+      tibble(category = cat,
+             var = vars_info[[cat]]$names,
+             ci_target = case_when(str_detect(var, '_replCI$') ~ 'replicate',
+                                   TRUE ~ 'median') %>%
+                         factor(levels=c('median', 'replicate')))
+  }))
   all_varspecs.df <- tibble(varspec = varspecs,
                             index_varspec = seq_along(varspecs)) %>%
     tidyr::extract(varspec, c("var", "var_index"),

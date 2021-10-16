@@ -127,12 +127,12 @@ frame2matrix <- function(df, row_col, col_col, val_col="w", val_default=0, cols=
   if (nrow(mtx) == 0 || is.integer(rows) && vctrs::vec_equal(rows, seq_len(nrow(mtx)))) {
     rownames(mtx) <- NULL
   } else {
-    checkmate::assert_set_equal(rownames(mtx), rows, ordered=TRUE)
+    checkmate::assert_set_equal(rownames(mtx), as.character(rows), ordered=TRUE)
   }
   if (ncol(mtx) == 0 || is.integer(cols) && vctrs::vec_equal(cols, seq_len(ncol(mtx)))) {
     colnames(mtx) <- NULL
   } else {
-    checkmate::assert_set_equal(colnames(mtx), cols, ordered=TRUE)
+    checkmate::assert_set_equal(colnames(mtx), as.character(cols), ordered=TRUE)
   }
   return(mtx)
 }

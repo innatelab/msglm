@@ -153,20 +153,30 @@ frame2matrix <- function(df, row_col, col_col, val_col="w", val_default=0, cols=
 #'
 #' @export
 matrix2frame <- function(mtx, row_col = NULL, col_col = NULL, val_col = "w", skip_val = 0) {
-  dnn <- names(dimnames(mtx))
-  if (is.null(row_col)) {
+  df <- as.data.frame.table(mtx, stringsAsFactors=TRUE, responseName=val_col)
+  dnn <- colnames(df)
+  if (!is.null(row_col)) {
+    # overriding the existing name
+    df <- dplyr::rename(df, !!sym(row_col) := !!sym(dnn[[1]]))
+  } else {
     row_col <- dnn[[1]]
-    checkmate::assert_string(row_col, na.ok=FALSE, null.ok=FALSE)
-  } else {
-    dnn[[1]] <- row_col # overriding the existing name
   }
-  if (is.null(col_col)) {
+  # workaround df column being null (bug in as.data.frame.table()?)
+  if (is.null(df[[1]])) {
+    df[[1]] <- character(0)
+  }
+  if (is.null(df[[2]])) {
+    df[[2]] <- character(0)
+  }
+  if (!is.null(col_col)) {
+    # overriding the existing name
+    df <- dplyr::rename(df, !!sym(col_col) := !!sym(dnn[[2]]))
+  } else {
     col_col <- dnn[[2]]
-    checkmate::assert_string(col_col, na.ok=FALSE, null.ok=FALSE)
-  } else {
-    dnn[[2]] <- col_col # overriding the existing name
   }
-  df <- as.data.frame.table(mtx, dnn=dnn, stringsAsFactors=TRUE, responseName=val_col)
+  if (!rlang::has_name(df, val_col)) {
+    df[[val_col]] <- rlang::exec(typeof(skip_val), nrow(df))
+  }
   if (!is.null(skip_val)) {
     df <- dplyr::filter(df, !!sym(val_col) != skip_val)
   }

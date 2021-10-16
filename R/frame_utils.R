@@ -201,18 +201,18 @@ matrix2frame <- function(mtx, row_col = NULL, col_col = NULL, val_col = "w", ski
 
 # check if the index column exists and equals to 1:nrow
 # or create it otherwise
-ensure_primary_index_column <- function(df, index_col, id_col=NULL, ids_ordered=NULL,
+ensure_primary_index_column <- function(df, index_col, id_col=NA_character_, ids_ordered=NULL,
                                         create=FALSE, .var.name=checkmate::vname(df)) {
   checkmate::assert_data_frame(df, .var.name=.var.name)
-  if (!is.null(id_col)) {
+  if (!is.na(id_col)) {
     colname <- paste0(.var.name, "$", id_col)
-    if (!is.null(ids_ordered)) {
-      checkmate::assert_character(ids_ordered, any.missing=FALSE, names="unnamed", unique=TRUE)
-    }
     if (rlang::has_name(df, id_col)) {
       if (is.factor(df[[id_col]])) df[[id_col]] <- as.character(df[[id_col]])
       if (!is.null(ids_ordered)) {
+        checkmate::assert_character(ids_ordered, any.missing=FALSE, names="unnamed", unique=TRUE)
         checkmate::assert_set_equal(df[[id_col]], ids_ordered, ordered=FALSE, .var.name = colname)
+      } else {
+        checkmate::assert_character(as.character(df[[id_col]]), any.missing=FALSE, names="unnamed", unique=TRUE)
       }
     } else {
       stop("ID column '", id_col, "' not found in ", .var.name)
@@ -223,7 +223,7 @@ ensure_primary_index_column <- function(df, index_col, id_col=NULL, ids_ordered=
     checkmate::assert_integer(df[[index_col]], .var.name=colname)
     checkmate::assert_set_equal(df[[index_col]], seq_len(nrow(df)),
                                 ordered=FALSE, .var.name=colname)
-    if (!is.null(id_col)) {
+    if (!is.na(id_col)) {
       # check the order of the ids
       df_ids_ordered <- df[[id_col]]
       df_ids_ordered[df[[index_col]]] <- df_ids_ordered
@@ -232,9 +232,14 @@ ensure_primary_index_column <- function(df, index_col, id_col=NULL, ids_ordered=
     }
   } else {
     if (create) {
-      if (!is.null(id_col)) {
-        df[[index_col]] <- match(df[[id_col]], ids_ordered)
-        df <- dplyr::arrange_at(df, index_col)
+      if (!is.na(id_col)) {
+        if (!is.null(ids_ordered)) {
+          df[[index_col]] <- match(df[[id_col]], ids_ordered)
+          df <- dplyr::arrange_at(df, index_col)
+        } else {
+          df <- dplyr::arrange_at(df, id_col)
+          df[[index_col]] <- seq_len(nrow(df))
+        }
       } else {
         df[[index_col]] <- seq_len(nrow(df))
       }

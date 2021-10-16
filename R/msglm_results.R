@@ -133,7 +133,9 @@ vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
                                 method=c("draws", "normal"),
                                 nsteps = 100L, maxBandwidth = NA_real_,
                                 mlog10pvalue_threshold = 10.0,
-                                mlog10pvalue_hard_threshold_factor = 3.0)
+                                mlog10pvalue_hard_threshold_factor = 3.0,
+                                verbose=FALSE,
+                                .contrasts.name="contrasts")
 {
   method <- match.arg(method)
   tail <- match.arg(tail)
@@ -173,6 +175,10 @@ vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
   if (any(is.na(vargroup_info.df$`__vargroup_ix__`))) {
     stop(sum(is.na(vargroup_info.df$`__vargroup_ix__`)), " vargroup(s) not defined: ",
          paste0(dplyr::filter(vargroup_info.df, is.na(`__vargroup_ix__`)), collapse=", "))
+  }
+  if (!rlang::has_name(contrasts, offset_col)) {
+    if (verbose) message("No ", .contrasts.name, "$", offset_col, " offset column found, defaulting to 0 offset")
+    contrasts <- dplyr::mutate(contrasts, !!sym(offset_col) := 0)
   }
   contrast_offsets <- rlang::set_names(dplyr::pull(contrasts, !!offset_col), contrasts$contrast)
   contrast_stats <- if (method == "draws") {
@@ -227,9 +233,6 @@ vars_identity_contrast_stats <- function(vars_draws, vars_stats,
                                          offset_col='offset',
                                          ...) {
     groups_df <- dplyr::select(groups_info, !!group_idcol, any_of(offset_col)) %>% dplyr::distinct()
-    if (!rlang::has_name(groups_df, offset_col)) {
-      groups_df <- dplyr::mutate(groups_df, !!sym(offset_col):=0)
-    }
     group_ids <- dplyr::pull(groups_df, !!group_idcol)
     groups_diag <- diag(nrow = length(group_ids), ncol = length(group_ids))
     dimnames(groups_diag) <- list(group_ids, group_ids) %>%
@@ -316,7 +319,8 @@ append_contrasts_stats <- function(vars_results, standraws, stanstats, varspecs,
         metaconditionXcontrast, contrasts.df, conditionXcontrast.df,
         condition_agg_col = "condition", # filtering is based on pregrouping quantiles in metacondition using this column (per contrast)
         object_cols = 'index_object', metacondition_cols = c(),
-        group_cols = c(), method = c("draws", "normal")
+        group_cols = c(), method = c("draws", "normal"),
+        verbose = FALSE
 ){
   method <- match.arg(method)
   metacondition_col <- names(dimnames(metaconditionXcontrast))[[1]]
@@ -363,7 +367,8 @@ append_contrasts_stats <- function(vars_results, standraws, stanstats, varspecs,
       dplyr::group_modify(~ vars_contrast_stats(standraws, stanstats,
                               vargroups = dplyr::group_by_at(.x, c(metacondition_col, contrast_col)),
                               vargroupXcontrast = metaconditionXcontrast,
-                              contrasts = contrasts.df, method = method))
+                              contrasts = contrasts.df, method = method,
+                              verbose = verbose))
     return (vargroups.df)
   })
   # add contrast reports to the var_results
@@ -433,7 +438,8 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
       message('    - calculating P-values for: ',
               paste0(unique(cat_eff_varspecs.df$var), collapse=', '), '...')
       p_values.df <- vars_pvalues(msglm.stan_draws, msglm.stan_stats,
-                                  cat_eff_varspecs.df, method=contrast_method)
+                                  cat_eff_varspecs.df, method=contrast_method,
+                                  verbose=verbose)
       res.df <- dplyr::left_join(res.df, dplyr::select(p_values.df, -any_of("prior_mean")), by="varspec") %>%
         dplyr::select(-index_varspec, -var_index)
     }
@@ -456,7 +462,8 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
             dplyr::filter(varspecs$spec_info, var == 'obs_labu'),
             varspecs$cats_info$observations,
             group_idcol = "index_interaction",
-            method=contrast_method) %>% dplyr::mutate(var = 'obs_labu'))
+            method=contrast_method,
+            verbose=verbose) %>% dplyr::mutate(var = 'obs_labu'))
   }
 
   message("Calculating contrasts...")
@@ -509,6 +516,7 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
             condition_agg_col = condition_agg_col,
             object_cols = object_cols, metacondition_cols = c(),
             group_cols = contrast_group_cols,
-            method = contrast_method)
+            method = contrast_method,
+            verbose = verbose)
   return (res)
 }

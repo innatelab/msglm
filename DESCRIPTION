@@ -1,7 +1,7 @@
 Package: msglm
 Type: Package
 Title: GLM models for Mass Spectrometry Data
-Version: 0.3.4
+Version: 0.3.5
 Date: 2021-10-05
 Authors@R:
     c(person(given = "Alexey", family = "Stukalov", role = c("aut", "cre"),

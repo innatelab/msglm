@@ -121,11 +121,12 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
     msexpXbatchEffect <- model_def$msexperimentXbatchEffect
     msexp_idcol <- names(dimnames(msexpXbatchEffect))[[1]]
     batch_effects_df <- model_def$batch_effects
-    if (verbose) message(nrow(batch_effects_df), " batch effects on ", msexp_idcol, " level defined")
+    if (verbose) message(nrow(batch_effects_df), " batch effects on ",
+                         msexp_idcol, " level defined")
   } else {
     if (verbose) message("No batch effects defined")
     msexp_idcol <- "mschannel"
-    msexpXbatchEffect <- constant_matrix(0, list(mschannel = model_data$mschannels$mschannel,
+    msexpXbatchEffect <- constant_matrix(0, list(mschannel = character(0),
                                                  batch_effect = character(0)))
     batch_effects_df <- tibble::tibble(batch_effect = character(0),
                                        index_batch_effect = integer(0),
@@ -134,8 +135,9 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
   obsXobjbatcheff_df <- dplyr::full_join(matrix2frame(msexpXbatchEffect, row_col=msexp_idcol, col_col = "batch_effect"),
                                          dplyr::select(model_data$objects, index_object, object_id, object_label),
                                          by = character()) %>%
-    dplyr::inner_join(dplyr::select(model_data$observations, !!sym(msexp_idcol), index_object, index_observation), by=c("index_object", msexp_idcol)) %>%
     dplyr::inner_join(dplyr::select(batch_effects_df, batch_effect, index_batch_effect), by="batch_effect") %>%
+    dplyr::left_join(dplyr::select(model_data$observations, !!sym(msexp_idcol), index_object, index_observation),
+                     by=c("index_object", msexp_idcol)) %>%
     dplyr::mutate(object_batch_effect = paste0(batch_effect, '@', object_id))
   model_data$object_batch_effects <- dplyr::select(obsXobjbatcheff_df,
                                                    object_batch_effect,
@@ -145,7 +147,9 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
     dplyr::arrange(index_object, index_batch_effect) %>%
     dplyr::mutate(index_object_batch_effect = row_number())
   model_data$obsXobjbatcheff <- frame2matrix(obsXobjbatcheff_df, row_col="index_observation", col_col="object_batch_effect",
-                                             rows=model_data$observations$index_observation,
+                                             rows=if (nrow(obsXobjbatcheff_df) > 0) {
+                                                    model_data$observations$index_observation
+                                                  } else integer(0),
                                              cols=model_data$object_batch_effects$object_batch_effect)
   if (rlang::has_name(model_data, "subobjects")) {
     if (rlang::has_name(model_def, "msexperimentXquantBatchEffect")) {
@@ -156,7 +160,7 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
     } else {
       if (verbose) message("No quantification-level batch effects defined")
       msexp_idcol <- "mschannel"
-      msexpXquantBatchEffect <- constant_matrix(0, list(mschannel = model_data$mschannels$mschannel,
+      msexpXquantBatchEffect <- constant_matrix(0, list(mschannel = character(0),
                                                         quant_batch_effect = character(0)))
       quant_batch_effects_df <- tibble::tibble(quant_batch_effect = character(0),
                                                index_quant_batch_effect = integer(0),
@@ -169,8 +173,9 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
     subobsXsubobjbatcheff_df <- dplyr::full_join(matrix2frame(msexpXquantBatchEffect, row_col=msexp_idcol, col_col="quant_batch_effect"),
                                                  dplyr::select(subobjs_df, index_object, index_subobject, subobject_id),
                                                  by = character()) %>%
-      dplyr::inner_join(dplyr::select(model_data$msdata, !!sym(msexp_idcol), index_object, index_subobject, index_subobservation), by=c("index_object", "index_subobject", msexp_idcol)) %>%
       dplyr::inner_join(dplyr::select(quant_batch_effects_df, quant_batch_effect, index_quant_batch_effect), by="quant_batch_effect") %>%
+      dplyr::left_join(dplyr::select(model_data$msdata, !!sym(msexp_idcol), index_object, index_subobject, index_subobservation),
+                       by=c("index_object", "index_subobject", msexp_idcol)) %>%
       dplyr::mutate(subobject_batch_effect = paste0(quant_batch_effect, '@', subobject_id)) %>%
       dplyr::arrange(index_quant_batch_effect, index_subobservation)
     model_data$subobject_batch_effects <- dplyr::select(subobsXsubobjbatcheff_df,
@@ -183,6 +188,9 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
     model_data$subobsXsubobjbatcheff <- frame2matrix(subobsXsubobjbatcheff_df,
                                                      row_col="index_subobservation",
                                                      col_col="subobject_batch_effect",
+                                                     rows = if (nrow(subobsXsubobjbatcheff_df)>0) {
+                                                              model_data$msdata$index_subobservation
+                                                            } else integer(0),
                                                      cols = model_data$subobject_batch_effects$subobject_batch_effect)
   }
 

@@ -53,9 +53,9 @@ msglm_model <- function(conditionXeffect,
   }
 
   # remove intercept if it's in the design matrix
-  if ("(Intercept)" %in% rownames(conditionXeffect)) {
+  if ("(Intercept)" %in% colnames(conditionXeffect)) {
     if (verbose) warning('Removing (Intercept) effect from the conditionXeffect matrix (always present in the model)')
-    conditionXeffect <- conditionXeffect[rownames(conditionXeffect) != "(Intercept)",, .drop=FALSE]
+    conditionXeffect <- conditionXeffect[, colnames(conditionXeffect) != "(Intercept)", drop=FALSE]
   }
   # FIXME allow row/col permutations, but then fix the row/col order
   checkmate::assert_matrix(conditionXeffect, mode="numeric",

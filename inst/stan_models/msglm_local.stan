@@ -128,10 +128,10 @@ transformed data {
 
   int<lower=0> NrealIactions = ndistinct(observation2iaction, Niactions);
   int<lower=0> Nobservations0 = Nobservations - NrealIactions; // number of observations degrees of freedom ()
-  int<lower=0> obs_shiftXobs_shift0_Nw = contr_poly_Nw(Niactions, observation2iaction);
+  int<lower=0> obs_shiftXobs_shift0_Nw = Nobservations0 > 0 ? contr_poly_Nw(Niactions, observation2iaction) : 0;
   vector[obs_shiftXobs_shift0_Nw] obs_shiftXobs_shift0_w;
-  int<lower=1, upper=obs_shiftXobs_shift0_Nw + 1> obs_shiftXobs_shift0_u[Nobservations + 1];
-  int<lower=1, upper=Nobservations0> obs_shiftXobs_shift0_v[obs_shiftXobs_shift0_Nw];
+  int<lower=1, upper=obs_shiftXobs_shift0_Nw + 1> obs_shiftXobs_shift0_u[Nobservations0 > 0 ? Nobservations + 1 : 0];
+  int<lower=1, upper=Nobservations0> obs_shiftXobs_shift0_v[Nobservations0 > 0 ? obs_shiftXobs_shift0_Nw : 0];
 
   matrix[Nobjects + NobjEffects, Niactions] iaction2objeffx_op;
   //matrix[Niactions, Nobjects] iactXobjbase = csr_to_dense_matrix(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u);
@@ -158,7 +158,7 @@ transformed data {
   }
 
   // prepare obs_shiftXobs_shift0
-  {
+  if (Nobservations0 > 0) {
     int iaction2nobs[Niactions];
 
     int iaction2nobs_2ndpass[Niactions];
@@ -379,7 +379,7 @@ generated quantities {
         csr_matrix_times_vector(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u, obj_base_labu) +
         csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect);
         //obj_base_labu[iaction2obj] + iactXobjeff * obj_effect;
-    vector[Niactions] iaction_labu_replCI = to_vector(normal_rng(iaction_labu, iact_repl_shift_sigma));
+    vector[Niactions] iaction_labu_replCI = Nobservations0 > 0 ? to_vector(normal_rng(iaction_labu, iact_repl_shift_sigma)) : iaction_labu;
     vector[Nobjects] obj_base_labu_replCI;
     vector[NobjEffects] obj_effect_replCI;
 

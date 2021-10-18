@@ -132,7 +132,7 @@ msglm_model <- function(conditionXeffect,
     if (verbose) message("MS experiment-specific experimental design specified")
     checkmate::assert_matrix(msexperimentXeffect, mode="numeric", any.missing = FALSE)
     msexp_dim <- names(dimnames(msexperimentXeffect))[[1]]
-    checkmate::assert_choice(msexp_dim, c("msrun", "mschannel"))
+    checkmate::assert_choice(msexp_dim, c("msexperiment", "msrun", "mschannel"))
     checkmate::assert_subset(colnames(msexp_dim), choices=effects$effect)
     model_def$msexperimentXeffect <- msexperimentXeffect
   }
@@ -169,12 +169,14 @@ set_batch_effects <- function(model_def,
   checkmate::assert_matrix(msexperimentXbatchEffect, mode="numeric", any.missing=FALSE,
                            min.rows = 1, min.cols = 1, row.names = "unique", col.names = "unique")
   msexp_dim <- names(dimnames(msexperimentXbatchEffect))[[1]]
-  checkmate::assert_choice(msexp_dim, c("msrun", "mschannel"))
+  msexp_dimnames_allowed <- c("msrun", "mschannel")
+  if (applies_to == "modelobject") msexp_dimnames_allowed <- append(msexp_dimnames_allowed, "msexperiment")
+  checkmate::assert_choice(msexp_dim, msexp_dimnames_allowed)
   msexperiments <- rownames(msexperimentXbatchEffect)
   if (is.null(msexperiments)) stop("No names for MS experiments in the rows of the matrix")
 
-  mtx_name <- paste0("msexperimentX",
-                     c(modelobject="batchEffect", quantobject="quantBatchEffect")[[applies_to]])
+  mtx_name <- c(modelobject="msexperimentXbatchEffect",
+                quantobject="mschannelXquantBatchEffect")[[applies_to]]
   mtx_batch_effects <- colnames(msexperimentXbatchEffect)
 
   if (verbose) message("  * ", ncol(msexperimentXbatchEffect), " ", applies_to, "-level batch effect(s) specified")

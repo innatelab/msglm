@@ -81,11 +81,12 @@ to_standata.msglm_model_data <- function(model_data,
   model_def <- model_data$model_def
   if (verbose) message('Converting MSGLM model data to Stan-readable format...')
   ensure_primary_index_column(model_def$effects, 'index_effect')
+  ensure_primary_index_column(model_data$msexperiments, 'index_msexperiment')
   ensure_primary_index_column(model_data$mschannels, 'index_mschannel')
 
   is_glmm <- rlang::inherits_all(model_def, "msglmm_model")
   xaction_ix_col <- if (is_glmm) "index_superaction" else "index_interaction"
-  obs_df <- dplyr::select(model_data$observations, index_observation, index_mschannel, index_msrun,
+  obs_df <- dplyr::select(model_data$observations, index_observation, index_msexperiment,
                           index_object, !!xaction_ix_col)
   if (any(obs_df$index_observation != seq_len(nrow(obs_df)))) {
     stop("model_data$msdata not ordered by observations / have missing observations")
@@ -98,12 +99,16 @@ to_standata.msglm_model_data <- function(model_data,
 
   missing_mask <- is.na(model_data$msdata$intensity)
   res <- list(
-    Nobservations = nrow(obs_df),
-    Nmschannels = n_distinct(model_data$mschannels$index_mschannel),
     Nconditions = nrow(model_def$conditions),
     Nobjects = nrow(model_data$objects),
+
+    Nexperiments = nrow(model_data$msexperiments),
+
+    Nobservations = nrow(obs_df),
+    observation2experiment = as.array(obs_df$index_msexperiment),
+
+    Nmschannels = n_distinct(model_data$mschannels$index_mschannel),
     mschannel_shift = as.array(model_data$mschannels$mschannel_shift),
-    observation2mschannel = as.array(obs_df$index_mschannel),
 
     Neffects = ncol(model_def$conditionXeffect),
     effect_is_positive = as.array(as.integer(model_def$effects$is_positive)),
@@ -160,6 +165,7 @@ to_standata.msglm_model_data <- function(model_data,
       quant2subobs = as.array(model_data$msdata$index_subobservation[!is.na(model_data$msdata$index_qdata)]),
       miss2subobs = as.array(model_data$msdata$index_subobservation[!is.na(model_data$msdata$index_mdata)]),
       subobs2subobj = as.array(model_data$msdata$index_subobject),
+      subobs2mschannel = as.array(model_data$msdata$index_mschannel),
       subobs2obs = as.array(model_data$msdata$index_observation),
       # TODO support different noise models
       Nmsprotocols = 0L,

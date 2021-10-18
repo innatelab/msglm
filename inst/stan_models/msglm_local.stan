@@ -11,11 +11,11 @@ data {
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
 
-  int<lower=1> Nmschannels;     // number of mschannels
-  vector[Nmschannels] mschannel_shift;
+  int<lower=1> Nexperiments;    // number of experiments
+  vector[Nexperiments] mschannel_shift;
 
   int<lower=0> Nobservations;   // number of observations of interactions (objectXmschannel pairs for all iactions and mschannels of its condition)
-  int<lower=1,upper=Nmschannels> observation2mschannel[Nobservations];
+  int<lower=1,upper=Nexperiments> observation2experiment[Nobservations];
   int<lower=1,upper=Niactions> observation2iaction[Nobservations];
 
   // map from labelXreplicateXobject to observed/missed data
@@ -96,10 +96,11 @@ transformed data {
   int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
 
+  int<lower=1> Nmschannels = Nexperiments;
   int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2obs];
-  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted] = observation2mschannel[quant2obs];
+  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted] = observation2experiment[quant2obs];
   int<lower=1,upper=Niactions> miss2iaction[Nmissed] = observation2iaction[miss2obs];
-  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed] = observation2mschannel[miss2obs];
+  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed] = observation2experiment[miss2obs];
 
   int<lower=0,upper=NobjEffects> NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   int<lower=0,upper=NobjEffects> NobjEffectsOther = NobjEffects - NobjEffectsPos;

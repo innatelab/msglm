@@ -14,17 +14,20 @@ data {
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
 
+  int<lower=1> Nexperiments;    // number of experiments
+
   int<lower=0> Nmsprotocols;    // number of MS protocols used
-  int<lower=1> Nmschannels;     // number of mschannels
+  int<lower=Nexperiments> Nmschannels;     // number of mschannels
   vector[Nmschannels] mschannel_shift;
+  int<lower=1,upper=Nmsprotocols> mschannel2msproto[Nmsprotocols > 0 ? Nmschannels : 0]; // TODO support by the model
 
   int<lower=0> Nobservations;   // number of observations of interactions (objectXmschannel pairs for all iactions and mschannels of its condition)
-  int<lower=1,upper=Nmschannels> observation2mschannel[Nobservations];
+  int<lower=1,upper=Nexperiments> observation2experiment[Nobservations];
   int<lower=1,upper=Niactions> observation2iaction[Nobservations];
-  int<lower=1,upper=Nmsprotocols> mschannel2msproto[Nmsprotocols > 0 ? Nmschannels : 0]; // TODO support by the model
 
   int<lower=0> Nsubobservations;// number of subobject observations (observation X subobject)
   int<lower=1,upper=Nobservations> subobs2obs[Nsubobservations];
+  int<lower=1,upper=Nmschannels> subobs2mschannel[Nsubobservations];
   int<lower=1,upper=Nsubobjects> subobs2subobj[Nsubobservations];
 
   // map from labelXreplicateXobject to observed/missed data
@@ -122,12 +125,12 @@ transformed data {
   int<lower=1,upper=Nsubobjects> quant2subobj[Nquanted] = subobs2subobj[quant2subobs];
   int<lower=1,upper=Nobservations> quant2obs[Nquanted] = subobs2obs[quant2subobs];
   int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2obs];
-  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted] = observation2mschannel[quant2obs];
+  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted] = subobs2mschannel[quant2subobs];
 
   int<lower=1,upper=Nsubobjects> miss2subobj[Nmissed] = subobs2subobj[miss2subobs];
   int<lower=1,upper=Nobservations> miss2obs[Nmissed] = subobs2obs[miss2subobs];
   int<lower=1,upper=Niactions> miss2iaction[Nmissed] = observation2iaction[miss2obs];
-  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed] = observation2mschannel[miss2obs];
+  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed] = subobs2mschannel[miss2subobs];
 
   int<lower=0,upper=NobjEffects> NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   int<lower=0,upper=NobjEffects> NobjEffectsOther = NobjEffects - NobjEffectsPos;

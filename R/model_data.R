@@ -119,25 +119,23 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
 
   if (rlang::has_name(model_def, "msexperimentXbatchEffect")) {
     msexpXbatchEffect <- model_def$msexperimentXbatchEffect
-    msexp_idcol <- names(dimnames(msexpXbatchEffect))[[1]]
     batch_effects_df <- model_def$batch_effects
     if (verbose) message(nrow(batch_effects_df), " batch effects on ",
                          msexp_idcol, " level defined")
   } else {
     if (verbose) message("No batch effects defined")
-    msexp_idcol <- "mschannel"
-    msexpXbatchEffect <- constant_matrix(0, list(mschannel = character(0),
+    msexpXbatchEffect <- constant_matrix(0, list(msexperiment = character(0),
                                                  batch_effect = character(0)))
     batch_effects_df <- tibble::tibble(batch_effect = character(0),
                                        index_batch_effect = integer(0),
                                        is_positive = logical(0))
   }
-  obsXobjbatcheff_df <- dplyr::full_join(matrix2frame(msexpXbatchEffect, row_col=msexp_idcol, col_col = "batch_effect"),
+  obsXobjbatcheff_df <- dplyr::full_join(matrix2frame(msexpXbatchEffect, row_col="msexperiment", col_col="batch_effect"),
                                          dplyr::select(model_data$objects, index_object, object_id, object_label),
                                          by = character()) %>%
     dplyr::inner_join(dplyr::select(batch_effects_df, batch_effect, index_batch_effect), by="batch_effect") %>%
-    dplyr::left_join(dplyr::select(model_data$observations, !!sym(msexp_idcol), index_object, index_observation),
-                     by=c("index_object", msexp_idcol)) %>%
+    dplyr::left_join(dplyr::select(model_data$observations, msexperiment, index_object, index_observation),
+                     by=c("index_object", "msexperiment")) %>%
     dplyr::mutate(object_batch_effect = paste0(batch_effect, '@', object_id))
   model_data$object_batch_effects <- dplyr::select(obsXobjbatcheff_df,
                                                    object_batch_effect,
@@ -152,16 +150,17 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
                                                   } else integer(0),
                                              cols=model_data$object_batch_effects$object_batch_effect)
   if (rlang::has_name(model_data, "subobjects")) {
-    if (rlang::has_name(model_def, "msexperimentXquantBatchEffect")) {
-      msexpXquantBatchEffect <- model_def$msexperimentXquantBatchEffect
-      msexp_idcol <- names(dimnames(msexpXquantBatchEffect))[[1]]
+    if (rlang::has_name(model_def, "mschannelXquantBatchEffect")) {
+      mschannelXquantBatchEffect <- model_def$mschannelXquantBatchEffect
+      mschan <- model_data$msentities[['mschannel']]
+      mschan_idcol <- mschan
       quant_batch_effects_df <- model_def$quant_batch_effects
-      if (verbose) message(nrow(quant_batch_effects_df), " quantification batch effects on ", msexp_idcol, " level defined")
+      if (verbose) message(nrow(quant_batch_effects_df),
+                           " quantification batch effects on ", mschan_idcol, " level defined")
     } else {
       if (verbose) message("No quantification-level batch effects defined")
-      msexp_idcol <- "mschannel"
-      msexpXquantBatchEffect <- constant_matrix(0, list(mschannel = character(0),
-                                                        quant_batch_effect = character(0)))
+      mschannelXquantBatchEffect <- constant_matrix(0, list(mschannel = character(0),
+                                                            quant_batch_effect = character(0)))
       quant_batch_effects_df <- tibble::tibble(quant_batch_effect = character(0),
                                                index_quant_batch_effect = integer(0),
                                                is_positive = logical(0))
@@ -170,12 +169,12 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
     subobjs_df <- dplyr::group_by(model_data$subobjects, index_object) %>%
       dplyr::filter(index_subobject > min(index_subobject)) %>%
       dplyr::ungroup()
-    subobsXsubobjbatcheff_df <- dplyr::full_join(matrix2frame(msexpXquantBatchEffect, row_col=msexp_idcol, col_col="quant_batch_effect"),
+    subobsXsubobjbatcheff_df <- dplyr::full_join(matrix2frame(mschannelXquantBatchEffect, row_col="mschannel"),
                                                  dplyr::select(subobjs_df, index_object, index_subobject, subobject_id),
                                                  by = character()) %>%
       dplyr::inner_join(dplyr::select(quant_batch_effects_df, quant_batch_effect, index_quant_batch_effect), by="quant_batch_effect") %>%
-      dplyr::left_join(dplyr::select(model_data$msdata, !!sym(msexp_idcol), index_object, index_subobject, index_subobservation),
-                       by=c("index_object", "index_subobject", msexp_idcol)) %>%
+      dplyr::left_join(dplyr::select(model_data$msdata, mschannel, index_object, index_subobject, index_subobservation),
+                       by=c("index_object", "index_subobject", "mschannel")) %>%
       dplyr::mutate(subobject_batch_effect = paste0(quant_batch_effect, '@', subobject_id)) %>%
       dplyr::arrange(index_quant_batch_effect, index_subobservation)
     model_data$subobject_batch_effects <- dplyr::select(subobsXsubobjbatcheff_df,
@@ -211,20 +210,21 @@ impute_intensities <- function(intensities_df, stats_df, log2_mean_offset=-1.8, 
 }
 
 #' @export
-cluster_msprofiles <- function(msdata, msrun_stats, obj_col="pepmodstate_id", msrun_col="msrun", nclu=4) {
+cluster_msprofiles <- function(msdata, mschannel_stats,
+                               obj_col="pepmodstate_id", mschannel_col="mschannel", nclu=4) {
   # create matrix of intensities
   objs.df <- dplyr::select_at(msdata, obj_col) %>%
     dplyr::distinct() %>% dplyr::arrange_at(obj_col) %>%
     dplyr::mutate(`__index_msobject__` = row_number())
-  intensities.df <- tidyr::expand(msdata, !!!rlang::syms(c(obj_col, msrun_col))) %>%
-    dplyr::left_join(dplyr::select(msdata, any_of(c(obj_col, msrun_col, "intensity"))),
-                     by=c(obj_col, msrun_col)) %>%
-    impute_intensities(msrun_stats) %>%
+  intensities.df <- tidyr::expand(msdata, !!!rlang::syms(c(obj_col, mschannel_col))) %>%
+    dplyr::left_join(dplyr::select(msdata, any_of(c(obj_col, mschannel_col, "intensity"))),
+                     by=c(obj_col, mschannel_col)) %>%
+    impute_intensities(mschannel_stats) %>%
     dplyr::inner_join(objs.df, by=obj_col) %>%
-    dplyr::arrange_at(c("__index_msobject__", msrun_col))
+    dplyr::arrange_at(c("__index_msobject__", mschannel_col))
   # handle trivial cases
   if (n_distinct(intensities.df[[obj_col]]) == 1L ||
-      n_distinct(intensities.df[[msrun_col]]) == 1L) {
+      n_distinct(intensities.df[[mschannel_col]]) == 1L) {
     return(tibble(!!obj_col := unique(intensities.df[[obj_col]]),
                   profile_cluster = 1L,
                   nsimilar_profiles = 1L))
@@ -235,7 +235,7 @@ cluster_msprofiles <- function(msdata, msrun_stats, obj_col="pepmodstate_id", ms
   # add a bit of noise to avoid zero variance
   intensities.mtx <- matrix(log2(pmax(intensities.df$intensity_imputed + rnorm(nrow(intensities.df)), 0)),
                             ncol = nrow(objs.df),
-                            dimnames = list(msrun = unique(intensities.df[[msrun_col]]),
+                            dimnames = list(mschannel = unique(intensities.df[[mschannel_col]]),
                                             `__index_msobject__` = NULL))
   obj.pca <- stats::prcomp(intensities.mtx, scale.=TRUE)
   # create object feature matrix
@@ -319,24 +319,29 @@ annotate_msdata <- function(msdata_df, model_def, verbose = model_def$verbose,
 # select relevant msdata and subobjects from msdata_df
 # and define model_data$subobjects and model_data$observations
 prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$verbose,
-                           max_subobjects = 20L, ...) {
+                           max_subobjects = 20L,
+                           specificity_msexp_group_cols = 'condition',
+                           specificity_quantobject_group_cols = NULL,
+                           cooccurrence_msexp_group_cols = 'msrun',
+                           ...) {
   model_def <- model_data$model_def
-  intensities_dfname <- paste0(model_def$quantobject, "_",
-                               if (any(coalesce(model_data$mschannels$mstag, "F") == "F")) "" else "tag",
-                               "intensities")
+  intensities_dfname <- paste0(model_def$quantobject, "_intensities")
   if (!rlang::has_name(msdata, intensities_dfname)) {
     stop("No intensities (", intensities_dfname, " data frame) found in msdata")
   }
   intensities_df <- msdata[[intensities_dfname]]
-  msexp_idcol <- intersect(c("mschannel", "msrun"), colnames(intensities_df))[[1]]
+  msexp <- msdata$msentities[['msexperiment']]
+  msexp_idcol <- msexp
+  mschan <- msdata$msentities[['mschannel']]
+  mschan_idcol <- mschan
   modelobj_idcol <- paste0(model_def$modelobject, "_id")
   quantobj_idcol <- paste0(model_def$quantobject, "_id")
-  intensities_df <- dplyr::select(intensities_df, !!sym(quantobj_idcol), !!sym(msexp_idcol), intensity)
+  intensities_df <- dplyr::select_at(intensities_df, c(quantobj_idcol, mschannel=mschan_idcol, "intensity"))
 
   if (model_def$modelobject == model_def$quantobject) {
     # modelobj is quanted directly
     msdata_df <- dplyr::left_join(model_data$observations,
-                                  intensities_df, by = c(quantobj_idcol, msexp_idcol)) %>%
+                                  intensities_df, by = c(quantobj_idcol, "msexperiment")) %>%
         annotate_msdata(model_def) %>%
         dplyr::arrange(index_observation)
   } else if (model_def$quantobject == "pepmodstate") {
@@ -346,18 +351,31 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                                     dplyr::select(model_data$objects, !!sym(modelobj_idcol), object_id, index_object),
                                     by=modelobj_idcol) %>%
       dplyr::filter(is_specific) %>%
-      dplyr::inner_join(dplyr::select(msdata$pepmodstates, charge, pepmodstate_id), by="pepmodstate_id") %>%
+      dplyr::inner_join(dplyr::select(msdata$pepmodstates, charge, pepmodstate_id, any_of("msfraction")),
+                        by="pepmodstate_id") %>%
       dplyr::mutate(subobject_id = pepmodstate_id)
     if (nrow(subobjs_df) == 0L) stop("No specific ", model_def$quantobject, "s found for ", modelobj_idcol, "=", model_data$modelobj_id)
     if (verbose) message(nrow(subobjs_df), " specific ", model_def$quantobject, "(s) found")
-    msdata_df <- dplyr::inner_join(dplyr::select(model_data$observations, index_mschannel, index_observation, index_object, object_id),
-                                   dplyr::select(subobjs_df, index_object, subobject_id), by="index_object") %>%
-        dplyr::inner_join(model_data$mschannels, by = c("index_mschannel")) %>%
-        dplyr::left_join(intensities_df, by=c(subobject_id="pepmodstate_id", msexp_idcol))
+    msdata_df <- dplyr::inner_join(dplyr::select(model_data$observations, index_msexperiment, index_observation, index_object, object_id),
+                                   dplyr::select(subobjs_df, index_object, subobject_id, any_of("msfraction")), by="index_object") %>%
+        dplyr::inner_join(model_data$mschannels,
+                          by = intersect(c("index_msexperiment", "msfraction"),
+                                         union(colnames(model_data$observations),
+                                               colnames(subobjs_df)))) %>%
+        dplyr::inner_join(dplyr::select(model_data$msexperiment,
+            any_of(c("index_msexperiment", "msexperiment", "mstag",
+                     specificity_msexp_group_cols, specificity_quantobject_group_cols,
+                     cooccurrence_msexp_group_cols))),
+         by=c("index_msexperiment", "msexperiment")) %>%
+        dplyr::left_join(intensities_df, by=c(subobject_id="pepmodstate_id", "mschannel"))
     if (all(is.na(msdata_df$intensity))) stop("No quantifications for ", nrow(subobjs_df), " specific ",
                                               model_def$quantobject, "(s) of ", modelobj_idcol, "=",
                                               model_data$object_id)
-    msdata_df <- annotate_msdata(msdata_df, model_def, verbose=verbose, ...)
+    msdata_df <- annotate_msdata(msdata_df, model_def, verbose=verbose,
+                                 specificity_msexp_group_cols = specificity_msexp_group_cols,
+                                 specificity_quantobject_group_cols = specificity_quantobject_group_cols,
+                                 cooccurrence_msexp_group_cols = cooccurrence_msexp_group_cols,
+                                 ...)
 
     # arrange pepmodstates by object, by profile cluster and by the number of quantitations
     subobject_group_size <- model_def$subobject_group_size %||% (max_subobjects %/% 2)
@@ -368,9 +386,10 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                        .groups = "drop") %>%
       dplyr::inner_join(
         dplyr::group_by(msdata_df, index_object) %>%
-        dplyr::group_modify(~ cluster_msprofiles(.x, msdata[[paste0(msexp_idcol, "_pepmodstate_stats")]],
-                                                 obj_col='subobject_id', msrun_col=msexp_idcol)) %>%
-          dplyr::ungroup(),
+        dplyr::group_modify(~ cluster_msprofiles(.x, dplyr::rename(msdata[[paste0(mschan, "_pepmodstate_stats")]],
+                                                                   mschannel = !!sym(mschan_idcol)),
+                                                 obj_col='subobject_id', mschannel_col="mschannel")) %>%
+        dplyr::ungroup(),
         by = c("subobject_id", "index_object")) %>%
       dplyr::left_join(dplyr::select(subobjs_df, subobject_id, pepmodstate_id, pepmod_id, is_specific, charge), by = 'subobject_id') %>%
       dplyr::arrange(index_object, profile_cluster, desc(is_specific), desc(n_quants), desc(intensity_med),
@@ -399,8 +418,9 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
   model_data$msdata <- mutate(msdata_df,
                               index_qdata = if_else(is_observed, cumsum(is_observed), NA_integer_),
                               index_mdata = if_else(!is_observed, cumsum(!is_observed), NA_integer_))
-  message(nrow(model_data$msdata), " ", if_else(rlang::has_name(model_data$msdata, 'index_subobservation'),
-                                                'subobservation', 'observation'), '(s) of ',
+  message(nrow(model_data$msdata), " ",
+          if_else(rlang::has_name(model_data$msdata, 'index_subobservation'),
+                  'subobservation', 'observation'), '(s) of ',
           n_distinct(model_data$msdata$index_object), ' ', model_def$modelobject, '(s)',
           if_else(rlang::has_name(model_data$msdata, 'index_subobject'),
                   paste0(' with ', n_distinct(model_data$msdata$index_subobject), ' ',
@@ -423,14 +443,25 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
 #'
 #' @examples
 msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbose,
-                       msexperiment_extra_cols = character(0),
-                       msexperiment_shift_col = "total_shift",
+                       mschannel_extra_cols = character(0),
+                       mschannel_shift_col = paste0("total_", msdata$msentities[['mschannel']], "_shift"),
                        max_subobjects = 20L, ...) {
   checkmate::assert_class(model_def, "msglm_model")
   checkmate::assert_class(msdata, "msglm_data_collection")
-  model_data <- list(model_def = model_def, object_id = object_ids)
+  model_data <- list(model_def = model_def, object_id = object_ids,
+                     msentities = msdata$msentities)
   modelobj <- model_def$modelobject
+  if (modelobj != msdata$msentities[['modelobject']]) {
+    stop("msdata model object (", msdata$msentities[['modelobject']],
+         ") does not match model_def model object (", modelobj, ")")
+  }
   modelobj_idcol <- paste0(modelobj, "_id")
+
+  quantobj <- model_def$quantobject
+  if (quantobj != msdata$msentities[['quantobject']]) {
+    stop("msdata quantitation object (", msdata$msentities[['quantobject']],
+         ") does not match model_def quantitation object (", quantobj, ")")
+  }
 
   if (!rlang::has_name(msdata, paste0(modelobj, "s"))) {
     stop("No model object (", modelobj, ") information found in MS data")
@@ -454,56 +485,101 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
   }
 
   # FIXME support experiments with mschannels
-  if (rlang::has_name(msdata, "mschannels")) {
-    if (verbose) message("Using msdata$mschannels for experimental design")
-    checkmate::assert_tibble(msdata$mschannels)
-    checkmate::assert_names(names(msdata$mschannels), must.include = c("mschannel", "msrun", "mstag", "condition"))
-    mschannels_df <- msdata$mschannels
-  } else if (rlang::has_name(msdata, "msruns")) {
-    if (verbose) message("Using msdata$msruns for experimental design")
-    checkmate::assert_tibble(msdata$msruns)
-    checkmate::assert_names(names(msdata$msruns), must.include = c("msrun", "condition"))
-    mschannels_df <- dplyr::mutate(msdata$msruns, mstag = NA_character_, mschannel = msrun)
-  } else {
-    stop("Cannot find MS experiments information (msdata$mschannels or msdata$msruns)")
-  }
-  checkmate::assert_subset(mschannels_df$condition, model_def$conditions$condition)
-  # add normalization shifts to mschannels
-  if (rlang::has_name(msdata, "mschannel_shifts")) {
-    checkmate::assert_tibble(msdata$mschannel_shifts)
-    checkmate::assert_names(names(msdata$mschannel_shifts), must.include = c("mschannel", msexperiment_shift_col))
-    if (verbose) message("Using msdata$mschannel_shifts$", msexperiment_shift_col, " for MS experiments normalization")
-    checkmate::assert_set_equal(msdata$mschannel_shifts$mschannel, mschannels_df$mschannel)
-    mschannels_df <- dplyr::inner_join(mschannels_df, dplyr::select_at(msdata$mschannel_shifts,
-                                                                       c("msrun", mschannel_shift=msexperiment_shift_col)), by="mschannel")
-    checkmate::assert_numeric(msdata$mschannel_shifts[[msexperiment_shift_col]], any.missing = FALSE, finite=TRUE, lower=-20, upper=20)
-  } else if (rlang::has_name(msdata, "msrun_shifts")) {
-    checkmate::assert_tibble(msdata$msrun_shifts)
-    checkmate::assert_names(names(msdata$msrun_shifts), must.include = c("msrun", msexperiment_shift_col))
-    if (verbose) message("Using msdata$msrun_shifts$", msexperiment_shift_col, " for MS experiments normalization")
-    checkmate::assert_set_equal(msdata$msrun_shifts$msrun, mschannels_df$msrun)
-    checkmate::assert_numeric(msdata$msrun_shifts[[msexperiment_shift_col]], any.missing = FALSE, finite=TRUE, lower=-20, upper=20)
-    mschannels_df <- dplyr::inner_join(mschannels_df,
-                                       dplyr::select_at(msdata$msrun_shifts,
-                                                        c("msrun", mschannel_shift=msexperiment_shift_col)),
-                                       by="msrun")
-  } else {
-    stop("Cannot find MS experiments normalization information (msdata$mschannel_shifts or msdata$msrun_shifts)")
-  }
-  checkmate::assert_set_equal(unique(mschannels_df$condition),
+  mschan <- msdata$msentities[['mschannel']]
+  msexp <- msdata$msentities[['msexperiment']]
+  condition <- msdata$msentities[['condition']]
+  msexp_idcol <- msexp
+  mschan_idcol <- mschan
+  mschan_parent = if_else(msexp == mschan, condition, msexp)
+  msexps_df <- msdata[[paste0(msexp,'s')]]
+  if (verbose) message("Using msdata$", msexp, "s for MS experiments information")
+  checkmate::assert_data_frame(msexps_df)
+  checkmate::assert_names(colnames(msexps_df),
+                          must.include = c(msexp_idcol, condition))
+  msexps_df <- dplyr::rename(msdata[[paste0(msexp,'s')]],
+                             msexperiment=!!sym(msexp_idcol),
+                             condition=!!sym(condition))
+  checkmate::assert_subset(as.character(msexps_df$condition), model_def$conditions$condition)
+  checkmate::assert_set_equal(unique(as.character(msexps_df$condition)),
                               dplyr::filter(model_def$conditions, !is_virtual)$condition)
-  model_data$mschannels <- mschannels_df %>%
+
+  mschans_df <- msdata[[paste0(mschan,"s")]]
+  if (verbose) message("Using msdata$", mschan, "s for MS channels information")
+  checkmate::assert_data_frame(mschans_df)
+  mschan_cols <- c(mschannel = mschan_idcol, mschan_parent,
+                   msrun = msdata$msentities[['msrun']],
+                   msfraction = msdata$msentities[['msfraction']],
+                   mstag = msdata$msentities[['mstag']])
+  names(mschan_cols)[[2]] <- if_else(msexp == mschan, "condition", "msexperiment")
+  checkmate::assert_names(colnames(mschans_df),
+                          must.include = Filter(Negate(is.na), mschan_cols))
+  mschans_df <- dplyr::select_at(mschans_df, Filter(Negate(is.na), mschan_cols))
+  checkmate::assert_character(as.character(mschans_df$mschannel), unique=TRUE, any.missing=FALSE)
+  if (msexp != mschan) {
+    checkmate::assert_set_equal(unique(as.character(mschans_df$msexperiment)),
+                                as.character(msexps_df$msexperiment))
+  }
+  # fill missing columns with NA
+  for (col in setdiff(names(mschan_cols), colnames(mschans_df))) {
+    if (verbose) message("Adding empty ", col, " column to MS channel information")
+    mschans_df[[col]] <- NA_character_
+  }
+  # add normalization shifts to mschannels
+  if (rlang::has_name(msdata, paste0(mschan, "_shifts"))) {
+    mschan_shifts_dfname <- paste0(mschan, "_shifts")
+    mschan_shifts_idcol <- mschan_idcol
+    mschan_shift_refcol <- "mschannel"
+  } else if (rlang::has_name(msdata, paste0(msdata$msentities[['msrun']], "_shifts"))) {
+    mschan_shifts_dfname <- paste0(msdata$msentities[['msrun']], "_shifts")
+    mschan_shifts_idcol <- msdata$msentities[['msrun']]
+    mschan_shift_refcol <- "msrun"
+  } else {
+    stop("Cannot find MS experiments normalization information ",
+         "(msdata$", mschan, "_shifts or msdata$", msdata$msentities[['msrun']], "_shifts)")
+  }
+  if (verbose) message("Using msdata$", mschan_shifts_dfname, "$", mschannel_shift_col, " for MS experiments normalization")
+  mschan_shifts_df <- msdata[[mschan_shifts_dfname]]
+  checkmate::assert_data_frame(mschan_shifts_df, .var.name = paste0("msdata$", mschan_shifts_dfname))
+  checkmate::assert_names(names(mschan_shifts_df), must.include = c(mschan_shifts_idcol, mschannel_shift_col))
+  checkmate::assert_set_equal(as.character(mschan_shifts_df[[mschan_shifts_idcol]]),
+                              as.character(mschans_df[[mschan_shift_refcol]]))
+  mschan_shifts_df = dplyr::select_at(mschan_shifts_df,
+                                      c(mschan_shifts_idcol, mschannel_shift=mschannel_shift_col))
+  checkmate::assert_numeric(mschan_shifts_df$mschannel_shift, any.missing = FALSE, finite=TRUE, lower=-20, upper=20)
+  mschans_df <- dplyr::inner_join(mschans_df, mschan_shifts_df,
+                                  by=rlang::set_names(mschan_shifts_idcol, mschan_shift_refcol))
+  msexps_df <- msexps_df %>%
     dplyr::inner_join(dplyr::select(model_def$conditions, condition, index_condition, any_of("mstag")),
                       by=intersect(c('condition', 'mstag'), colnames(model_def$conditions))) %>%
-    dplyr::arrange(index_condition, msrun, mstag) %>%
-    dplyr::mutate(index_mschannel = row_number(),
-                  index_msrun = as.integer(factor(msrun, levels=unique(msrun))),
-                  index_mscalib = 1L) # FIXME there could be multiple protocols
+    dplyr::arrange(across(c(index_condition, !!sym(msexp_idcol), any_of("mstag"))))
   if (rlang::has_name(msdata, "msexperimentXeffect")) {
     msexp_dim <- names(dimnames(model_def$msexperimentXeffect))
-    checkmate::assert_character(mschannels_df[[msexp_dim]], unique=TRUE)
-    checkmate::assert_set_equal(mschannels_df[[msexp_dim]], rownames(model_def$msexperimentXeffect))
+    if (msexp_dim != msexp_idcol) {
+      stop("MS experiments object (", msexp_idcol, ") does not match",
+           " the name of model_def$msexperimentXeffect rows dimension (",
+           msexp_dim, ")")
+    }
+    msexperiments_order <- rownames(model_def$msexperimentXeffect)
+  } else {
+    msexperiments_order <- NULL
   }
+  # fix the order of msexperiments
+  msexps_df <- ensure_primary_index_column(
+        msexps_df, 'index_msexperiment',
+        id_col="msexperiment", ids_ordered=msexperiments_order,
+        create=TRUE, paste0("msdata$", msdata$msexperiment_object, "s"))
+  # fix the order of mschannels
+  if (msexp != mschan) {
+    mschans_df <- dplyr::inner_join(mschans_df,
+        dplyr::select(msexps_df, msexperiment, index_msexperiment),
+        by='msexperiment') %>%
+      dplyr::arrange(index_msexperiment, msrun, mstag)
+  }
+  model_data$msexperiments <- msexps_df
+  model_data$mschannels <- dplyr::mutate(mschans_df,
+      index_msrun = as.integer(factor(msrun, levels=unique(msrun))),
+      index_mschannel = row_number(),
+      index_mscalib = 1L) # FIXME there could be multiple mscalib per dataset
 
   # all objects X all conditions (including virtual)
   # FIXME rename objectXcondition
@@ -516,13 +592,12 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
 
   # all objects X all MS channels (only those with actual experiments)
   # FIXME rename objectXmschannel
-  model_data$observations <- dplyr::inner_join(model_data$interactions, model_data$mschannels,
+  model_data$observations <- dplyr::inner_join(model_data$interactions, model_data$msexperiments,
                                                by = c("index_condition", "condition")) %>%
-    dplyr::arrange(index_object, index_interaction, index_mschannel) %>%
+    dplyr::arrange(index_object, index_interaction, index_msexperiment) %>%
     dplyr::mutate(index_observation = row_number(),
-                  observation_id = paste0(object_id, '_', mschannel))
+                  observation_id = paste0(object_id, '_', msexperiment))
 
-  quantobj <- model_def$quantobject
   model_data$quantobj_mscalib <- msdata[[paste0(quantobj, "_mscalib")]]
   model_data$quantobj_labu_shift <- msdata[[paste0(quantobj, '_labu_shift')]]
   model_data$quantobj_labu_min <- msdata[[paste0(quantobj, '_labu_min')]]
@@ -531,9 +606,9 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
     warning("msdata$", quantobj, "_mscalib logintensityBase=", logbase,
             " converting mscalib model and log-intensities to log2-based ones")
     model_data$quantobj_mscalib <- convert_logintensityBase(model_data$quantobj_mscalib, new_base=2)
-    k <- log(logintensityBase) / log(2)
-    model_data$quantobj_labu_shift <- model_data$quantobj_labu_shift * k
-    model_data$quantobj_labu_min <- model_data$quantobj_labu_min * k
+    #k <- log(logbase) / log(2)
+    #model_data$quantobj_labu_shift <- model_data$quantobj_labu_shift * k
+    #model_data$quantobj_labu_min <- model_data$quantobj_labu_min * k
   }
 
   model_data <- prepare_msdata(model_data, msdata, max_subobjects=max_subobjects,

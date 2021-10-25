@@ -159,7 +159,7 @@ import_msglm_data <- function(msdata, model_def,
     if (verbose) message("Importing all ", nrow(msexps_df), " ", msexp, "(s)")
   }
   print(setdiff(unique(msexps_df$condition), model_def$conditions$condition))
-  checkmate::assert_subset(msexps_df$condition, model_def$conditions$condition,
+  checkmate::assert_subset(as.character(msexps_df$condition), as.character(model_def$conditions$condition),
                            .var.name = paste0("msdata$", msexps_dfname, "$condition"))
   res[[msexps_dfname]] <- msexps_df
 

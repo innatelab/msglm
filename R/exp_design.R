@@ -17,8 +17,6 @@ effect_factor <- function(effects, factor_name, factor_levels, default = factor_
 #'        per-MS experiment effect specification. Normally it is not required as `conditionXeffect`
 #'        matrix should be enough. It's reserved for the rare cases where the there is a high variability
 #'        in biological responses between the biological replicates.
-#' @param modelobject name of the MS object, which abundance would be modeled by MSGLM
-#' @param quantobject name of the MS object to take the intensity information from
 #' @param verbose
 #'
 #' @return *msglm_model* object
@@ -28,14 +26,9 @@ effect_factor <- function(effects, factor_name, factor_levels, default = factor_
 msglm_model <- function(conditionXeffect,
                         conditions, effects,
                         msexperimentXeffect = NULL,
-                        modelobject = c("protgroup", "protregroup", "ptmgroup"),
-                        quantobject = c("protgroup", "protregroup", "ptmgroup", "pepmodstate"),
                         verbose = FALSE)
 {
-  modelobject <- match.arg(modelobject)
-  quantobject <- match.arg(quantobject)
-  if (verbose) message("Initializing MSGLM model for ", modelobject,
-                       "s using ", quantobject, " intensities")
+  if (verbose) message("Initializing MSGLM model")
 
   checkmate::assert_matrix(conditionXeffect, mode="numeric",
                            any.missing = FALSE, nrows = nrow(conditions),
@@ -122,7 +115,6 @@ msglm_model <- function(conditionXeffect,
   }
 
   model_def <- structure(list(
-    modelobject = modelobject, quantobject = quantobject,
     effects = effects,
     conditions = conditions,
     conditionXeffect = conditionXeffect,

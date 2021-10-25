@@ -61,6 +61,8 @@ mschannel_quantobj_statistics <- function(msdata) {
 #' @param msdata list of various MS-related data frames
 #' @param model_def *msglm_model* object
 #' @param mscalib *mscalib* MS intensities noise model (on "quantobject" leve)
+#' @param modelobject name of the MS object, which abundance would be modeled by MSGLM
+#' @param quantobject name of the MS object to take the intensity information from
 #' @param verbose if TRUE, produces debugging output
 #'
 #' @return *msglm_data_collection* object with the data for all potential model objects
@@ -69,6 +71,8 @@ mschannel_quantobj_statistics <- function(msdata) {
 #' @examples
 import_msglm_data <- function(msdata, model_def,
                               mscalib = get(paste0(model_def$quantobject, "_mscalib")),
+                              modelobject = c("protgroup", "protregroup", "ptmngroup"),
+                              quantobject = modelobject,
                               condition = "condition",
                               msexperiment = NA_character_,
                               mschannel = NA_character_,
@@ -82,10 +86,12 @@ import_msglm_data <- function(msdata, model_def,
   checkmate::assert_class(model_def, "msglm_model")
   checkmate::assert_list(msdata)
   res <- structure(list(), class="msglm_data_collection")
-  modelobj <- model_def$modelobject
-  modelobj_idcol <- paste0(modelobj, "_id")
-  quantobj <- model_def$quantobject
-  quantobj_idcol <- paste0(quantobj, "_id")
+  modelobject <- match.arg(modelobject)
+  modelobj_idcol <- paste0(modelobject, "_id")
+  checkmate::assert_choice(quantobject, c(modelobject, "pepmodstate"))
+  quantobj_idcol <- paste0(quantobject, "_id")
+  if (verbose) message("Importing MS data for ", modelobject,
+                       "s using ", quantobject, " intensities")
 
   # FIXME support experiments with mschannels
   if (!is.na(msexperiment)) {
@@ -157,8 +163,8 @@ import_msglm_data <- function(msdata, model_def,
   }
 
   res$msentities <- c(
-    quantobject = quantobj,
-    modelobject = modelobj,
+    quantobject = quantobject,
+    modelobject = modelobject,
     condition = condition,
     msexperiment = msexp,
     mschannel = mschan,
@@ -205,7 +211,7 @@ import_msglm_data <- function(msdata, model_def,
     mschans_df <- msexps_df
   }
 
-  quantobj_intensities_dfname <- paste0(quantobj, "_intensities")
+  quantobj_intensities_dfname <- paste0(quantobject, "_intensities")
   if (rlang::has_name(msdata, quantobj_intensities_dfname)) {
     if (verbose) message("Importing ", quantobj_intensities_dfname, "...")
     quantobj_intensities_df <- msdata[[quantobj_intensities_dfname]]
@@ -219,18 +225,18 @@ import_msglm_data <- function(msdata, model_def,
   } else {
     stop("msdata$", quantobj_intensities_dfname, " not found")
   }
-  modelobjs_dfname <- paste0(modelobj, "s")
+  modelobjs_dfname <- paste0(modelobject, "s")
   if (rlang::has_name(msdata, modelobjs_dfname)) {
     modelobjs_df <- msdata[[modelobjs_dfname]]
-    if (verbose) message("Found ", nrow(modelobjs_df), " ", modelobj, "(s)")
+    if (verbose) message("Found ", nrow(modelobjs_df), " ", modelobject, "(s)")
   } else {
     stop("msdata$", modelobjs_dfname, " not found")
   }
-  if (quantobj != modelobj) {
-    quantobjs_dfname <- paste0(quantobj, "s")
+  if (quantobject != modelobject) {
+    quantobjs_dfname <- paste0(quantobject, "s")
     if (rlang::has_name(msdata, quantobjs_dfname)) {
       quantobjs_df <- msdata[[quantobjs_dfname]]
-      if (verbose) message("Found ", nrow(quantobjs_df), " ", quantobj, "(s)")
+      if (verbose) message("Found ", nrow(quantobjs_df), " ", quantobject, "(s)")
     } else {
       stop("msdata$", quantobjs_dfname, " not found")
     }
@@ -238,7 +244,7 @@ import_msglm_data <- function(msdata, model_def,
     quantobjs_dfname <- modelobjs_dfname
     quantobjs_df <- modelobjs_df
   }
-  modelobj_idents_dfname <- paste0(modelobj, "_idents")
+  modelobj_idents_dfname <- paste0(modelobject, "_idents")
   if (rlang::has_name(msdata, modelobj_idents_dfname)) {
     if (verbose) message("Importing ", modelobj_idents_dfname, "...")
     modelobj_idents_df <- msdata[[modelobj_idents_dfname]]
@@ -252,16 +258,16 @@ import_msglm_data <- function(msdata, model_def,
   } else {
     warning("msdata$", modelobj_idents_dfname, " not found")
   }
-  if (modelobj == quantobj) {
+  if (modelobject == quantobject) {
     quantobj_intensities_df <- dplyr::filter(quantobj_intensities_df, !is.na(intensity))
     if (verbose) message(nrow(quantobj_intensities_df), " of ", nrow(quantobj_intensities_orig_df),
-                         " ", quantobj, " intensity measurements selected")
-    modelobjs_df <- dplyr::semi_join(modelobjs_df, quantobj_intensities_dfname, by=modelobj_idcol)
+                         " ", quantobject, " intensity measurements selected")
+    modelobjs_df <- dplyr::semi_join(modelobjs_df, quantobj_intensities_df, by=modelobj_idcol)
     if (verbose) message(nrow(modelobjs_df), " of ", nrow(modelobjs_orig_df),
-                         " ", modelobj, "s selected")
-  } else if (quantobj == "pepmodstate") {
-    modelobj2pepmod_dfname = paste0(modelobj, "2pepmod")
-    modelobj2quantobj_dfname = paste0(modelobj, "2", quantobj)
+                         " ", modelobject, "s selected")
+  } else if (quantobject == "pepmodstate") {
+    modelobj2pepmod_dfname = paste0(modelobject, "2pepmod")
+    modelobj2quantobj_dfname = paste0(modelobject, "2", quantobject)
     modelobj2pepmod_df <- msdata[[modelobj2pepmod_dfname]]
     if (!rlang::has_name(msdata, modelobj2quantobj_dfname)) {
       warning("msdata$", modelobj2quantobj_dfname, " not found, trying msdata$", modelobj2pepmod_dfname)
@@ -276,12 +282,10 @@ import_msglm_data <- function(msdata, model_def,
     }
     checkmate::assert_data_frame(modelobj2quantobj_df, .var.name=paste0("msdata$", modelobj2quantobj_dfname))
     checkmate::assert_names(colnames(modelobj2quantobj_df),
-                            must.include=c(paste0(model_def$modelobject, "_id"),
-                                           paste0(model_def$quantobject, "_id"),
-                                           "is_specific"),
+                            must.include=c(modelobj_idcol, quantobj_idcol, "is_specific"),
                             .var.name = paste0("msdata$", modelobj2quantobj_dfname))
-    if (verbose) message("Filtering for specific and quantified ", quantobj,
-                         "s and corresponding ", modelobj, "s...")
+    if (verbose) message("Filtering for specific and quantified ", quantobject,
+                         "s and corresponding ", modelobject, "s...")
     quantobjs_orig_df <- quantobjs_df
     quantobj_intensities_orig_df <- quantobj_intensities_df
     modelobjs_orig_df <- modelobjs_df
@@ -292,18 +296,18 @@ import_msglm_data <- function(msdata, model_def,
     quantobj_intensities_df <- dplyr::filter(quantobj_intensities_df, !is.na(intensity)) %>%
         dplyr::semi_join(modelobj2quantobj_df, by=quantobj_idcol)
     if (verbose) message("  * ", nrow(quantobj_intensities_df), " of ", nrow(quantobj_intensities_orig_df),
-                         " specific ", quantobj, " intensity measurements selected")
+                         " specific ", quantobject, " intensity measurements selected")
     quantobjs_df <- dplyr::semi_join(quantobjs_df, quantobj_intensities_df, by=quantobj_idcol)
     if (verbose) message("  * ", nrow(quantobjs_df), " of ", nrow(quantobjs_orig_df),
-                         " specific ", quantobj, "s selected")
+                         " specific ", quantobject, "s selected")
     modelobj2quantobj_df <- dplyr::semi_join(modelobj2quantobj_df, quantobjs_df, by=quantobj_idcol)
     modelobjs_df <- dplyr::semi_join(modelobjs_df, modelobj2quantobj_df, by=modelobj_idcol)
     if (verbose) message("  * ", nrow(modelobjs_df), " of ", nrow(modelobjs_orig_df),
-                         " ", modelobj, "s have specific ", quantobj, " quantitations")
+                         " ", modelobject, "s have specific ", quantobject, " quantitations")
     res[[modelobj2quantobj_dfname]] <- modelobj2quantobj_df
     res[[quantobjs_dfname]] <- quantobjs_df
 
-    quantobj_idents_dfname <- paste0(quantobj, "_idents")
+    quantobj_idents_dfname <- paste0(quantobject, "_idents")
     if (rlang::has_name(msdata, quantobj_idents_dfname)) {
       if (verbose) message("Importing ", quantobj_idents_dfname, "...")
       quantobj_idents_df <- msdata[[quantobj_idents_dfname]]
@@ -320,21 +324,21 @@ import_msglm_data <- function(msdata, model_def,
   }
   res[[modelobjs_dfname]] <- modelobjs_df
   res$modelobjects <- dplyr::mutate(modelobjs_df,
-                                    object_id = !!sym(paste0(modelobj, "_id")),
-                                    object_label = !!sym(paste0(modelobj, "_label")),
+                                    object_id = !!sym(modelobj_idcol),
+                                    object_label = !!sym(paste0(modelobject, "_label")),
                                     chunk = row_number())
   res[[quantobj_intensities_dfname]] <- quantobj_intensities_df
-  if (verbose) message("Calculating MS channel (", mschan, ") ", quantobj, " statistics...")
-  res[[paste0(mschan, "_", quantobj, "_stats")]] <- mschannel_quantobj_statistics(res)
+  if (verbose) message("Calculating MS channel (", mschan, ") ", quantobject, " statistics...")
+  res[[paste0(mschan, "_", quantobject, "_stats")]] <- mschannel_quantobj_statistics(res)
 
   checkmate::assert_class(mscalib, "mscalib")
-  res[[paste0(quantobj, "_mscalib")]] <- mscalib
+  res[[paste0(quantobject, "_mscalib")]] <- mscalib
 
-  quantobj_labu_shift_name <- paste0(quantobj, "_labu_shift")
+  quantobj_labu_shift_name <- paste0(quantobject, "_labu_shift")
   res[[quantobj_labu_shift_name]] <- 0.95*log2(median(quantobj_intensities_df$intensity, na.rm=TRUE))
   if (verbose) message(quantobj_labu_shift_name, "=", res[[quantobj_labu_shift_name]])
 
-  quantobj_labu_min_name <- paste0(quantobj, "_labu_min")
+  quantobj_labu_min_name <- paste0(quantobject, "_labu_min")
   res[[quantobj_labu_min_name]] <- quantile(quantobj_intensities_df$intensity, min_intensity_quantile, na.rm=TRUE) %>% log2() -
                                             res[[quantobj_labu_shift_name]] + min_intensity_offset
   if (verbose) message(quantobj_labu_min_name, "=", res[[quantobj_labu_min_name]])

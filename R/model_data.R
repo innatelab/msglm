@@ -325,7 +325,11 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                            cooccurrence_msexp_group_cols = 'msrun',
                            ...) {
   model_def <- model_data$model_def
-  intensities_dfname <- paste0(model_def$quantobject, "_intensities")
+  modelobj <- msdata$msentities[['modelobject']]
+  modelobj_idcol <- sym(paste0(modelobj, "_id"))
+  quantobj <- msdata$msentities[['quantobject']]
+  quantobj_idcol <- sym(paste0(quantobj, "_id"))
+  intensities_dfname <- paste0(quantobj, "_intensities")
   if (!rlang::has_name(msdata, intensities_dfname)) {
     stop("No intensities (", intensities_dfname, " data frame) found in msdata")
   }
@@ -334,19 +338,17 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
   msexp_idcol <- msexp
   mschan <- msdata$msentities[['mschannel']]
   mschan_idcol <- mschan
-  modelobj_idcol <- paste0(model_def$modelobject, "_id")
-  quantobj_idcol <- paste0(model_def$quantobject, "_id")
   intensities_df <- dplyr::select_at(intensities_df, c(quantobj_idcol, mschannel=mschan_idcol, "intensity"))
 
-  if (model_def$modelobject == model_def$quantobject) {
+  if (modelobj == quantobj) {
     # modelobj is quanted directly
     msdata_df <- dplyr::left_join(model_data$observations,
                                   intensities_df, by = c(quantobj_idcol, "msexperiment")) %>%
         annotate_msdata(model_def) %>%
         dplyr::arrange(index_observation)
-  } else if (model_def$quantobject == "pepmodstate") {
+  } else if (quantobj == "pepmodstate") {
     # quant specific pepmodstates of modelobj
-    modelobj2pepmodstate_df <- msdata[[paste0(model_def$modelobj, "2pepmodstate")]]
+    modelobj2pepmodstate_df <- msdata[[paste0(modelobj, "2pepmodstate")]]
     subobjs_df <- dplyr::inner_join(modelobj2pepmodstate_df,
                                     dplyr::select(model_data$objects, !!sym(modelobj_idcol), object_id, index_object),
                                     by=modelobj_idcol) %>%
@@ -369,7 +371,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
          by=c("index_msexperiment", "msexperiment")) %>%
         dplyr::left_join(intensities_df, by=c(subobject_id="pepmodstate_id", "mschannel"))
     if (all(is.na(msdata_df$intensity))) stop("No quantifications for ", nrow(subobjs_df), " specific ",
-                                              model_def$quantobject, "(s) of ", modelobj_idcol, "=",
+                                              quantobj, "(s) of ", modelobj_idcol, "=",
                                               model_data$object_id)
     msdata_df <- annotate_msdata(msdata_df, model_def, verbose=verbose,
                                  specificity_msexp_group_cols = specificity_msexp_group_cols,
@@ -411,8 +413,8 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
       dplyr::arrange(index_object, index_observation, index_subobject) %>%
       dplyr::mutate(index_subobservation = row_number())
   } else {
-     stop("Unsupported combination of modelobject=", model_def$modelobject,
-         " and quantobject=", model_def$quantobject)
+     stop("Unsupported combination of modelobject=", modelobj,
+         " and quantobject=", quantobj)
   }
   # separately index quantifications and missing data
   model_data$msdata <- mutate(msdata_df,
@@ -421,10 +423,10 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
   message(nrow(model_data$msdata), " ",
           if_else(rlang::has_name(model_data$msdata, 'index_subobservation'),
                   'subobservation', 'observation'), '(s) of ',
-          n_distinct(model_data$msdata$index_object), ' ', model_def$modelobject, '(s)',
+          n_distinct(model_data$msdata$index_object), ' ', modelobj, '(s)',
           if_else(rlang::has_name(model_data$msdata, 'index_subobject'),
                   paste0(' with ', n_distinct(model_data$msdata$index_subobject), ' ',
-                         model_def$quantobject, '(s)'), ''), ': ',
+                         quantobj, '(s)'), ''), ': ',
           sum(model_data$msdata$is_observed), " quantitation(s) (",
           sum(model_data$msdata$is_reliable), " reliable), ",
           sum(!model_data$msdata$is_observed), " missed")
@@ -450,18 +452,10 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
   checkmate::assert_class(msdata, "msglm_data_collection")
   model_data <- list(model_def = model_def, object_id = object_ids,
                      msentities = msdata$msentities)
-  modelobj <- model_def$modelobject
-  if (modelobj != msdata$msentities[['modelobject']]) {
-    stop("msdata model object (", msdata$msentities[['modelobject']],
-         ") does not match model_def model object (", modelobj, ")")
-  }
-  modelobj_idcol <- paste0(modelobj, "_id")
+  modelobj <- msdata$msentities[['modelobject']]
+  modelobj_idcol <- sym(paste0(modelobj, "_id"))
 
-  quantobj <- model_def$quantobject
-  if (quantobj != msdata$msentities[['quantobject']]) {
-    stop("msdata quantitation object (", msdata$msentities[['quantobject']],
-         ") does not match model_def quantitation object (", quantobj, ")")
-  }
+  quantobj <- msdata$msentities[['quantobject']]
 
   if (!rlang::has_name(msdata, paste0(modelobj, "s"))) {
     stop("No model object (", modelobj, ") information found in MS data")

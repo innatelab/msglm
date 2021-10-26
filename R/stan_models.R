@@ -81,12 +81,12 @@ to_standata.msglm_model_data <- function(model_data,
   model_def <- model_data$model_def
   if (verbose) message('Converting MSGLM model data to Stan-readable format...')
   ensure_primary_index_column(model_def$effects, 'index_effect')
-  ensure_primary_index_column(model_data$msexperiments, 'index_msexperiment')
+  ensure_primary_index_column(model_data$msprobes, 'index_msprobe')
   ensure_primary_index_column(model_data$mschannels, 'index_mschannel')
 
   is_glmm <- rlang::inherits_all(model_def, "msglmm_model")
   xaction_ix_col <- if (is_glmm) "index_superaction" else "index_interaction"
-  obs_df <- dplyr::select(model_data$observations, index_observation, index_msexperiment,
+  obs_df <- dplyr::select(model_data$observations, index_observation, index_msprobe,
                           index_object, !!xaction_ix_col)
   if (any(obs_df$index_observation != seq_len(nrow(obs_df)))) {
     stop("model_data$msdata not ordered by observations / have missing observations")
@@ -102,10 +102,10 @@ to_standata.msglm_model_data <- function(model_data,
     Nconditions = nrow(model_def$conditions),
     Nobjects = nrow(model_data$objects),
 
-    Nexperiments = nrow(model_data$msexperiments),
+    Nprobes = nrow(model_data$msprobes),
 
     Nobservations = nrow(obs_df),
-    observation2experiment = as.array(obs_df$index_msexperiment),
+    observation2probe = as.array(obs_df$index_msprobe),
 
     Nmschannels = n_distinct(model_data$mschannels$index_mschannel),
     mschannel_shift = as.array(model_data$mschannels$mschannel_shift),

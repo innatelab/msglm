@@ -14,15 +14,15 @@ data {
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
 
-  int<lower=1> Nexperiments;    // number of experiments
+  int<lower=1> Nprobes;         // number of MS probes (MS experiment X MS tag)
 
   int<lower=0> Nmsprotocols;    // number of MS protocols used
-  int<lower=Nexperiments> Nmschannels;     // number of mschannels
+  int<lower=Nprobes> Nmschannels;     // number of mschannels (MS probe X MS fraction)
   vector[Nmschannels] mschannel_shift;
   int<lower=1,upper=Nmsprotocols> mschannel2msproto[Nmsprotocols > 0 ? Nmschannels : 0]; // TODO support by the model
 
   int<lower=0> Nobservations;   // number of observations of interactions (objectXmschannel pairs for all iactions and mschannels of its condition)
-  int<lower=1,upper=Nexperiments> observation2experiment[Nobservations];
+  int<lower=1,upper=Nprobes> observation2probe[Nobservations];
   int<lower=1,upper=Niactions> observation2iaction[Nobservations];
 
   int<lower=0> Nsubobservations;// number of subobject observations (observation X subobject)

@@ -1,6 +1,6 @@
 # FIXME
 #' @export
-mschannel_quantobj_statistics <- function(msdata) {
+mschannel_quantobj_statistics <- function(msdata, verbose=FALSE) {
   checkmate::assert_class(msdata, "msglm_data_collection")
   quantobj <- msdata$msentities[['quantobject']]
   mschan <- msdata$msentities[['mschannel']]
@@ -16,23 +16,30 @@ mschannel_quantobj_statistics <- function(msdata) {
     stop("msdata contains no `", quantobj_intensities_dfname, "` data")
   }
   quantobj_intensities_df <- msdata[[quantobj_intensities_dfname]]
-  groupat <- c(msrun=msrun)
-  if (!is.na(mstag)) {
-    groupat[['mstag']] <- mstag
+  if (is.na(mschan)) {
+    stop("MS channel column not specified")
+  } else if (!rlang::has_name(quantobj_intensities_df, mschan)) {
+    stop("MS channel column msdata$", quantobj_intensities_dfname, "$", mschan, " not found")
   }
+  groupat <- c(mschan)
+  if (!is.na(mstag) && rlang::has_name(quantobj_intensities_df, mstag)) {
+    groupat <- append(groupat, mstag)
+  }
+  if (!is.na(msrun) && rlang::has_name(quantobj_intensities_df, msrun)) {
+    groupat <- append(groupat, msrun)
+  }
+  groupat <- unique(groupat)
+
   quantobj_intensities_df <- dplyr::select_at(quantobj_intensities_df,
-      append(groupat, c(quantobj_id=quantobj_idcol, "intensity"))) %>%
+      append(groupat, c(quantobj_idcol, "intensity"))) %>%
+    dplyr::rename(quantobj_id = !!sym(quantobj_idcol)) %>%
     dplyr::filter(!is.na(quantobj_id))
-  if (!is.na(mstag)) {
-    groupat[['mschannel']] <- mschan
-    mschans_df <- dplyr::select_at(msdata[[paste0(mschan,"s")]], groupat) %>% dplyr::distinct()
-    quantobj_intensities_df <- dplyr::inner_join(quantobj_intensities_df, mschans_df, by = c("msrun", "mstag"))
-  }
-  expandat <- append(names(groupat), "quantobj_id")
+
+  expandat <- append(groupat, "quantobj_id")
   intensity_stats_df <- tidyr::expand(quantobj_intensities_df, !!!syms(expandat)) %>%
     dplyr::left_join(quantobj_intensities_df, by=expandat) %>%
     #dplyr::group_by(quantobj_id, condition) %>% dplyr::filter(any(!is.na(intensity))) %>%
-    dplyr::group_by_at(names(groupat)) %>%
+    dplyr::group_by_at(groupat) %>%
     summarize(log2_intensity.mean = mean(log2(intensity[!is.na(intensity)])),
               log2_intensity.median = median(log2(intensity[!is.na(intensity)])),
               log2_intensity.sd = sd(log2(intensity[!is.na(intensity)])),
@@ -41,19 +48,30 @@ mschannel_quantobj_statistics <- function(msdata) {
 
   quantobj_idents_dfname <- str_c(quantobj, "_idents")
   if (!rlang::has_name(msdata, quantobj_idents_dfname)) {
-    warning("msdata contains no `", quantobj_idents_dfname, "` data, using intensities instead")
+    if (verbose) warning("msdata contains no `", quantobj_idents_dfname,
+                         "` data, using intensities instead")
     quantobj_idents_dfname <- quantobj_intensities_dfname
   }
-  quantobj_idents_df <- dplyr::select_at(msdata[[quantobj_idents_dfname]],
-    c(quantobj_id=quantobj_idcol, msrun=msrun, "ident_type"))
-  ident_stats_df <- dplyr::mutate(quantobj_idents_df,
-      is_matching = ident_type %in% c("By matching", "MULTI-MATCH", "MULTI-MATCH-MSMS"),
-      is_msms = ident_type %in% c("By MS/MS", "MULTI-MSMS", "ISO-MSMS", "MSMS", "MULTI-SECPEP")) %>%
-    dplyr::group_by(msrun) %>%
-    summarize(n_matching = n_distinct(quantobj_id[is_matching], na.rm = TRUE),
-              n_msms = n_distinct(quantobj_id[is_msms], na.rm = TRUE),
-              .group = "drop")
-  return (dplyr::left_join(intensity_stats_df, ident_stats_df, by="msrun"))
+  quantobj_idents_df <- msdata[[quantobj_idents_dfname]]
+  if (!rlang::has_name(quantobj_idents_df, "ident_type")) {
+    if (verbose) warning("msdata$", quantobj_idents_dfname,
+                         " has no ident_type column, skipping identification statistics")
+  } else if (!rlang::has_name(quantobj_idents_df, msrun)) {
+    if (verbose) warning("msdata$", quantobj_idents_dfname,
+                         " has no `", msrun, "` MS run column, skipping identification statistics")
+  } else {
+    quantobj_idents_df <- dplyr::select_at(quantobj_idents_df,
+        c(quantobj_id=quantobj_idcol, msrun, "ident_type"))
+    ident_stats_df <- dplyr::mutate(quantobj_idents_df,
+        is_matching = ident_type %in% c("By matching", "MULTI-MATCH", "MULTI-MATCH-MSMS"),
+        is_msms = ident_type %in% c("By MS/MS", "MULTI-MSMS", "ISO-MSMS", "MSMS", "MULTI-SECPEP")) %>%
+      dplyr::group_by(!!sym(msrun)) %>%
+      summarize(n_matching = n_distinct(quantobj_id[is_matching], na.rm = TRUE),
+                n_msms = n_distinct(quantobj_id[is_msms], na.rm = TRUE),
+                .group = "drop")
+    intensity_stats_df <- dplyr::left_join(intensity_stats_df, ident_stats_df, by=msrun)
+  }
+  return (intensity_stats_df)
 }
 
 #' Collect MS data that would be used by MSGLM models.
@@ -69,21 +87,21 @@ mschannel_quantobj_statistics <- function(msdata) {
 #' @export
 #'
 #' @examples
-import_msglm_data <- function(msdata, model_def,
-                              mscalib = get(paste0(model_def$quantobject, "_mscalib")),
+import_msglm_data <- function(msdata, model_def = NULL,
+                              mscalib = get(paste0(quantobject, "_mscalib")),
                               modelobject = c("protgroup", "protregroup", "ptmngroup"),
                               quantobject = modelobject,
-                              condition = "condition",
+                              condition = NA_character_,
                               msexperiment = NA_character_,
+                              msprobe = NA_character_,
                               mschannel = NA_character_,
                               msrun = NA_character_,
                               msfraction = NA_character_,
                               mstag = NA_character_,
                               min_intensity_quantile = 0.001,
                               min_intensity_offset = -5,
-                              verbose=model_def$verbose)
+                              verbose = FALSE)
 {
-  checkmate::assert_class(model_def, "msglm_model")
   checkmate::assert_list(msdata)
   res <- structure(list(), class="msglm_data_collection")
   modelobject <- match.arg(modelobject)
@@ -93,138 +111,6 @@ import_msglm_data <- function(msdata, model_def,
   if (verbose) message("Importing MS data for ", modelobject,
                        "s using ", quantobject, " intensities")
 
-  # FIXME support experiments with mschannels
-  if (!is.na(msexperiment)) {
-    msexp <- msexperiment
-  } else if (rlang::has_name(msdata, "msexperiments")) {
-    msexp <- "msexperiment"
-  } else {
-    msexp <- NA_character_
-  }
-  if (!is.na(msexp)) {
-    msexps_dfname <- paste0(msexp, "s")
-    if (verbose) message("Using msdata$", msexps_dfname, " as MS experiments source")
-    msexps_df <- msdata[[msexps_dfname]]
-    checkmate::assert_data_frame(msexps_df, .var.name = paste0("msdata$", msexps_dfname))
-    checkmate::assert_names(names(msexps_df),
-                            must.include = c(msexp, condition))
-    checkmate::assert_character(as.character(msexps_df[[msexp]]), unique=TRUE, any.missing = FALSE,
-                                .var.name = paste0("msdata$", msexps_dfname, "$", msexp))
-    mschan_parent <- msexp
-  } else {
-    if (verbose) message("No explicit MS experiments frame specified")
-    msexps_df <- NULL
-    msexp <- NA_character_
-    mschan_parent <- condition
-  }
-
-  mschan_required_cols <- NULL
-  if (!is.na(mschannel)) {
-    mschan <- mschannel
-    if (!is.na(mstag)) {
-      if (is.na(msrun)) stop("Specifying mstag column (", mstag, ") also requires specifying msrun column")
-      mschan_required_cols <- c(mschan, msrun, mstag, mschan_parent)
-    } else {
-      if (!is.na(msrun)) stop("Specifying mschannel (", mschan, ") and msrun (", msrun, ") column also requires specifying mstag column")
-    }
-  } else if (!is.na(msrun)) {
-    if (!is.na(mstag)) stop("For data with mstag column (", mstag, "), mschannel column has to be specified")
-    mschan <- msrun
-  } else if (rlang::has_name(msdata, "mschannels")) {
-    mschan <- "mschannel"
-    mstag <- mstag %||% "mstag"
-    msrun <- msrun %||% "msrun"
-    mschan_required_cols <- c(mschan, mstag, msrun, mschan_parent)
-  } else if (rlang::has_name(msdata, "msruns")) {
-    if (!is.na(mstag)) stop("MS tag column (", mstag, ") specified, but no tagged MS channels found")
-    mschan <- "msrun"
-    msrun <- "msrun"
-  } else {
-    stop("Cannot find MS channels information (msdata$mschannels or msdata$msruns)")
-  }
-  mschan_required_cols <- mschan_required_cols %||% c(mschan, mschan_parent)
-  if (verbose) message("Using msdata$", mschan, "s as MS channels source")
-  mschans_dfname <- paste0(mschan, "s")
-  mschans_df <- msdata[[mschans_dfname]]
-  checkmate::assert_data_frame(mschans_df, .var.name = paste0("msdata$", mschans_dfname))
-  if (!is.na(msfraction)) {
-    msfrac <- mfraction
-  } else if (rlang::has_name(mschans_df, "msfraction")) {
-    msfrac <- "msfraction"
-    if (verbose) message("MS fraction column (", msfrac, ") detected")
-  }
-  if (!is.na(msfrac)) {
-    mschan_required_cols <- c(mschan_required_cols, msfrac)
-  }
-  checkmate::assert_names(names(mschans_df), must.include = mschan_required_cols)
-  if (is.na(msexp)) {
-    msexp <- mschan
-    if (verbose) message("Using msdata$", msexp, "s as MS experiments source")
-  }
-
-  res$msentities <- c(
-    quantobject = quantobject,
-    modelobject = modelobject,
-    condition = condition,
-    msexperiment = msexp,
-    mschannel = mschan,
-    msrun = msrun,
-    mstag = mstag,
-    msfraction = msfrac)
-
-  msexp_idcol <- msexp
-  mschan_idcol <- mschan
-  msrun_idcol <- msrun
-  if (rlang::has_name(msexps_df, "is_used")) {
-    checkmate::assert_logical(msexps_df$is_used, any.missing=FALSE,
-                              .var.name=paste0("msdata$", msexp, "s$is_used"))
-    if (verbose) message("Importing ", sum(msexps_df$is_used), " used ", msexp,
-                         "(s) of ", nrow(msexps_df))
-    msexps_df <- dplyr::filter(msexps_df, is_used)
-  } else {
-    if (verbose) message("Importing all ", nrow(msexps_df), " MS experiment(s)")
-  }
-  virtual_conditions <- setdiff(unique(msexps_df[[condition]]), model_def$conditions$condition)
-  if (length(virtual_conditions) > 0) {
-    warning(length(virtual_conditions), ' condition(s) not covered by MS experiments')
-  }
-  checkmate::assert_subset(as.character(msexps_df[[condition]]), as.character(model_def$conditions$condition),
-                           .var.name = paste0("msdata$", msexps_dfname, "$", condition))
-  res[[msexps_dfname]] <- msexps_df
-  if (mschan != msexp) {
-    mschans_df <- dplyr::semi_join(msdata[[mschans_dfname]],
-                                  dplyr::select(msexps_df, !!sym(msexp_idcol)),
-                                  by=msexp_idcol)
-    if (rlang::has_name(mschans_df, "is_used")) {
-      checkmate::assert_logical(mschans_df$is_used, any.missing=FALSE,
-                                .var.name=paste0("msdata$", mschan, "s$is_used"))
-      if (verbose) message("Importing ", sum(mschans_df$is_used), " used ", mschan,
-                          "(s) of ", nrow(mschans_df))
-      mschans_df <- dplyr::filter(mschans_df, is_used)
-    } else {
-      if (verbose) message("Importing all ", nrow(mschans_df), " MS channel(s)")
-    }
-    res[[mschans_dfname]] <- mschans_df
-    checkmate::assert_set_equal(mschans_df[[msexp_idcol]], msexps_df[[msexp_idcol]],
-                                .var.name = paste0("msdata$", mschans_dfname, "$", msexp_idcol))
-  } else {
-    mschans_df <- msexps_df
-  }
-
-  quantobj_intensities_dfname <- paste0(quantobject, "_intensities")
-  if (rlang::has_name(msdata, quantobj_intensities_dfname)) {
-    if (verbose) message("Importing ", quantobj_intensities_dfname, "...")
-    quantobj_intensities_df <- msdata[[quantobj_intensities_dfname]]
-    checkmate::assert_data_frame(quantobj_intensities_df)
-    checkmate::assert_names(colnames(quantobj_intensities_df),
-                            must.include = c(mschan_idcol, quantobj_idcol, "intensity"),
-                            .var.name = paste0("msdata$", quantobj_intensities_dfname))
-    quantobj_intensities_df <- dplyr::semi_join(quantobj_intensities_df,
-                                                dplyr::select(mschans_df, !!sym(mschan_idcol)),
-                                                by=mschan_idcol)
-  } else {
-    stop("msdata$", quantobj_intensities_dfname, " not found")
-  }
   modelobjs_dfname <- paste0(modelobject, "s")
   if (rlang::has_name(msdata, modelobjs_dfname)) {
     modelobjs_df <- msdata[[modelobjs_dfname]]
@@ -244,6 +130,239 @@ import_msglm_data <- function(msdata, model_def,
     quantobjs_dfname <- modelobjs_dfname
     quantobjs_df <- modelobjs_df
   }
+
+  # autodetect/check msglm entities
+  if (is.na(condition)) {
+    condition <- "condition"
+    if (verbose) message("No condition column specified, defaulting to condition=", condition)
+  }
+
+  msrun_def <- dplyr::coalesce(msrun, "msrun")
+  msruns_def_dfname <- paste0(msrun_def, "s")
+  if (!is.na(msexperiment)) {
+    msexp <- msexperiment
+  } else if (rlang::has_name(msdata, "msexperiments")) {
+    if (verbose) message("Detected msdata$msexperiments frame")
+    msexp <- "msexperiment"
+  } else if (is.na(msfraction) && rlang::has_name(msdata, msruns_def_dfname)
+         && !rlang::has_name(msdata[[msruns_def_dfname]], "msfraction")) {
+    if (verbose) message("Detected msdata$", msruns_def_dfname,
+                         ", no msfractions. Setting msexperiment=", msrun_def)
+    msexp <- msrun_def
+  } else {
+    msexp <- NA_character_
+  }
+
+  mschan_def <- dplyr::coalesce(mschannel, "mschannel")
+  mschans_def_dfname <- paste0(mschan_def, "s")
+  if (!is.na(msprobe)) {
+    msprb <- msprobe
+  } else if (rlang::has_name(msdata, "msprobes")) {
+    if (verbose) message("Detected msdata$msprobes frame")
+    msprb <- "msprobe"
+  } else if (is.na(mstag) && !is.na(msexp) && rlang::has_name(msdata, paste0(msexp, "s"))) {
+    if (verbose) message("No msprobe and mstag columns specified, defaulting to msprobe=", msexp)
+    msprb <- msexp
+  } else {
+    msprb <- NA_character_
+  }
+  if (!is.na(msprb) && rlang::has_name(msdata, paste0(msprb, "s"))) {
+    msprbs_dfname <- paste0(msprb, "s")
+    if (verbose) message("Using msdata$", msprbs_dfname, " as MS probes source")
+    msprbs_df <- msdata[[msprbs_dfname]]
+  } else {
+    if (rlang::has_name(msdata, mschans_def_dfname)) {
+      msprb_src_dfname <- mschans_def_dfname
+      msprb_src <- mschan_def
+    } else if (rlang::has_name(msdata, msruns_def_dfname)) {
+      msprb_src_dfname <- msruns_def_dfname
+      msprb_src <- msrun_def
+    } else {
+      stop("Cannot autodetect MS probes/experiments/channels/runs frame. ",
+           "Make sure msprobe/msexperiment/mschannel/msrun= parameter set correctly and corresponding frames exist.")
+    }
+    msfrac <- dplyr::coalesce(msfraction, "msfraction")
+    if (rlang::has_name(msdata[[msprb_src_dfname]], msfrac)) {
+      if (verbose) message("Generating MS probes from msdata$", msprb_src_dfname,
+                           " by removing MS fractions")
+      msprbs_src_df <- msdata[[msprb_src_dfname]]
+      checkmate::assert_data_frame(msprbs_src_df, .var.name = paste0("msdata$", msprb_src_dfname))
+      if (is.na(msprb) && rlang::has_name(msprbs_src_df, "msprobe")) {
+        msprb <- "msprobe"
+      } else if (is.na(msprb) && !is.na(msexp) && is.na(mstag) && rlang::has_name(msprbs_src_df, msexp)) {
+        msprb <- msexp
+      } else if (is.na(msprb) && is.na(msexp) && is.na(mstag) && rlang::has_name(msprbs_src_df, "msexperiment")) {
+        msprb <- "msexperiment"
+      } else if (is.na(msprb)) {
+        msprb <- if_else(is.na(mstag) && msprb_src_dfname == msruns_def_dfname, "msexperiment", "msprobe")
+      }
+      if (!rlang::has_name(msprbs_src_df, msprb)) {
+        # generate msprobe column in the source data frame
+        msprb_key_cols <- setdiff(colnames(msprbs_src_df), c(msprb_src, msfrac))
+        msprbs_df <- dplyr::group_by_at(msprbs_src_df, msprb_key_cols) %>%
+          dplyr::filter(row_number() == 1L) %>% dplyr::ungroup() %>%
+          dplyr::mutate(!!sym(msprb) := !!sym(msprb_src))
+        # update the source frame with msprb column
+        msdata[[msprb_src_dfname]] <- dplyr::inner_join(msdata[[msprb_src_dfname]],
+            dplyr::select_at(msprbs_df, c(msprb, msprb_key_cols)), by=msprb_key_cols)
+      } else {
+        msprbs_df <- msprbs_src_df
+      }
+      msprbs_df <- dplyr::select(msprbs_df, -!!sym(msprb_src), -!!sym(msfrac)) %>% dplyr::distinct()
+    } else {
+      if (is.na(msprb)) {
+        if (verbose) message("Detected msdata$", msprb_src_dfname, ", no msfractions. Setting msprobe=", msprb_src_def)
+        msprb <- msprb_src
+      }
+      msprbs_df <- msdata[[msprb_src_dfname]]
+    }
+    msprbs_dfname <- paste0(msprb, "s")
+  }
+
+  checkmate::assert_data_frame(msprbs_df, .var.name = paste0("msdata$", msprbs_dfname))
+  msprb_req_cols <- c(condition, msprb)
+  if (!is.na(msexp)) msprb_req_cols <- unique(c(msprb_req_cols, msexp))
+  if (!is.na(mstag)) msprb_req_cols <- c(msprb_req_cols, mstag)
+  checkmate::assert_names(names(msprbs_df), must.include = msprb_req_cols)
+  if (is.na(mstag)) {
+    if (rlang::has_name(msprbs_df, "mstag")) {
+      if (!is.na(msexp) && (msexp == msprb)) {
+        stop("msexperiment=msprobe=", msprb, " so assuming unlabeled MS data, but msdata$",
+            msprbs_dfname, "$", mstag, " column detected. Check the correctness of your MS entities")
+      } else {
+        mstag <- "mstag"
+        if (verbose) message("Detected msdata$", msprbs_dfname, "$", mstag, " column, assuming MS tagged data")
+      }
+    } else if (is.na(msexp)) {
+      if (verbose) message("No MS experiment column specified, assuming msexperiment=", msprb)
+      msexp <- msprb
+    }
+  }
+  if (is.na(msfraction) && rlang::has_name(msprbs_df, "msfraction")) {
+    warning("msdata$", msprbs_dfname, " contains msfraction column. Check the correctness of your MS entities")
+  }
+  checkmate::assert_character(as.character(msprbs_df[[msprb]]), unique=TRUE, any.missing = FALSE,
+                              .var.name = paste0("msdata$", msprbs_dfname, "$", msprb))
+
+  if (msprb == mschan_def) {
+    mschan = msprb
+    mschans_dfname <- msprbs_dfname
+  } else if (rlang::has_name(msdata, mschans_def_dfname)) {
+    mschan <- mschan_def
+    mschans_dfname <- mschans_def_dfname
+  } else if (is.na(mstag) && rlang::has_name(msdata, msruns_def_dfname)) {
+    mschan <- msrun_def
+    mschans_dfname <- msruns_def_dfname
+  } else if (!is.na(msfraction)) {
+    stop("MS entities declared to contain fractions (", msfraction,
+          " column), but no MS channels/MS runs frame found")
+  } else if (is.na(mschannel) && is.na(msfraction) && rlang::has_name(msprbs_df, "raw_file")) {
+    mschan <- msprb
+    mschans_dfname <- msprbs_dfname
+  } else {
+    stop("Cannot autodetect MS channels data, specify mschannel= argument")
+  }
+  checkmate::assert_character(mschans_dfname, any.missing = FALSE)
+  if (verbose) message(if_else(mschans_dfname == msprbs_dfname, "Reusing", "Using"),
+                       " msdata$", mschans_dfname, " as MS channels source")
+  mschans_df <- msdata[[mschans_dfname]]
+  checkmate::assert_data_frame(mschans_df, .var.name = paste0("msdata$", mschans_dfname))
+
+  mschan_required_cols <- c(msprb, mschan)
+  if (!is.na(msfraction)) {
+    if (mschan == msprb) stop("msfraction=", msfraction, " but msprobe=mschannel=", msprb)
+    msfrac <- msfaction
+  } else if (rlang::has_name(mschans_df, "msfraction")) {
+    if (mschan == msprb) stop("MS fraction column (msfraction) detected, but msprobe=mschannel=", msprb)
+    msfrac <- "msfraction"
+  } else {
+    msfrac <- NA_character_
+  }
+  if (!is.na(msfrac)) {
+    mschan_required_cols <- c(mschan_required_cols, msfrac)
+  }
+
+  if (!is.na(mstag)) {
+    if (!is.na(msrun) && (msrun == mschan)) {
+      stop("Specifying mstag column (", mstag,
+           ") also requires that MS channel (", mschan, ") and MS run (",
+           msrun, ") columns are different")
+    }
+  } else if (is.na(msrun)) {
+    if (verbose) message("Assuming msrun=mschannel=", mschan)
+    msrun <- mschan
+  }
+  checkmate::assert_names(names(mschans_df), must.include = unique(mschan_required_cols),
+                          .var.name = paste0("msdata$", mschans_dfname))
+
+  res$msentities <- c(
+    quantobject = quantobject,
+    modelobject = modelobject,
+    condition = condition,
+    msexperiment = msexp,
+    msprobe = msprb,
+    msrun = msrun,
+    mschannel = mschan,
+    mstag = mstag,
+    msfraction = msfrac)
+
+  msprb_idcol <- msprb
+  msexp_idcol <- msexp
+  mschan_idcol <- mschan
+  msrun_idcol <- msrun
+  if (rlang::has_name(msprbs_df, "is_used")) {
+    checkmate::assert_logical(msprbs_df$is_used, any.missing=FALSE,
+                              .var.name=paste0("msdata$", msexp, "s$is_used"))
+    if (verbose) message("Importing ", sum(msprbs_df$is_used), " used ", msprb,
+                         "(s) of ", nrow(msprbs_df))
+    msprbs_df <- dplyr::filter(msprbs_df, is_used)
+  } else {
+    if (verbose) message("Importing all ", nrow(msprbs_df), " MS probe(s)")
+  }
+  if (!is.null(model_def)) {
+    checkmate::assert_class(model_def, "msglm_model")
+    virtual_conditions <- setdiff(unique(msprbs_df[[condition]]), model_def$conditions$condition)
+    if (length(virtual_conditions) > 0) {
+      warning(length(virtual_conditions), ' condition(s) not covered by MS experiments')
+    }
+    checkmate::assert_subset(as.character(msprbs_df[[condition]]), as.character(model_def$conditions$condition),
+                             .var.name = paste0("msdata$", msprbs_dfname, "$", condition))
+  }
+  res[[msprbs_dfname]] <- msprbs_df
+  if (mschan != msprb) {
+    mschans_df <- dplyr::semi_join(msdata[[mschans_dfname]],
+                                   dplyr::select(msprbs_df, !!sym(msprb_idcol)),
+                                   by=msprb_idcol)
+    if (rlang::has_name(mschans_df, "is_used")) {
+      checkmate::assert_logical(mschans_df$is_used, any.missing=FALSE,
+                                .var.name=paste0("msdata$", mschan, "s$is_used"))
+      if (verbose) message("Importing ", sum(mschans_df$is_used), " used ", mschan,
+                          "(s) of ", nrow(mschans_df))
+      mschans_df <- dplyr::filter(mschans_df, is_used)
+    } else {
+      if (verbose) message("Importing all ", nrow(mschans_df), " MS channel(s)")
+    }
+    res[[mschans_dfname]] <- mschans_df
+    checkmate::assert_set_equal(mschans_df[[msprb_idcol]], msprbs_df[[msprb_idcol]],
+                                .var.name = paste0("msdata$", mschans_dfname, "$", msprb_idcol))
+  } else {
+    mschans_df <- msprbs_df
+  }
+
+  quantobj_intensities_dfname <- paste0(quantobject, "_intensities")
+  if (rlang::has_name(msdata, quantobj_intensities_dfname)) {
+    if (verbose) message("Importing ", quantobj_intensities_dfname, "...")
+    quantobj_intensities_df <- msdata[[quantobj_intensities_dfname]]
+    checkmate::assert_data_frame(quantobj_intensities_df)
+    checkmate::assert_names(colnames(quantobj_intensities_df),
+                            must.include = c(mschan_idcol, quantobj_idcol, "intensity"),
+                            .var.name = paste0("msdata$", quantobj_intensities_dfname))
+    quantobj_intensities_df <- dplyr::semi_join(quantobj_intensities_df,
+                                                dplyr::select(mschans_df, !!sym(mschan_idcol)),
+                                                by=mschan_idcol)
+  } else {
+    stop("msdata$", quantobj_intensities_dfname, " not found")
+  }
   modelobj_idents_dfname <- paste0(modelobject, "_idents")
   if (rlang::has_name(msdata, modelobj_idents_dfname)) {
     if (verbose) message("Importing ", modelobj_idents_dfname, "...")
@@ -252,35 +371,43 @@ import_msglm_data <- function(msdata, model_def,
     checkmate::assert_names(colnames(modelobj_idents_df),
                             must.include = c(msexp_idcol, modelobj_idcol, "ident_type"),
                             .var.name = paste0("msdata$", modelobj_idents_dfname))
-    res[[modelobj_idents_dfname]] <- dplyr::semi_join(modelobj_idents_df,
-                                                      dplyr::select(msexps_df, !!sym(msexp_idcol)),
-                                                      by=msexp_idcol)
+    if (!rlang::has_name(msprbs_df, msexp_idcol)) {
+      if (verbose) warning("No MS experiment ID column (", msexp_idcol, ") found, ignoring ", modelobj_idents_dfname)
+    } else {
+      res[[modelobj_idents_dfname]] <- dplyr::semi_join(modelobj_idents_df,
+                                                        dplyr::select(msprbs_df, !!sym(msexp_idcol)),
+                                                        by=msexp_idcol)
+    }
   } else {
-    warning("msdata$", modelobj_idents_dfname, " not found")
+    if (verbose) warning("msdata$", modelobj_idents_dfname, " not found")
   }
   if (modelobject == quantobject) {
+    orig_nintensities <- nrow(quantobj_intensities_df)
     quantobj_intensities_df <- dplyr::filter(quantobj_intensities_df, !is.na(intensity))
-    if (verbose) message(nrow(quantobj_intensities_df), " of ", nrow(quantobj_intensities_orig_df),
+    if (verbose) message(nrow(quantobj_intensities_df), " of ", orig_nintensities,
                          " ", quantobject, " intensity measurements selected")
+    orig_nmodelobjs <- nrow(modelobjs_df)
     modelobjs_df <- dplyr::semi_join(modelobjs_df, quantobj_intensities_df, by=modelobj_idcol)
-    if (verbose) message(nrow(modelobjs_df), " of ", nrow(modelobjs_orig_df),
+    if (verbose) message(nrow(modelobjs_df), " of ", orig_nmodelobjs,
                          " ", modelobject, "s selected")
   } else if (quantobject == "pepmodstate") {
-    modelobj2pepmod_dfname = paste0(modelobject, "2pepmod")
     modelobj2quantobj_dfname = paste0(modelobject, "2", quantobject)
-    modelobj2pepmod_df <- msdata[[modelobj2pepmod_dfname]]
     if (!rlang::has_name(msdata, modelobj2quantobj_dfname)) {
-      warning("msdata$", modelobj2quantobj_dfname, " not found, trying msdata$", modelobj2pepmod_dfname)
+      modelobj2pepmod_dfname = paste0(modelobject, "2pepmod")
+      if (verbose) warning("msdata$", modelobj2quantobj_dfname,
+                           " not found, trying msdata$", modelobj2pepmod_dfname)
       if (!rlang::has_name(msdata, modelobj2pepmod_dfname)) {
         stop("msdata$", modelobj2pepmod_dfname, " not found")
       }
+      modelobj2pepmod_df <- msdata[[modelobj2pepmod_dfname]]
       modelobj2quantobj_df <- dplyr::inner_join(modelobj2pepmod_df, quantobjs_df, by="pepmod_id") %>%
-        dplyr::select(!!syms(modelobj_idcol, quantobj_idcol, "pepmod_id", "is_specific")) %>% dplyr::distinct()
+        dplyr::select(!!syms(modelobj_idcol, quantobj_idcol, "pepmod_id", "is_specific")) %>%
+        dplyr::distinct()
     } else {
       modelobj2quantobj_df <- msdata[[modelobj2quantobj_dfname]]
-      modelobj2pepmod_df <- NULL
     }
-    checkmate::assert_data_frame(modelobj2quantobj_df, .var.name=paste0("msdata$", modelobj2quantobj_dfname))
+    checkmate::assert_data_frame(modelobj2quantobj_df,
+                                 .var.name=paste0("msdata$", modelobj2quantobj_dfname))
     checkmate::assert_names(colnames(modelobj2quantobj_df),
                             must.include=c(modelobj_idcol, quantobj_idcol, "is_specific"),
                             .var.name = paste0("msdata$", modelobj2quantobj_dfname))
@@ -319,7 +446,7 @@ import_msglm_data <- function(msdata, model_def,
                                                         dplyr::select(mschans_df, !!sym(msrun_idcol)),
                                                         by=msrun_idcol)
     } else {
-      warning("msdata$", quantobj_idents_dfname, " not found")
+      if (verbose) warning("msdata$", quantobj_idents_dfname, " not found")
     }
   }
   res[[modelobjs_dfname]] <- modelobjs_df
@@ -329,7 +456,7 @@ import_msglm_data <- function(msdata, model_def,
                                     chunk = row_number())
   res[[quantobj_intensities_dfname]] <- quantobj_intensities_df
   if (verbose) message("Calculating MS channel (", mschan, ") ", quantobject, " statistics...")
-  res[[paste0(mschan, "_", quantobject, "_stats")]] <- mschannel_quantobj_statistics(res)
+  res[[paste0(mschan, "_", quantobject, "_stats")]] <- mschannel_quantobj_statistics(res, verbose=verbose)
 
   checkmate::assert_class(mscalib, "mscalib")
   res[[paste0(quantobject, "_mscalib")]] <- mscalib

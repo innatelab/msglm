@@ -239,7 +239,9 @@ cluster_msprofiles <- function(msdata, mschannel_stats,
     summarise(n_quants = sum(!is.na(intensity))) %>%
     dplyr::ungroup()
   # add a bit of noise to avoid zero variance
-  intensities.mtx <- matrix(log2(pmax(intensities.df$intensity_imputed + rnorm(nrow(intensities.df)), 0)),
+  intensities.mtx <- matrix(log2(pmax(if_else(is.finite(intensities.df$intensity_imputed),
+                                              intensities.df$intensity_imputed, 0.0), 1)) +
+                            rnorm(nrow(intensities.df), sd=0.01),
                             ncol = nrow(objs.df),
                             dimnames = list(mschannel = unique(intensities.df[[mschannel_col]]),
                                             `__index_msobject__` = NULL))

@@ -124,12 +124,12 @@ frame2matrix <- function(df, row_col, col_col, val_col="w", val_default=0, cols=
     dplyr::arrange_at(c(col_col, row_col))
   mtx <- stats::xtabs(as.formula(paste0(val_col, " ~ ", row_col, " + ", col_col)), data=df_expanded)
   checkmate::assert_set_equal(names(dimnames(mtx)), c(row_col, col_col), ordered=TRUE)
-  if (nrow(mtx) == 0 || is.integer(rows) && vctrs::vec_equal(rows, seq_len(nrow(mtx)))) {
+  if (nrow(mtx) == 0 || is.integer(rows) && all(vctrs::vec_equal(rows, seq_len(nrow(mtx))))) {
     rownames(mtx) <- NULL
   } else {
     checkmate::assert_set_equal(rownames(mtx), as.character(rows), ordered=TRUE)
   }
-  if (ncol(mtx) == 0 || is.integer(cols) && vctrs::vec_equal(cols, seq_len(ncol(mtx)))) {
+  if (ncol(mtx) == 0 || is.integer(cols) && all(vctrs::vec_equal(cols, seq_len(ncol(mtx))))) {
     colnames(mtx) <- NULL
   } else {
     checkmate::assert_set_equal(colnames(mtx), as.character(cols), ordered=TRUE)

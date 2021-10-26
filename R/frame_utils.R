@@ -155,6 +155,7 @@ frame2matrix <- function(df, row_col, col_col, val_col="w", val_default=0, cols=
 matrix2frame <- function(mtx, row_col = NULL, col_col = NULL, val_col = "w", skip_val = 0) {
   df <- as.data.frame.table(mtx, stringsAsFactors=TRUE, responseName=val_col)
   dnn <- colnames(df)
+  row_col <- row_col %||% names(dimnames(mtx))[[1]]
   if (!is.null(row_col)) {
     # overriding the existing name
     df <- dplyr::rename(df, !!sym(row_col) := !!sym(dnn[[1]]))
@@ -168,6 +169,7 @@ matrix2frame <- function(mtx, row_col = NULL, col_col = NULL, val_col = "w", ski
   if (is.null(df[[2]])) {
     df[[2]] <- character(0)
   }
+  col_col <- col_col %||% names(dimnames(mtx))[[2]]
   if (!is.null(col_col)) {
     # overriding the existing name
     df <- dplyr::rename(df, !!sym(col_col) := !!sym(dnn[[2]]))

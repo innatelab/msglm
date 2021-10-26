@@ -1,5 +1,7 @@
 context("frame utils tests")
 
+library(checkmate)
+
 test_that("empty contsant_matrix() and frame conversion are correct", {
     emptymtx <- constant_matrix(0, list(orange = character(0),
                                         apple = character(0)))

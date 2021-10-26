@@ -413,7 +413,7 @@ import_msglm_data <- function(msdata, model_def = NULL,
       }
       modelobj2pepmod_df <- msdata[[modelobj2pepmod_dfname]]
       modelobj2quantobj_df <- dplyr::inner_join(modelobj2pepmod_df, quantobjs_df, by="pepmod_id") %>%
-        dplyr::select(!!syms(modelobj_idcol, quantobj_idcol, "pepmod_id", "is_specific")) %>%
+        dplyr::select_at(c(modelobj_idcol, quantobj_idcol, "pepmod_id", "is_specific")) %>%
         dplyr::distinct()
     } else {
       modelobj2quantobj_df <- msdata[[modelobj2quantobj_dfname]]

@@ -208,6 +208,8 @@ test_that(paste0(modelobj, "/pepmodstate model, msfractions, ",
     expect_tibble(msdata[[msprobes_dfname]], nrows=nrow(msprobes_df))
     expect_tibble(msdata[[mschannels_dfname]], nrows=nrow(mschannels_df))
 
+    # TODO with modelobj2pepmod but without modelobj2pepmodstate
+
     # without specifying mschannels
     orig_msdata2 <- orig_msdata
     orig_msdata2[[msprobes_dfname]] <- dplyr::rename(msprobes_df, !!sym(msprobe) := msprobe)

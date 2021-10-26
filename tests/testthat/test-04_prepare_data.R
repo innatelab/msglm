@@ -150,12 +150,15 @@ test_that(paste0(modelobj, "/pepmodstate model, msfractions, ",
 
     mschannel <- c(msprobe = "mschannel", msexperiment = "msrun")[[msprobe]]
     mschannels_df <- dplyr::full_join(msprobes_df, tibble(msfraction = c(1L, 2L)), by=character()) %>%
-                     dplyr::mutate(mschannel = paste0(msprobe, "_F", msfraction))
+            dplyr::mutate(mschannel = paste0(condition, "_", replicate, "_F", msfraction))
     if (!is.na(mstag)) {
         mschannels_df <- dplyr::mutate(mschannels_df,
                                        msrun = mschannel,
                                        mschannel = paste0(mschannel, "_", mstag))
     }
+    mschannels_df <- dplyr::mutate(mschannels_df,
+                                   raw_file = paste0(condition, '_', replicate,
+                                                     '_F', msfraction, ".raw"))
     orig_msdata <- gen_msdata(model_def, mschannels_df, msprobe = msprobe, mschannel = mschannel,
                               modelobject = modelobj, quantobject = "pepmodstate", nmodelobjects=3)
     msprobes_dfname <- paste0(msprobe, "s")

@@ -108,14 +108,20 @@ gen_msdata <- function(model_def, mschannels_df,
         res[[paste0(modelobject, "_intensities")]] <- gen_modelobj_intensities(res$interactions, mschannels_df) %>%
             dplyr::select_at(intensities_cols)
     }
-    mschan_cols <- c("condition")
-    mschan_cols[[msprobe]] <- "msprobe"
-    if ((msprobe != mschannel) && rlang::has_name(mschannels_df, "mschannel")) {
-        mschan_cols[[mschannel]] <- "mschannel"
+    mschan_cols <- character()
+    for (col in c('condition', 'replicate', 'raw_file', 'rawfile')) {
+        if (rlang::has_name(mschannels_df, col)) {
+            mschan_cols <- append(mschan_cols, col)
+        }
     }
-    if (rlang::has_name(mschannels_df, "mstag")) { mschan_cols[[mstag]] <- "mstag" }
-    if (rlang::has_name(mschannels_df, "msfraction")) { mschan_cols[[msfraction]] <- "msfraction" }
-    if (rlang::has_name(mschannels_df, "replicate")) { mschan_cols <- c(mschan_cols, "replicate") }
+    renamed_cols <- c("mstag", "msfraction", "msprobe")
+    if (msprobe != mschannel) renamed_cols <- append(renamed_cols, "mschannel")
+    for (col in renamed_cols) {
+        colval <- get(col, inherits = FALSE)
+        if (rlang::has_name(mschannels_df, col)) {
+            mschan_cols[[colval]] <- col
+        }
+    }
     res[[paste0(mschannel, 's')]] <- dplyr::select_at(mschannels_df, mschan_cols)
     return(res)
 }

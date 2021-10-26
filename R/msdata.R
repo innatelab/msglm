@@ -209,15 +209,18 @@ import_msglm_data <- function(msdata, model_def = NULL,
         msprb_src_df <- dplyr::inner_join(msdata[[msprb_src_dfname]],
             dplyr::select_at(msprbs_df, c(msprb, msprb_key_cols)), by=msprb_key_cols)
         if (nrow(msprb_src_df) != nrow(msdata[[msprb_src_dfname]])) {
-          stop("MSGLM failed to detect columns uniquely identifying ", msprb)
+          stop("MSGLM failed to detect columns uniquely identifying ", msprb, ".",
+               "Plese add ", msprb, " column to your msdata$", msprb_src_dfname,
+               " experimental design data frame")
         }
         msdata[[msprb_src_dfname]] <- msprb_src_df
       } else {
         msprbs_df <- msprbs_src_df
       }
-      msprbs_df <- dplyr::select(msprbs_df, -!!sym(msprb_src), -!!sym(msfrac),
-                                 -dplyr::matches("raw_?file")) %>%
-                   dplyr::distinct(!!sym(msprb), .keep_all=TRUE)
+      # try to exclude columns that vary between msfractions
+      msprbs_df <- dplyr::select(msprbs_df, -!!sym(msprb_src), -!!sym(msfrac)) %>%
+          dplyr::select_if(~n_distinct(paste0(.x, "_", msprbs_df[[msprb]])) == n_distinct(msprbs_df[[msprb]])) %>%
+          dplyr::distinct(!!sym(msprb), .keep_all=TRUE)
     } else {
       if (is.na(msprb)) {
         if (verbose) message("Detected msdata$", msprb_src_dfname, ", no msfractions. Setting msprobe=", msprb_src_def)

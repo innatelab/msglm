@@ -187,28 +187,37 @@ import_msglm_data <- function(msdata, model_def = NULL,
                            " by removing MS fractions")
       msprbs_src_df <- msdata[[msprb_src_dfname]]
       checkmate::assert_data_frame(msprbs_src_df, .var.name = paste0("msdata$", msprb_src_dfname))
-      if (is.na(msprb) && rlang::has_name(msprbs_src_df, "msprobe")) {
-        msprb <- "msprobe"
-      } else if (is.na(msprb) && !is.na(msexp) && is.na(mstag) && rlang::has_name(msprbs_src_df, msexp)) {
-        msprb <- msexp
-      } else if (is.na(msprb) && is.na(msexp) && is.na(mstag) && rlang::has_name(msprbs_src_df, "msexperiment")) {
-        msprb <- "msexperiment"
-      } else if (is.na(msprb)) {
-        msprb <- if_else(is.na(mstag) && msprb_src_dfname == msruns_def_dfname, "msexperiment", "msprobe")
+      if (is.na(msprb)) {
+        if (rlang::has_name(msprbs_src_df, "msprobe")) {
+          msprb <- "msprobe"
+        } else if (!is.na(msexp) && is.na(mstag) && rlang::has_name(msprbs_src_df, msexp)) {
+          msprb <- msexp
+        } else if (is.na(msexp) && is.na(mstag) && rlang::has_name(msprbs_src_df, "msexperiment")) {
+          msprb <- "msexperiment"
+        } else {
+          msprb <- if_else(is.na(mstag) && msprb_src_dfname == msruns_def_dfname, "msexperiment", "msprobe")
+        }
       }
       if (!rlang::has_name(msprbs_src_df, msprb)) {
         # generate msprobe column in the source data frame
-        msprb_key_cols <- setdiff(colnames(msprbs_src_df), c(msprb_src, msfrac))
-        msprbs_df <- dplyr::group_by_at(msprbs_src_df, msprb_key_cols) %>%
-          dplyr::filter(row_number() == 1L) %>% dplyr::ungroup() %>%
-          dplyr::mutate(!!sym(msprb) := !!sym(msprb_src))
+        msprb_key_cols <- intersect(c('condition', 'replicate', mstag), colnames(msprbs_src_df))
+        if (verbose) message("Trying to generate ", msprb, " column using: ",
+                             paste0(msprb_key_cols, collapse=", "))
+        msprbs_df <- dplyr::distinct_at(msprbs_src_df, msprb_key_cols, .keep_all = TRUE) %>%
+          dplyr::mutate(!!sym(msprb) := paste(!!!syms(msprb_key_cols), sep='_'))
         # update the source frame with msprb column
-        msdata[[msprb_src_dfname]] <- dplyr::inner_join(msdata[[msprb_src_dfname]],
+        msprb_src_df <- dplyr::inner_join(msdata[[msprb_src_dfname]],
             dplyr::select_at(msprbs_df, c(msprb, msprb_key_cols)), by=msprb_key_cols)
+        if (nrow(msprb_src_df) != nrow(msdata[[msprb_src_dfname]])) {
+          stop("MSGLM failed to detect columns uniquely identifying ", msprb)
+        }
+        msdata[[msprb_src_dfname]] <- msprb_src_df
       } else {
         msprbs_df <- msprbs_src_df
       }
-      msprbs_df <- dplyr::select(msprbs_df, -!!sym(msprb_src), -!!sym(msfrac)) %>% dplyr::distinct()
+      msprbs_df <- dplyr::select(msprbs_df, -!!sym(msprb_src), -!!sym(msfrac),
+                                 -dplyr::matches("raw_?file")) %>%
+                   dplyr::distinct(!!sym(msprb), .keep_all=TRUE)
     } else {
       if (is.na(msprb)) {
         if (verbose) message("Detected msdata$", msprb_src_dfname, ", no msfractions. Setting msprobe=", msprb_src_def)

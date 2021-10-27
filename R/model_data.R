@@ -359,7 +359,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                                       any_of(c("msfraction", "charge"))),
                         by=quantobj_idcol) %>%
       dplyr::mutate(subobject_id = !!sym(quantobj_idcol))
-    if (nrow(subobjs_df) == 0L) stop("No specific ", model_def$quantobject, "s found for ", modelobj_idcol, "=", model_data$modelobj_id)
+    if (nrow(subobjs_df) == 0L) stop("No specific ", model_def$quantobject, "s found for ", modelobj_idcol, "=", model_data$object_id)
     if (verbose) message(nrow(subobjs_df), " specific ", model_def$quantobject, "(s) found")
     intensities_df <- dplyr::select_at(msdata[[intensities_dfname]],
                                        c(subobject_id = quantobj_idcol, mschannel=mschan_idcol, "intensity"))

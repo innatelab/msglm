@@ -376,22 +376,27 @@ import_msglm_data <- function(msdata, model_def = NULL,
     stop("msdata$", quantobj_intensities_dfname, " not found")
   }
   modelobj_idents_dfname <- paste0(modelobject, "_idents")
-  if (rlang::has_name(msdata, modelobj_idents_dfname)) {
-    if (verbose) message("Importing ", modelobj_idents_dfname, "...")
-    modelobj_idents_df <- msdata[[modelobj_idents_dfname]]
-    checkmate::assert_data_frame(modelobj_idents_df)
-    checkmate::assert_names(colnames(modelobj_idents_df),
-                            must.include = c(msexp_idcol, modelobj_idcol, "ident_type"),
-                            .var.name = paste0("msdata$", modelobj_idents_dfname))
-    if (!rlang::has_name(msprbs_df, msexp_idcol)) {
-      if (verbose) warning("No MS experiment ID column (", msexp_idcol, ") found, ignoring ", modelobj_idents_dfname)
-    } else {
-      res[[modelobj_idents_dfname]] <- dplyr::semi_join(modelobj_idents_df,
-                                                        dplyr::select(msprbs_df, !!sym(msexp_idcol)),
-                                                        by=msexp_idcol)
-    }
+  if (!rlang::has_name(msprbs_df, msexp_idcol)) {
+    if (verbose) message("msdata$", msprbs_dfname, " does not have ", msexp_idcol,
+                         " ignoring ", modelobject, "-level identifications")
+  } else if (!rlang::has_name(msdata, modelobj_idents_dfname)) {
+    if (verbose) message("msdata$", modelobj_idents_dfname, " not found")
   } else {
-    if (verbose) warning("msdata$", modelobj_idents_dfname, " not found")
+    modelobj_idents_df <- msdata[[modelobj_idents_dfname]]
+    if (!checkmate::test_data_frame(modelobj_idents_df)) {
+      if (verbose) warning("msdata$", modelobj_idents_dfname, " is not a data frame, ignoring")
+    } else {
+      col_check <- checkmate::check_names(colnames(modelobj_idents_df),
+                        must.include = c(msexp_idcol, modelobj_idcol, "ident_type"),
+                        what = "column names")
+      if (is.logical(col_check) && col_check) {
+        res[[modelobj_idents_dfname]] <- dplyr::semi_join(modelobj_idents_df,
+                                                          dplyr::select(msprbs_df, !!sym(msexp_idcol)),
+                                                          by=msexp_idcol)
+      } else {
+        if (verbose) warning("Detected msdata$", modelobj_idents_dfname, " problems, skipping: ", col_check)
+      }
+    }
   }
   if (modelobject == quantobject) {
     orig_nintensities <- nrow(quantobj_intensities_df)

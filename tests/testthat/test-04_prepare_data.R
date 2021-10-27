@@ -48,23 +48,40 @@ test_that(paste0(modelobj, "/", modelobj, " model, no msfractions, ",
     orig_msdata <- gen_msdata(model_def, msprobes_df, msprobe = msprobe,
                               modelobject = modelobj, nmodelobjects = 3)
     msprobes_dfname <- paste0(msprobe, "s")
-    bad_msdata <- orig_msdata
-    bad_msdata[[msprobes_dfname]] <- NULL
-    expect_error(import_msglm_data(bad_msdata, model_def, mscalib, modelobject=modelobj),
-                 "Cannot autodetect MS probes")
     if (!(msprobe %in% c("msrun", "mschannel"))) {
-        expect_error(import_msglm_data(orig_msdata, model_def, mscalib, modelobject=modelobj),
-                    "Cannot autodetect MS channels")
         # add raw_file column to facilitate autodetection
         orig_msdata[[msprobes_dfname]] <- dplyr::mutate(orig_msdata[[msprobes_dfname]],
                                                         raw_file = paste0(!!sym(msprobe), ".raw"))
     }
 
+    test_that(paste0("import fails if no ", msprobe, " data probided"), {
+        bad_msdata <- orig_msdata
+        bad_msdata[[msprobes_dfname]] <- NULL
+        expect_error(import_msglm_data(bad_msdata, model_def, mscalib, modelobject=modelobj),
+                    "Cannot autodetect MS probes")
+        bad_msdata <- orig_msdata
+        if (!(msprobe %in% c("msrun", "mschannel"))) {
+            bad_msdata[[msprobes_dfname]] <- dplyr::mutate(orig_msdata[[msprobes_dfname]],
+                                                           raw_file = NULL)
+            expect_error(import_msglm_data(bad_msdata, model_def, mscalib, modelobject=modelobj),
+                        "Cannot autodetect MS channels")
+        }
+    })
+
     if (modelobj != "protgroup") {
-        # expecting protgroups by default
-        expect_error(import_msglm_data(orig_msdata, model_def, mscalib),
-                     "msdata\\$protgroups not found")
+        test_that("expecting protgroups by default", {
+            expect_error(import_msglm_data(orig_msdata, model_def, mscalib),
+                        "msdata\\$protgroups not found")
+        })
     }
+
+    test_that("bad idents frame is skipped without error", {
+        bad_idents_msdata <- orig_msdata
+        bad_idents_msdata[[paste0(modelobj, "_idents")]] <- tibble()
+        msdata <- import_msglm_data(bad_idents_msdata, model_def, mscalib, modelobject=modelobj)
+        expect_s3_class(msdata, "msglm_data_collection")
+        expect_names(names(msdata), disjunct.from = paste0(modelobj, "_idents"))
+    })
 
     msdata <- import_msglm_data(orig_msdata, model_def, mscalib, modelobject=modelobj)
     expect_s3_class(msdata, "msglm_data_collection")

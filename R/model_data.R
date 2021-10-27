@@ -215,9 +215,7 @@ impute_intensities <- function(intensities_df, stats_df, log2_mean_offset=-1.8, 
 }
 
 #' @export
-cluster_msprofiles <- function(msdata, mschannel_stats,
-                               obj_col=msdata$msentities[['quantobject']],
-                               mschannel_col=msdata$msentities[['mschannel']], nclu=4) {
+cluster_msprofiles <- function(msdata, mschannel_stats, obj_col, mschannel_col, nclu=4) {
   # create matrix of intensities
   objs.df <- dplyr::select_at(msdata, obj_col) %>%
     dplyr::distinct() %>% dplyr::arrange(!!sym(obj_col)) %>%

@@ -208,7 +208,18 @@ test_that(paste0(modelobj, "/pepmodstate model, msfractions, ",
     expect_tibble(msdata[[msprobes_dfname]], nrows=nrow(msprobes_df))
     expect_tibble(msdata[[mschannels_dfname]], nrows=nrow(mschannels_df))
 
-    # TODO with modelobj2pepmod but without modelobj2pepmodstate
+    # with modelobj2pepmod but without modelobj2pepmodstate
+    orig_msdata1c <- orig_msdata
+    modelobj2pms_dfname <- paste0(modelobj, "2pepmodstate")
+    orig_msdata1c[[modelobj2pms_dfname]] <- NULL
+    msdata <- msglm::import_msglm_data(orig_msdata1c, model_def, mscalib,
+                                       modelobject=modelobj, quantobject="pepmodstate")
+    expect_s3_class(msdata, "msglm_data_collection")
+    # check that modelobj2pepmodstate is automatically generated
+    expect_names(names(msdata), must.include = modelobj2pms_dfname)
+    expect_tibble(msdata[[modelobj2pms_dfname]], nrows=nrow(orig_msdata[[modelobj2pms_dfname]]))
+    expect_names(names(msdata[[modelobj2pms_dfname]]),
+                 must.include = c(paste0(c(modelobj, "pepmodstate"), "_id"), "is_specific"))
 
     # without specifying mschannels
     orig_msdata2 <- orig_msdata

@@ -227,11 +227,14 @@ cluster_msprofiles <- function(msdata, mschannel_stats, obj_col, mschannel_col, 
     dplyr::inner_join(objs.df, by=obj_col) %>%
     dplyr::arrange(`__index_msobject__`, !!sym(mschannel_col))
   # handle trivial cases
-  if (n_distinct(intensities.df[[obj_col]]) == 1L ||
-      n_distinct(intensities.df[[mschannel_col]]) == 1L) {
-    return(tibble(!!obj_col := unique(intensities.df[[obj_col]]),
+  mschannels <- unique(intensities.df[[mschannel_col]])
+  if (nrow(objs.df) == 1L || length(mschannels) == 1L) {
+    return(tibble(!!obj_col := objs.df[[obj_col]],
                   profile_cluster = 1L,
                   nsimilar_profiles = 1L))
+  }
+  if (nrow(intensities.df) != length(mschannels)*nrow(objs.df)) {
+    stop("Duplicate intensities detected, check the input data")
   }
   obj_stats.df <- group_by(intensities.df, `__index_msobject__`) %>%
     summarise(n_quants = sum(!is.na(intensity))) %>%
@@ -241,8 +244,7 @@ cluster_msprofiles <- function(msdata, mschannel_stats, obj_col, mschannel_col, 
                                               intensities.df$intensity_imputed, 0.0), 1)) +
                             rnorm(nrow(intensities.df), sd=0.01),
                             ncol = nrow(objs.df),
-                            dimnames = list(mschannel = unique(intensities.df[[mschannel_col]]),
-                                            `__index_msobject__` = NULL))
+                            dimnames = list(mschannel = mschannels, `__index_msobject__` = NULL))
   obj.pca <- stats::prcomp(intensities.mtx, scale.=TRUE)
   # create object feature matrix
   obj.pca_featmtx <- obj.pca$rotation * crossprod(t(rep.int(1, nrow(obj.pca$rotation))),

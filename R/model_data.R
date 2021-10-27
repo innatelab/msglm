@@ -370,6 +370,13 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                                         any_of(specificity_quantobject_group_cols)),
                           by=c("index_msprobe")) %>%
         dplyr::left_join(intensities_df, by=c("subobject_id", "mschannel"))
+    if (nrow(msdata_df) != nrow(dplyr::distinct(msdata_df, subobject_id, mschannel))) {
+      if (verbose) warning("Duplicate MS intensities detected, summing duplicate entries")
+      msdata_df <- dplyr::group_by(msdata_df, dplyr::across(!any_of("intensity"))) %>%
+        dplyr::summarise(intensity = sum(intensity, na.rm = TRUE),
+                         .groups="drop") %>%
+        dplyr::mutate(intensity = if_else(intensity != 0, intensity, NA_real_))
+    }
     if (all(is.na(msdata_df$intensity))) stop("No quantifications for ", nrow(subobjs_df), " specific ",
                                               quantobj, "(s) of ", modelobj_idcol, "=", model_data$object_id)
     msdata_df <- annotate_msdata(msdata_df, model_def, verbose=verbose,

@@ -274,16 +274,3 @@ set_contrasts <- function(model_def,
   }
   return(model_def)
 }
-
-#' @export
-isSubobjectQuanted <- function(model_def) {
-  checkmate::assert_class(model_def, "msglm_model")
-  if (model_def$modelobject == model_def$quantobject) {
-    return (FALSE)
-  } else if (model_def$quantobject == "pepmodstate") {
-    return (TRUE)
-  } else {
-     stop("Unsupported combination of modelobject=", model_def$modelobject,
-         " and quantobject=", model_def$quantobject)
-  }
-}

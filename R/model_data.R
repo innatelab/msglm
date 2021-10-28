@@ -359,8 +359,9 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                                       any_of(c("msfraction", "charge"))),
                         by=quantobj_idcol) %>%
       dplyr::mutate(subobject_id = !!sym(quantobj_idcol))
-    if (nrow(subobjs_df) == 0L) stop("No specific ", model_def$quantobject, "s found for ", modelobj_idcol, "=", model_data$object_id)
-    if (verbose) message(nrow(subobjs_df), " specific ", model_def$quantobject, "(s) found")
+    if (nrow(subobjs_df) == 0L) stop("No specific ", quantobj, "s found for ",
+                                     modelobj_idcol, "=", model_data$object_id)
+    if (verbose) message(nrow(subobjs_df), " specific ", quantobj, "(s) found")
     intensities_df <- dplyr::select_at(msdata[[intensities_dfname]],
                                        c(subobject_id = quantobj_idcol, mschannel=mschan_idcol, "intensity"))
     msdata_df <- dplyr::inner_join(dplyr::select(model_data$observations, index_msprobe, index_observation, index_object, object_id),
@@ -418,7 +419,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
       dplyr::arrange(index_object, index_subobject_group, profile_cluster, index_subobject_local) %>%
       dplyr::mutate(index_subobject = row_number()) %>%
       dplyr::filter(index_subobject <= max_subobjects) # remove less abundant subobjects of rich objects
-    if (verbose) message(nrow(model_data$subobjects), " ", model_def$quantobject, "(s) from ",
+    if (verbose) message(nrow(model_data$subobjects), " ", quantobj, "(s) from ",
                          n_distinct(model_data$subobjects$profile_cluster), " cluster(s) selected")
     msdata_df <- dplyr::inner_join(msdata_df,
                                    dplyr::select(model_data$subobjects, index_object, index_subobject, subobject_id),

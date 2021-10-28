@@ -304,9 +304,11 @@ annotate_msdata <- function(msdata_df, model_def, verbose = model_def$verbose,
     # calculate probabilities that all quantitations of subobjects in a given observation are false discoveries
     cooccur_stats_df <- dplyr::group_by(msdata_df, object_id, cooccur_msexp_group) %>%
       dplyr::summarise(nsubobj_observed = n_distinct(subobject_id[is_observed]),
-                       nsubobj_missed = n_distinct(subobject_id[!is_observed]),
                        .groups = "drop") %>%
-      dplyr::mutate(is_cooccurring = pbinom(nsubobj_observed - 1L, nsubobj_observed + nsubobj_missed,
+      dplyr::inner_join(dplyr::group_by(msdata_df, object_id) %>%
+                        dplyr::summarise(nsubobj_total = n_distinct(subobject_id),
+                                         .groups = "drop"), by="object_id") %>%
+      dplyr::mutate(is_cooccurring = pbinom(nsubobj_observed - 1L, nsubobj_total,
                                             observation_fdr, lower.tail=FALSE) <= cooccurrence_pvalue)
 
     msdata_df <- dplyr::left_join(msdata_df,

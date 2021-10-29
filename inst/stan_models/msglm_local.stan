@@ -12,7 +12,7 @@ data {
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
 
   int<lower=1> Nprobes;         // number of MS probes (= MS channels)
-  vector[Nmschannels] mschannel_shift;
+  vector[Nprobes] mschannel_shift;
 
   int<lower=0> Nobservations;   // number of observations of interactions (objectXmschannel pairs for all iactions and mschannels of its condition)
   int<lower=1,upper=Nprobes> observation2probe[Nobservations];

@@ -316,6 +316,11 @@ annotate_msdata <- function(msdata_df, model_def, verbose = model_def$verbose,
         by = c("object_id", "cooccur_msexp_group")) %>%
         dplyr::mutate(is_reliable = is_reliable | is_cooccurring,
                       is_cooccurring = NULL)
+    if (rlang::has_name(msdata_df, "ident_type")) {
+      msdata_df <- dplyr::group_by(msdata_df, subobject_id, spec_msexp_group) %>%
+        dplyr::mutate(is_reliable = is_reliable | any(ident_type %in% c("MULTI-MSMS"))) %>%
+        dplyr::ungroup()
+    }
   }
   msdata_df <- dplyr::mutate(msdata_df, is_reliable = !is.na(intensity) & is_reliable)
 
@@ -344,8 +349,9 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
 
   if (modelobj == quantobj) {
     # modelobj is quanted directly
-    intensities_df <- dplyr::select_at(msdata[[intensities_dfname]],
-                                       c(object_id=modelobj_idcol, msprobe=msprb_idcol, "intensity"))
+    intensities_df <- dplyr::select(msdata[[intensities_dfname]],
+                                    object_id=!!sym(modelobj_idcol), msprobe=!!sym(msprb_idcol),
+                                    intensity, any_of("ident_type"))
     msdata_df <- dplyr::left_join(model_data$observations,
                                   intensities_df, by = c("object_id", "msprobe")) %>%
         annotate_msdata(model_def) %>%
@@ -364,8 +370,9 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
     if (nrow(subobjs_df) == 0L) stop("No specific ", quantobj, "s found for ",
                                      modelobj_idcol, "=", model_data$object_id)
     if (verbose) message(nrow(subobjs_df), " specific ", quantobj, "(s) found")
-    intensities_df <- dplyr::select_at(msdata[[intensities_dfname]],
-                                       c(subobject_id = quantobj_idcol, mschannel=mschan_idcol, "intensity"))
+    intensities_df <- dplyr::select(msdata[[intensities_dfname]],
+                                    subobject_id=!!sym(quantobj_idcol), mschannel=!!sym(mschan_idcol),
+                                    intensity, any_of("ident_type"))
     msdata_df <- dplyr::inner_join(dplyr::select(model_data$observations, index_msprobe, index_observation, index_object, object_id),
                                    dplyr::select(subobjs_df, index_object, subobject_id, any_of("msfraction")), by="index_object") %>%
         dplyr::inner_join(dplyr::select(model_data$mschannels, index_mschannel, mschannel, index_msprobe, any_of("msfraction")),

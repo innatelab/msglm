@@ -276,8 +276,8 @@ stan_model_name <- function(standata) {
 fit_model <- function(model_data, ...) UseMethod("fit_model")
 
 #' @export
-fit_model.msglm_model_data <- function(model_data, standata_options=list(), ...) {
-  standata <- do.call(to_standata, modifyList(list(model_data), standata_options))
+fit_model.msglm_model_data <- function(model_data, stanmodel_options=list(), ...) {
+  standata <- rlang::exec(to_standata, model_data, !!!stanmodel_options)
   fit_model(standata, ...)
 }
 

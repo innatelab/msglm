@@ -90,6 +90,7 @@ mschannel_quantobj_statistics <- function(msdata, verbose=FALSE) {
 import_msglm_data <- function(msdata, model_def = NULL,
                               mscalib = get(paste0(quantobject, "_mscalib")),
                               modelobject = c("protgroup", "protregroup", "ptmngroup"),
+                              modelobject_cols = NULL,
                               quantobject = modelobject,
                               condition = NA_character_,
                               msexperiment = NA_character_,
@@ -111,6 +112,8 @@ import_msglm_data <- function(msdata, model_def = NULL,
   if (verbose) message("Importing MS data for ", modelobject,
                        "s using ", quantobject, " intensities")
 
+  res$msentities_extra_columns <- list()
+
   modelobjs_dfname <- paste0(modelobject, "s")
   if (rlang::has_name(msdata, modelobjs_dfname)) {
     modelobjs_df <- msdata[[modelobjs_dfname]]
@@ -118,6 +121,25 @@ import_msglm_data <- function(msdata, model_def = NULL,
   } else {
     stop("msdata$", modelobjs_dfname, " not found")
   }
+  if (is.null(modelobject_cols)) {
+    if (verbose) message('Guessing ', modelobject, ' columns to keep in the report')
+    modelobject_cols <- append(modelobject_cols,
+        dplyr::select(modelobjs_df, any_of(c("majority_protein_acs", "protein_acs",
+                       "gene_names", "protein_names"))) %>% colnames())
+    if (modelobject %in% c('ptmngroup')) {
+      modelobject_cols <- append(modelobject_cols,
+          dplyr::select(modelobjs_df, any_of(c("ptm_type", "nselptms", "ptm_pos", "ptm_AA_seq"))) %>%
+          colnames())
+    }
+    modelobject_cols <- append(modelobject_cols,
+        dplyr::select(modelobjs_df, starts_with("is_")) %>% colnames())
+    modelobject_cols <- append(modelobject_cols,
+        dplyr::select(modelobjs_df, ends_with("_label")) %>% colnames())
+  }
+  if (verbose) message("Model object (", modelobject, ") columns to use in fit results report: ",
+                       paste0(modelobject_cols, collapse=", "))
+  res$msentities_extra_columns$modelobject <- modelobject_cols
+
   if (quantobject != modelobject) {
     quantobjs_dfname <- paste0(quantobject, "s")
     if (rlang::has_name(msdata, quantobjs_dfname)) {

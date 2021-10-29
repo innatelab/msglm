@@ -488,16 +488,20 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
     stop("No model object (", modelobj, ") information found in MS data")
   }
   modelobjs_df <- msdata$modelobjects
-  modelobj_cols <- model_def$object_cols %||%
-      (c(intersect(c("majority_protein_acs", "protein_acs",
+  modelobj_cols <- msdata$msentities_extra_columns$modelobject
+  # FIXME remove this if
+  if (is.null(modelobj_cols)) {
+    if (verbose) warning("msdata$msentities_extra_columns$modelobject not found, resorting to temorary guess")
+    modelobj_cols <- (c(intersect(c("majority_protein_acs", "protein_acs",
                      "gene_names", "protein_names"), colnames(modelobjs_df)),
          str_subset(colnames(modelobjs_df), "^is_")) %>% unique())
-  if (verbose) {
-    message("Model object (", modelobj, ") columns to use: ", paste0(modelobj_cols, collapse=", "))
+    if (verbose) {
+      message("Model object (", modelobj, ") columns to use: ", paste0(modelobj_cols, collapse=", "))
+    }
   }
   model_data$objects <- dplyr::filter(modelobjs_df, object_id %in% object_ids) %>%
       dplyr::select_at(c("object_id", "object_label", modelobj_idcol,
-                         modelobj_cols)) %>%
+                         modelobj_cols) %>% unique()) %>%
       dplyr::arrange(object_id) %>%
       dplyr::mutate(index_object = row_number())
   missing_obj_ids <- setdiff(object_ids, unique(modelobjs_df$object_id))

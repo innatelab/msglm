@@ -95,6 +95,8 @@ transformed data {
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
   int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
+  real<lower=0> q_s = 0.25;
+  real<lower=0> q_k = 1;
 
   int<lower=1> Nmschannels = Nprobes;
   int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2obs];
@@ -366,7 +368,7 @@ model {
         }
 
         // model quantitations and missing data
-        logcompressv(exp2(q_labu - qLog2Std) - qDataNorm, 0.25) ~ double_exponential(0.0, 1);
+        logcompressv(exp2(q_labu - qLog2Std) - qDataNorm, q_s, q_k) ~ double_exponential(0.0, 1);
         // soft-lower-limit for object intensities of reliable quantifications
         1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept)));

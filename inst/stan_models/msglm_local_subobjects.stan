@@ -345,8 +345,7 @@ parameters {
 
   vector[Nobjects] obj_base_labu0; // baseline object abundance
 
-  real<lower=1.0> subobj_shift_sigma;
-  vector[Nsubobjects > 0 ? Nsubobjects-Nobjects : 0] subobj_shift0_unscaled; // subobject shift within object
+  vector[Nsubobjects > 0 ? Nsubobjects-Nobjects : 0] subobj_shift0; // subobject shift within object
 
   //real<lower=0.0> obj_effect_tau;
   real<lower=0.0> effect_slab_c_t;
@@ -390,7 +389,6 @@ transformed parameters {
   vector[NobjBatchEffects > 0 ? Nobservations : 0] obs_batch_shift;
   vector[NsubobjBatchEffects > 0 ? Nsubobservations : 0] subobs_batch_shift;
 
-  vector[Nsubobjects] subobj_shift_unscaled; // subcomponent shift within object
   vector[Nsubobjects] subobj_shift; // subcomponent shift within object
 
   // calculate effects lambdas and scale effects
@@ -421,13 +419,12 @@ transformed parameters {
   }
   // calculate subobj_shift
   if (Nsubobjects > 1) {
-    subobj_shift_unscaled = csr_matrix_times_vector(Nsubobjects, Nsubobjects - Nobjects,
-                                                    subobj_shiftXsubobj_shift0_w, subobj_shiftXsubobj_shift0_v,
-                                                    subobj_shiftXsubobj_shift0_u, subobj_shift0_unscaled);
+    subobj_shift = csr_matrix_times_vector(Nsubobjects, Nsubobjects - Nobjects,
+                                           subobj_shiftXsubobj_shift0_w, subobj_shiftXsubobj_shift0_v,
+                                           subobj_shiftXsubobj_shift0_u, subobj_shift0);
   } else if (Nsubobjects == 1) {
-    subobj_shift_unscaled = rep_vector(0.0, Nsubobjects);
+    subobj_shift = rep_vector(0.0, Nsubobjects);
   }
-  subobj_shift = subobj_shift_unscaled * subobj_shift_sigma;
 
   // calculate suoXobs_subbatch_shift (doesn't make sense to add to obs_labu)
   if (NsubobjBatchEffects > 0) {
@@ -480,8 +477,7 @@ model {
       obj_batch_effect_unscaled_other ~ std_normal();
     }
     if (Nsubobjects > 0) {
-      subobj_shift_sigma ~ cauchy(0, 1);
-      subobj_shift_unscaled ~ std_normal();
+      subobj_shift ~ cauchy(0, 1);
       if (NsubobjBatchEffects > 0) {
         subobj_batch_effect_lambda_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * quant_batch_effect_df, 0.5 * quant_batch_effect_df);
         subobj_batch_effect_lambda_a - hsprior_lambda_a_offset ~ std_normal();

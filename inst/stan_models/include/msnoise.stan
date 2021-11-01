@@ -7,14 +7,17 @@
     // logcompress(x0, s, k) = x0, where k = logcompress_k(x0, s)
     // abs(x)>>0 -> logcompress(x)~sign(x)*log(abs(x))
     real logcompress(real x, data real s, data real k) {
-      return x * (1 + k*log1p(fabs(s*x))) / (1 + fabs(s*x));
+      real t = fabs(s*x);
+      return x * (1 + k*log1p(t)) / (1 + t);
     }
 
     vector logcompressv(vector x, data real s, data real k) {
-      return x .* (1 + k*log1p(fabs(s*x))) ./ (1 + fabs(s*x));
+      vector[size(x)] t = fabs(s*x);
+      return x .* (1 + k*log1p(t)) ./ (1 + t);
     }
 
     real logcompress_k(data real x, data real s) {
-      return fabs(s*x)/log1p(fabs(s*x));
+      real t = fabs(s*x);
+      return t/log1p(t);
     }
 //}

@@ -122,7 +122,8 @@ transformed data {
   int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
   real<lower=0> q_s = 0.25;
-  real<lower=0> q_k = 1;
+  real<lower=0> q_a = 0.25;
+  real<lower=0> q_k = logcompress_k(4.0, q_s, q_a);
 
   int<lower=1,upper=Nsubobjects> quant2subobj[Nquanted] = subobs2subobj[quant2subobs];
   int<lower=1,upper=Nobservations> quant2obs[Nquanted] = subobs2obs[quant2subobs];
@@ -513,7 +514,7 @@ model {
         }
 
         // model quantitations and missing data
-        logcompressv(exp2(q_labu - qLog2Std) - qDataNorm, q_s, q_k) ~ double_exponential(0.0, 1);
+        logcompressv(exp2(q_labu - qLog2Std) - qDataNorm, q_s, q_a, q_k) ~ double_exponential(0.0, 1);
         // soft-lower-limit for subobject intensities of reliable quantifications
         1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept)));
@@ -562,7 +563,7 @@ generated quantities {
         // calculate log-likelihood per subobject
         subobj_llh = rep_vector(0.0, Nsubobjects);
         for (i in 1:Nquanted) {
-          subobj_llh[quant2subobj[i]] += double_exponential_lpdf(logcompress(exp2(q_labu[i] - qLog2Std[i]) - qDataNorm[i], q_s, q_k) | 0, 1) +
+          subobj_llh[quant2subobj[i]] += double_exponential_lpdf(logcompress(exp2(q_labu[i] - qLog2Std[i]) - qDataNorm[i], q_s, q_a, q_k)) +
               bernoulli_logit_lpmf(1 | q_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         }
         for (i in 1:Nmissed) {

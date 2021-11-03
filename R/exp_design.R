@@ -39,7 +39,19 @@ msglm_model <- function(conditionXeffect,
 
   checkmate::assert_matrix(conditionXeffect, mode="numeric",
                            any.missing = FALSE, nrows = nrow(conditions),
-                           min.cols = nrow(effects), max.cols=nrow(effects)+1L)
+                           min.cols = nrow(effects), max.cols=nrow(effects)+1L, min.rows = 1)
+
+  # Check rank of the conditionXeffect matrix
+  rank_conditionXeffect <- if (length(conditionXeffect) > 0) Matrix::rankMatrix(conditionXeffect) else 0
+  if (rank_conditionXeffect < nrow(effects)) {
+    warning('The rank of conditionXeffect matrix (', rank_conditionXeffect,
+            ') is lower than the number of effects (', nrow(effects), '), i.e. there are redundant effects')
+  }
+
+  if (nrow(effects)< 1) {
+    warning('The number of effects is (', nrow(effects), ')')
+  }
+
   # remove intercept if it's in the design matrix
   if ("(Intercept)" %in% rownames(conditionXeffect)) {
     if (verbose) warning('Removing (Intercept) effect from the conditionXeffect matrix (always present in the model)')
@@ -53,7 +65,7 @@ msglm_model <- function(conditionXeffect,
                        ncol(conditionXeffect), " effect(s)")
 
   # process effects
-  checkmate::assert_tibble(effects)
+  checkmate::assert_data_frame(effects)
   # TODO remove automatic sounds-like column renames?
   effects <- maybe_rename(effects, c("prior_mean" = "mean", "prior_tau" = "tau"))
   checkmate::assert_names(names(effects), must.include = 'effect')
@@ -96,7 +108,7 @@ msglm_model <- function(conditionXeffect,
   }
 
   # process conditions
-  checkmate::assert_tibble(conditions)
+  checkmate::assert_data_frame(conditions)
   checkmate::assert_names(names(conditions), must.include = 'condition')
   conditions <- dplyr::mutate(conditions, condition = as.character(condition))
   checkmate::assert_character(conditions$condition, unique=TRUE)
@@ -115,7 +127,7 @@ msglm_model <- function(conditionXeffect,
     conditions = conditions,
     conditionXeffect = conditionXeffect,
     verbose = verbose
-  ), class="msglm_model")
+  ), class = "msglm_model")
   if (!is.null(msexperimentXeffect)) {
     if (verbose) message("MS experiment-specific experimental design specified")
     checkmate::assert_matrix(msexperimentXeffect, mode="numeric", any.missing = FALSE)
@@ -128,15 +140,18 @@ msglm_model <- function(conditionXeffect,
   return(model_def)
 }
 
-#' Title
+
+#' Set batch effects to the MSGLM model.
 #'
-#' @param model_def
-#' @param mschannelXbatchEffect
+#' TODO longer description
+#'
+#' @param model_def *msglm_model* object
+#' @param msexperimentXbatchEffect
 #' @param batch_effects
 #' @param applies_to
 #' @param verbose
 #'
-#' @return updated msglm_model object
+#' @return updated *msglm_model* object
 #' @export
 #'
 #' @examples

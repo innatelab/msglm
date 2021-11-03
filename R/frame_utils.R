@@ -196,10 +196,14 @@ ensure_primary_index_column <- function(df, index_col, id_col=NULL, ids_ordered=
   checkmate::assert_data_frame(df, .var.name=.var.name)
   if (!is.null(id_col)) {
     colname <- paste0(.var.name, "$", id_col)
-    checkmate::assert_character(ids_ordered, any.missing=FALSE, names="unnamed", unique=TRUE)
+    if (!is.null(ids_ordered)) {
+      checkmate::assert_character(ids_ordered, any.missing=FALSE, names="unnamed", unique=TRUE)
+    }
     if (rlang::has_name(df, id_col)) {
       if (is.factor(df[[id_col]])) df[[id_col]] <- as.character(df[[id_col]])
-      checkmate::assert_set_equal(df[[id_col]], ids_ordered, ordered=FALSE, .var.name = colname)
+      if (!is.null(ids_ordered)) {
+        checkmate::assert_set_equal(df[[id_col]], ids_ordered, ordered=FALSE, .var.name = colname)
+      }
     } else {
       stop("ID column '", id_col, "' not found in ", .var.name)
     }

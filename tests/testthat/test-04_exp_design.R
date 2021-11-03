@@ -5,8 +5,6 @@ test_that("msglm_model()", {
                                 conditions = data.frame(condition = "mock"),
                                 effects = data.frame(effect = character()))
   checkmate::expect_class(simplest_model, "msglm_model")
-  expect_equal(simplest_model$modelobject, 'protgroup') # default model object
-  expect_equal(simplest_model$modelobject, simplest_model$quantobject)
   expect_warning(msglm_model(constant_matrix(1, list(condition = "mock", effect = c())),
                              conditions = data.frame(condition = "mock"),
                              effects = data.frame(effect = character())),

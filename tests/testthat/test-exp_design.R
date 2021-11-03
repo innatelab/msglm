@@ -10,7 +10,7 @@ test_that("msglm_model()", {
   expect_warning(msglm_model(constant_matrix(1, list(condition = "mock", effect = c())),
                              conditions = data.frame(condition = "mock"),
                              effects = data.frame(effect = character())),
-                 'The number of effects is \\(0\\)', )
+                 'No effects in the experimental design')
 
   twoeffects_model <- msglm_model(constant_matrix(0, list(condition = "mock", effect = c("a", "b"))),
                                   conditions = data.frame(condition = "mock"),

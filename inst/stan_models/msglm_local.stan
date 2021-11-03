@@ -11,11 +11,11 @@ data {
   int<lower=0> Niactions;       // number of interactions (observed objectXcondition pairs)
   int<lower=1,upper=Nobjects> iaction2obj[Niactions];
 
-  int<lower=1> Nmschannels;     // number of mschannels
-  vector[Nmschannels] mschannel_shift;
+  int<lower=1> Nprobes;         // number of MS probes (= MS channels)
+  vector[Nprobes] mschannel_shift;
 
   int<lower=0> Nobservations;   // number of observations of interactions (objectXmschannel pairs for all iactions and mschannels of its condition)
-  int<lower=1,upper=Nmschannels> observation2mschannel[Nobservations];
+  int<lower=1,upper=Nprobes> observation2probe[Nobservations];
   int<lower=1,upper=Niactions> observation2iaction[Nobservations];
 
   // map from labelXreplicateXobject to observed/missed data
@@ -95,11 +95,14 @@ transformed data {
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
   int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
+  real<lower=0> q_s = 0.25;
+  real<lower=0> q_k = 1;
 
+  int<lower=1> Nmschannels = Nprobes;
   int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2obs];
-  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted] = observation2mschannel[quant2obs];
+  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted] = observation2probe[quant2obs];
   int<lower=1,upper=Niactions> miss2iaction[Nmissed] = observation2iaction[miss2obs];
-  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed] = observation2mschannel[miss2obs];
+  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed] = observation2probe[miss2obs];
 
   int<lower=0,upper=NobjEffects> NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   int<lower=0,upper=NobjEffects> NobjEffectsOther = NobjEffects - NobjEffectsPos;
@@ -127,10 +130,10 @@ transformed data {
 
   int<lower=0> NrealIactions = ndistinct(observation2iaction, Niactions);
   int<lower=0> Nobservations0 = Nobservations - NrealIactions; // number of observations degrees of freedom ()
-  int<lower=0> obs_shiftXobs_shift0_Nw = contr_poly_Nw(Niactions, observation2iaction);
+  int<lower=0> obs_shiftXobs_shift0_Nw = Nobservations0 > 0 ? contr_poly_Nw(Niactions, observation2iaction) : 0;
   vector[obs_shiftXobs_shift0_Nw] obs_shiftXobs_shift0_w;
-  int<lower=1, upper=obs_shiftXobs_shift0_Nw + 1> obs_shiftXobs_shift0_u[Nobservations + 1];
-  int<lower=1, upper=Nobservations0> obs_shiftXobs_shift0_v[obs_shiftXobs_shift0_Nw];
+  int<lower=1, upper=obs_shiftXobs_shift0_Nw + 1> obs_shiftXobs_shift0_u[Nobservations0 > 0 ? Nobservations + 1 : 0];
+  int<lower=1, upper=Nobservations0> obs_shiftXobs_shift0_v[Nobservations0 > 0 ? obs_shiftXobs_shift0_Nw : 0];
 
   matrix[Nobjects + NobjEffects, Niactions] iaction2objeffx_op;
   //matrix[Niactions, Nobjects] iactXobjbase = csr_to_dense_matrix(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u);
@@ -157,7 +160,7 @@ transformed data {
   }
 
   // prepare obs_shiftXobs_shift0
-  {
+  if (Nobservations0 > 0) {
     int iaction2nobs[Niactions];
 
     int iaction2nobs_2ndpass[Niactions];
@@ -365,7 +368,7 @@ model {
         }
 
         // model quantitations and missing data
-        logcompressv(exp2(q_labu - qLog2Std) - qDataNorm, 0.25) ~ double_exponential(0.0, 1);
+        logcompressv(exp2(q_labu - qLog2Std) - qDataNorm, q_s, q_k) ~ double_exponential(0.0, 1);
         // soft-lower-limit for object intensities of reliable quantifications
         1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
         0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept)));
@@ -378,7 +381,7 @@ generated quantities {
         csr_matrix_times_vector(Niactions, Nobjects, iactXobjbase_w, iaction2obj, iactXobjbase_u, obj_base_labu) +
         csr_matrix_times_vector(Niactions, NobjEffects, iactXobjeff_w, iactXobjeff_v, iactXobjeff_u, obj_effect);
         //obj_base_labu[iaction2obj] + iactXobjeff * obj_effect;
-    vector[Niactions] iaction_labu_replCI = to_vector(normal_rng(iaction_labu, iact_repl_shift_sigma));
+    vector[Niactions] iaction_labu_replCI = Nobservations0 > 0 ? to_vector(normal_rng(iaction_labu, iact_repl_shift_sigma)) : iaction_labu;
     vector[Nobjects] obj_base_labu_replCI;
     vector[NobjEffects] obj_effect_replCI;
 

@@ -133,7 +133,9 @@ vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
                                 method=c("draws", "normal"),
                                 nsteps = 100L, maxBandwidth = NA_real_,
                                 mlog10pvalue_threshold = 10.0,
-                                mlog10pvalue_hard_threshold_factor = 3.0)
+                                mlog10pvalue_hard_threshold_factor = 3.0,
+                                verbose=FALSE,
+                                .contrasts.name="contrasts")
 {
   method <- match.arg(method)
   tail <- match.arg(tail)
@@ -173,6 +175,10 @@ vars_contrast_stats <- function(vars_draws, vars_stats, vargroups,
   if (any(is.na(vargroup_info.df$`__vargroup_ix__`))) {
     stop(sum(is.na(vargroup_info.df$`__vargroup_ix__`)), " vargroup(s) not defined: ",
          paste0(dplyr::filter(vargroup_info.df, is.na(`__vargroup_ix__`)), collapse=", "))
+  }
+  if (!rlang::has_name(contrasts, offset_col)) {
+    if (verbose) message("No ", .contrasts.name, "$", offset_col, " offset column found, defaulting to 0 offset")
+    contrasts <- dplyr::mutate(contrasts, !!sym(offset_col) := 0)
   }
   contrast_offsets <- rlang::set_names(dplyr::pull(contrasts, !!offset_col), contrasts$contrast)
   contrast_stats <- if (method == "draws") {
@@ -227,9 +233,6 @@ vars_identity_contrast_stats <- function(vars_draws, vars_stats,
                                          offset_col='offset',
                                          ...) {
     groups_df <- dplyr::select(groups_info, !!group_idcol, any_of(offset_col)) %>% dplyr::distinct()
-    if (!rlang::has_name(groups_df, offset_col)) {
-      groups_df <- dplyr::mutate(groups_df, !!sym(offset_col):=0)
-    }
     group_ids <- dplyr::pull(groups_df, !!group_idcol)
     groups_diag <- diag(nrow = length(group_ids), ncol = length(group_ids))
     dimnames(groups_diag) <- list(group_ids, group_ids) %>%
@@ -311,15 +314,72 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
     return (res.df)
 }
 
-#
-append_contrasts_stats <- function(vars_results, standraws, stanstats, varspecs,
-        metaconditionXcontrast, contrasts.df, conditionXcontrast.df,
-        condition_agg_col = "condition", # filtering is based on pregrouping quantiles in metacondition using this column (per contrast)
-        object_cols = 'index_object', metacondition_cols = c(),
-        group_cols = c(), method = c("draws", "normal")
-){
+#' @export
+default_contrast_vars <- function(vars_info) {
+  intersect(c('iaction_labu', 'iaction_labu_replCI'),
+            unlist(lapply(vars_info, function(vi) vi$names )))
+  # obs_labu is skipped because it's much more expensive to compute and Rhat statistics doesn't make sense
+}
+
+process.stan_fit.contrasts <- function(vars_results, msglm.stan_draws, msglm.stan_stats, model_data,
+                                       varspecs, dims_info = msglm_dims(model_data),
+                                       contrast_vars = default_contrast_vars(vars_info), contrast_group_cols = c(),
+                                       condition_agg_col = "condition", object_cols = setdiff(colnames(dims_info$object), "index_object"),
+                                       method = c("draws", "normal"),
+                                       verbose=model_data$model_def$verbose)
+{
   method <- match.arg(method)
+  model_def <- model_data$model_def
+  #if (verbose)
+  message("Calculating contrasts...")
+  contrasts.df <- model_def$contrasts
+  # set default quantile thresholds, if not defined
+  if (!rlang::has_name(contrasts.df, "lhs_quantile_min")) {
+    contrasts.df$lhs_quantile_min <- 0.0
+  }
+  if (!rlang::has_name(contrasts.df, "lhs_quantile_max")) {
+    contrasts.df$lhs_quantile_max <- 1.0
+  }
+  if (!rlang::has_name(contrasts.df, "rhs_quantile_min")) {
+    contrasts.df$rhs_quantile_min <- 0.0
+  }
+  if (!rlang::has_name(contrasts.df, "rhs_quantile_max")) {
+    contrasts.df$rhs_quantile_max <- 1.0
+  }
+
+  metaconditionXcontrast.df <- as.data.frame.table(model_def$metaconditionXcontrast, responseName="weight") %>%
+    dplyr::filter(weight != 0) %>%
+    dplyr::inner_join(contrasts.df, by="contrast")
+  conditionXcontrast.df <- as.data.frame.table(model_def$conditionXmetacondition, responseName="part_of") %>%
+    dplyr::filter(part_of) %>% dplyr::select(-part_of) %>%
+    dplyr::inner_join(dplyr::select(metaconditionXcontrast.df, metacondition, contrast, weight, contrast_type),
+                      by="metacondition")
+  if (rlang::has_name(model_def, "conditionXcontrast")) {
+    old_nrow <- nrow(conditionXcontrast.df)
+    join_cols <- intersect(intersect(colnames(conditionXcontrast.df), colnames(model_def$conditionXcontrast)),
+                          c("contrast", "contrast_type", "condition", "metacondition", "weight"))
+    conditionXcontrast.df <- dplyr::left_join(conditionXcontrast.df, model_def$conditionXcontrast, by=join_cols)
+    if (old_nrow != nrow(conditionXcontrast.df)) {
+      stop("Incompatible model_def$conditionXcontrast, check that it matches metaconditionXcondition and metaconditionXcontrast")
+    }
+  }
+  if (!rlang::has_name(conditionXcontrast.df, "is_preserved_condition")) {
+    conditionXcontrast.df$is_preserved_condition <- FALSE
+  }
+  conditionXcontrast.df <- dplyr::mutate(conditionXcontrast.df,
+                                        is_preserved_condition = coalesce(is_preserved_condition, FALSE)) %>%
+      dplyr::arrange(contrast, contrast_type, metacondition, condition)
+
+  # subset the varspec for those that could be used for contrasts calculation
+  contrast_varspecs = list(spec_info = dplyr::filter(varspecs$spec_info, var %in% contrast_vars))
+  contrast_varspecs$cats_info = varspecs$cats_info[unique(contrast_varspecs$spec_info$category)]
+  # filter for vars that have condition associated with them
+  #contrast_varspecs$cats_info = varspecs$cats_info[sapply(varspecs$cats_info, function(df) rlang::has_name(df, condition_agg_col)]
+  #contrast_varspecs$spec_info = dplyr::filter(contrast_varspecs$spec_info, category %in% names(contrast_varspecs$cats_info))
+
+  metaconditionXcontrast <- model_def$metaconditionXcontrast
   metacondition_col <- names(dimnames(metaconditionXcontrast))[[1]]
+  metacondition_cols <- c()
   contrast_col <- names(dimnames(metaconditionXcontrast))[[2]]
   condition_col <- 'condition'
   cutoff_quantiles.df <- dplyr::bind_rows(
@@ -331,8 +391,8 @@ append_contrasts_stats <- function(vars_results, standraws, stanstats, varspecs,
                      qtile_max = rhs_quantile_max))
 
   # generate contrast reports
-  contrast_results <- dplyr::group_by(varspecs$spec_info, category) %>%
-  dplyr::group_map(.keep = TRUE, function(cat_varspecs, cat) {
+  res <- dplyr::group_by(contrast_varspecs$spec_info, category) %>%
+    dplyr::group_map(.keep = TRUE, function(cat_varspecs, cat) {
     message('  * ', cat$category,
             ' variables: ', paste0(unique(cat_varspecs$var), collapse=', '), '...')
     cat_info <- varspecs$cats_info[[cat$category]]
@@ -343,10 +403,10 @@ append_contrasts_stats <- function(vars_results, standraws, stanstats, varspecs,
     conditionXcontrast_pregroup_stats.df <- dplyr::inner_join(cat_vars_stats,
                                                               dplyr::mutate(conditionXcontrast.df, is_lhs = weight > 0),
                                                               by = condition_col) %>%
-      dplyr::group_by_at(c("var", group_cols, contrast_col, metacondition_col, condition_agg_col,
+      dplyr::group_by_at(c("var", contrast_group_cols, contrast_col, metacondition_col, condition_agg_col,
                            "is_lhs", "is_preserved_condition")) %>%
       dplyr::summarize(var_pregroup_max = max(mean), var_pregroup_min = min(mean)) %>%
-      dplyr::group_by_at(c("var", group_cols, contrast_col, metacondition_col, "is_lhs")) %>%
+      dplyr::group_by_at(c("var", contrast_group_cols, contrast_col, metacondition_col, "is_lhs")) %>%
       dplyr::mutate(var_pregroup_max_qtile = cume_dist(var_pregroup_max) - 1/n(),
                     var_pregroup_min_qtile = cume_dist(var_pregroup_min) - 1/n()) %>%
       dplyr::ungroup() %>% dplyr::inner_join(cutoff_quantiles.df, by = c('contrast', 'is_lhs')) %>%
@@ -357,30 +417,19 @@ append_contrasts_stats <- function(vars_results, standraws, stanstats, varspecs,
 
     vargroups.df <- dplyr::inner_join(cat_varspecs, cat_info, by = "var_index") %>%
       dplyr::inner_join(dplyr::filter(conditionXcontrast_pregroup_stats.df, is_accepted),
-                        by = c("var", group_cols, condition_col)) %>%
-      dplyr::select_at(c("var", "ci_target", "index_varspec", "category", group_cols, contrast_col, metacondition_col, condition_col)) %>%
-      dplyr::group_by_at(c("var", "ci_target", "category", group_cols)) %>%
-      dplyr::group_modify(~ vars_contrast_stats(standraws, stanstats,
+                        by = c("var", contrast_group_cols, condition_col)) %>%
+      dplyr::select_at(c("var", "ci_target", "index_varspec", "category", contrast_group_cols,
+                         contrast_col, metacondition_col, condition_col)) %>%
+      dplyr::group_by_at(c("var", "ci_target", "category", contrast_group_cols)) %>%
+      dplyr::group_modify(~ vars_contrast_stats(msglm.stan_draws, msglm.stan_stats,
                               vargroups = dplyr::group_by_at(.x, c(metacondition_col, contrast_col)),
                               vargroupXcontrast = metaconditionXcontrast,
-                              contrasts = contrasts.df, method = method))
+                              contrasts = contrasts.df, method = method,
+                              verbose = verbose)) %>%
+      dplyr::ungroup()
     return (vargroups.df)
   })
-  # add contrast reports to the var_results
-  for (cat_contrasts in contrast_results) {
-    cat <- cat_contrasts$category[[1]]
-    cat_results <- vars_results[[cat]]
-    cat_results$contrast_stats <- cat_contrasts
-    vars_results[[cat]] <- cat_results
-  }
-  return(vars_results)
-}
-
-#' @export
-default_contrast_vars <- function(vars_info) {
-  intersect(c('iaction_labu', 'iaction_labu_replCI'),
-            unlist(lapply(vars_info, function(vi) vi$names )))
-  # obs_labu is skipped because it's much more expensive to compute and Rhat statistics doesn't make sense
+  return(res)
 }
 
 #' @export
@@ -433,7 +482,8 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
       message('    - calculating P-values for: ',
               paste0(unique(cat_eff_varspecs.df$var), collapse=', '), '...')
       p_values.df <- vars_pvalues(msglm.stan_draws, msglm.stan_stats,
-                                  cat_eff_varspecs.df, method=contrast_method)
+                                  cat_eff_varspecs.df, method=contrast_method,
+                                  verbose=verbose)
       res.df <- dplyr::left_join(res.df, dplyr::select(p_values.df, -any_of("prior_mean")), by="varspec") %>%
         dplyr::select(-index_varspec, -var_index)
     }
@@ -456,59 +506,26 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
             dplyr::filter(varspecs$spec_info, var == 'obs_labu'),
             varspecs$cats_info$observations,
             group_idcol = "index_interaction",
-            method=contrast_method) %>% dplyr::mutate(var = 'obs_labu'))
+            method=contrast_method,
+            verbose=verbose) %>% dplyr::mutate(var = 'obs_labu'))
   }
 
-  message("Calculating contrasts...")
-  contrasts.df <- model_def$contrasts
-  # set default quantile thresholds, if not defined
-  if (!rlang::has_name(contrasts.df, "lhs_quantile_min")) {
-    contrasts.df$lhs_quantile_min <- 0.0
-  }
-  if (!rlang::has_name(contrasts.df, "lhs_quantile_max")) {
-    contrasts.df$lhs_quantile_max <- 1.0
-  }
-  if (!rlang::has_name(contrasts.df, "rhs_quantile_min")) {
-    contrasts.df$rhs_quantile_min <- 0.0
-  }
-  if (!rlang::has_name(contrasts.df, "rhs_quantile_max")) {
-    contrasts.df$rhs_quantile_max <- 1.0
-  }
-
-  metaconditionXcontrast.df <- as.data.frame.table(model_def$metaconditionXcontrast, responseName="weight") %>%
-    dplyr::filter(weight != 0) %>%
-    dplyr::inner_join(contrasts.df, by="contrast")
-  conditionXcontrast.df <- as.data.frame.table(model_def$conditionXmetacondition, responseName="part_of") %>%
-    dplyr::filter(part_of) %>% dplyr::select(-part_of) %>%
-    dplyr::inner_join(dplyr::select(metaconditionXcontrast.df, metacondition, contrast, weight, contrast_type),
-                      by="metacondition")
-  if (rlang::has_name(model_def, "conditionXcontrast")) {
-    old_nrow <- nrow(conditionXcontrast.df)
-    join_cols <- intersect(intersect(colnames(conditionXcontrast.df), colnames(model_def$conditionXcontrast)),
-                           c("contrast", "contrast_type", "condition", "metacondition", "weight"))
-    conditionXcontrast.df <- dplyr::left_join(conditionXcontrast.df, model_def$conditionXcontrast, by=join_cols)
-    if (old_nrow != nrow(conditionXcontrast.df)) {
-      stop("Incompatible model_def$conditionXcontrast, check that it matches metaconditionXcondition and metaconditionXcontrast")
+  if (rlang::has_name(model_def, "contrasts")) {
+    contrast_res <- process.stan_fit.contrasts(res, msglm.stan_draws, msglm.stan_stats, model_data, varspecs,
+                                      dims_info=dims_info, contrast_vars=contrast_vars,
+                                      contrast_group_cols=contrast_group_cols,
+                                      condition_agg_col=condition_agg_col,
+                                      object_cols = object_cols,
+                                      method=contrast_method, verbose=verbose)
+    # add contrast reports to the results
+    for (cat_contrasts in contrast_res) {
+      cat <- cat_contrasts$category[[1]]
+      cat_results <- res[[cat]]
+      cat_results$contrast_stats <- cat_contrasts
+      res[[cat]] <- cat_results
     }
+  } else if (verbose) {
+    message("Skipping contrasts calculation: none specified")
   }
-  if (!rlang::has_name(conditionXcontrast.df, "is_preserved_condition")) {
-    conditionXcontrast.df$is_preserved_condition <- FALSE
-  }
-  conditionXcontrast.df <- dplyr::mutate(conditionXcontrast.df,
-                                         is_preserved_condition = coalesce(is_preserved_condition, FALSE)) %>%
-      dplyr::arrange(contrast, contrast_type, metacondition, condition)
-
-  # subset the varspec for those that could be used for contrasts calculation
-  contrast_varspecs = list(spec_info = dplyr::filter(varspecs$spec_info, var %in% contrast_vars))
-  contrast_varspecs$cats_info = varspecs$cats_info[unique(contrast_varspecs$spec_info$category)]
-  # filter for vars that have condition associated with them
-  #contrast_varspecs$cats_info = varspecs$cats_info[sapply(varspecs$cats_info, function(df) rlang::has_name(df, condition_agg_col)]
-  #contrast_varspecs$spec_info = dplyr::filter(contrast_varspecs$spec_info, category %in% names(contrast_varspecs$cats_info))
-  res <- append_contrasts_stats(res, msglm.stan_draws, msglm.stan_stats, contrast_varspecs,
-            model_def$metaconditionXcontrast, contrasts.df, conditionXcontrast.df,
-            condition_agg_col = condition_agg_col,
-            object_cols = object_cols, metacondition_cols = c(),
-            group_cols = contrast_group_cols,
-            method = contrast_method)
   return (res)
 }

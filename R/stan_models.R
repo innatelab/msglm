@@ -81,11 +81,12 @@ to_standata.msglm_model_data <- function(model_data,
   model_def <- model_data$model_def
   if (verbose) message('Converting MSGLM model data to Stan-readable format...')
   ensure_primary_index_column(model_def$effects, 'index_effect')
+  ensure_primary_index_column(model_data$msprobes, 'index_msprobe')
   ensure_primary_index_column(model_data$mschannels, 'index_mschannel')
 
   is_glmm <- rlang::inherits_all(model_def, "msglmm_model")
   xaction_ix_col <- if (is_glmm) "index_superaction" else "index_interaction"
-  obs_df <- dplyr::select(model_data$observations, index_observation, index_mschannel, index_msrun,
+  obs_df <- dplyr::select(model_data$observations, index_observation, index_msprobe,
                           index_object, !!xaction_ix_col)
   if (any(obs_df$index_observation != seq_len(nrow(obs_df)))) {
     stop("model_data$msdata not ordered by observations / have missing observations")
@@ -98,12 +99,16 @@ to_standata.msglm_model_data <- function(model_data,
 
   missing_mask <- is.na(model_data$msdata$intensity)
   res <- list(
-    Nobservations = nrow(obs_df),
-    Nmschannels = n_distinct(model_data$mschannels$index_mschannel),
     Nconditions = nrow(model_def$conditions),
     Nobjects = nrow(model_data$objects),
+
+    Nprobes = nrow(model_data$msprobes),
+
+    Nobservations = nrow(obs_df),
+    observation2probe = as.array(obs_df$index_msprobe),
+
+    Nmschannels = n_distinct(model_data$mschannels$index_mschannel),
     mschannel_shift = as.array(model_data$mschannels$mschannel_shift),
-    observation2mschannel = as.array(obs_df$index_mschannel),
 
     Neffects = ncol(model_def$conditionXeffect),
     effect_is_positive = as.array(as.integer(model_def$effects$is_positive)),
@@ -160,6 +165,7 @@ to_standata.msglm_model_data <- function(model_data,
       quant2subobs = as.array(model_data$msdata$index_subobservation[!is.na(model_data$msdata$index_qdata)]),
       miss2subobs = as.array(model_data$msdata$index_subobservation[!is.na(model_data$msdata$index_mdata)]),
       subobs2subobj = as.array(model_data$msdata$index_subobject),
+      subobs2mschannel = as.array(model_data$msdata$index_mschannel),
       subobs2obs = as.array(model_data$msdata$index_observation),
       # TODO support different noise models
       Nmsprotocols = 0L,
@@ -251,7 +257,16 @@ stan_model_name <- function(standata) {
   model_def <- model_data$model_def
   res <- c(msglm_model = "msglm_local",
            msglmm_model = "msglmm_local")[class(model_def)[[1]]]
-  if (isSubobjectQuanted(model_def)) res <- paste0(res, '_subobjects')
+  modelobj <- model_data$msentities[['modelobject']]
+  quantobj <- model_data$msentities[['quantobject']]
+  if (modelobj == quantobj) {
+    # do nothing
+  } else if (quantobj == "pepmodstate") {
+    res <- paste0(res, '_subobjects')
+  } else {
+     stop("Unsupported combination of modelobject=", modelobj,
+          " and quantobject=", quantobj)
+  }
   return(res)
 }
 
@@ -261,8 +276,8 @@ stan_model_name <- function(standata) {
 fit_model <- function(model_data, ...) UseMethod("fit_model")
 
 #' @export
-fit_model.msglm_model_data <- function(model_data, standata_options=list(), ...) {
-  standata <- do.call(to_standata, modifyList(list(model_data), standata_options))
+fit_model.msglm_model_data <- function(model_data, stanmodel_options=list(), ...) {
+  standata <- rlang::exec(to_standata, model_data, !!!stanmodel_options)
   fit_model(standata, ...)
 }
 

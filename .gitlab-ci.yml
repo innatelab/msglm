@@ -2,7 +2,7 @@ image: rocker/verse
 
 variables:
   # changing the snapshot will cause the rebuild of the msglm dependencies
-  R_DEPS_SNAPSHOT: RDeps-20210916
+  R_DEPS_SNAPSHOT: RDeps-20211026
   # msglm is installed to R_LIBS_USER
   R_LIBS_USER: "$CI_PROJECT_DIR/.ci/lib/R/library"
   # dependencies are installed to R_LIBS_SITE
@@ -38,7 +38,7 @@ build_deps:
     - mkdir -p $R_LIBS_SITE $CHECK_DIR $BUILD_LOGS_DIR
   script:
     # override dependencies with custom versions not yet on CRAN
-    - Rscript -e "remotes::install_github(c('r-lib/cpp11', 'stan-dev/posterior', 'stan-dev/cmdstanr'))"
+    - Rscript -e "remotes::install_github(c('r-lib/cpp11', 'r-lib/testthat', 'mllg/checkmate', 'stan-dev/posterior', 'stan-dev/cmdstanr'))"
     - Rscript -e "remotes::install_cran(c('decor', 'covr', 'DT'))"
     - Rscript -e "remotes::install_deps(dependencies = TRUE, upgrade = 'never')"
   cache:

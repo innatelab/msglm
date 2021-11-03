@@ -124,15 +124,15 @@ frame2matrix <- function(df, row_col, col_col, val_col="w", val_default=0, cols=
     dplyr::arrange_at(c(col_col, row_col))
   mtx <- stats::xtabs(as.formula(paste0(val_col, " ~ ", row_col, " + ", col_col)), data=df_expanded)
   checkmate::assert_set_equal(names(dimnames(mtx)), c(row_col, col_col), ordered=TRUE)
-  if (nrow(mtx) == 0 || is.integer(rows) && vctrs::vec_equal(rows, seq_len(nrow(mtx)))) {
+  if (nrow(mtx) == 0 || is.integer(rows) && all(vctrs::vec_equal(rows, seq_len(nrow(mtx))))) {
     rownames(mtx) <- NULL
   } else {
-    checkmate::assert_set_equal(rownames(mtx), rows, ordered=TRUE)
+    checkmate::assert_set_equal(rownames(mtx), as.character(rows), ordered=TRUE)
   }
-  if (ncol(mtx) == 0 || is.integer(cols) && vctrs::vec_equal(cols, seq_len(ncol(mtx)))) {
+  if (ncol(mtx) == 0 || is.integer(cols) && all(vctrs::vec_equal(cols, seq_len(ncol(mtx))))) {
     colnames(mtx) <- NULL
   } else {
-    checkmate::assert_set_equal(colnames(mtx), cols, ordered=TRUE)
+    checkmate::assert_set_equal(colnames(mtx), as.character(cols), ordered=TRUE)
   }
   return(mtx)
 }
@@ -153,20 +153,32 @@ frame2matrix <- function(df, row_col, col_col, val_col="w", val_default=0, cols=
 #'
 #' @export
 matrix2frame <- function(mtx, row_col = NULL, col_col = NULL, val_col = "w", skip_val = 0) {
-  dnn <- names(dimnames(mtx))
-  if (is.null(row_col)) {
+  df <- as.data.frame.table(mtx, stringsAsFactors=TRUE, responseName=val_col)
+  dnn <- colnames(df)
+  row_col <- row_col %||% names(dimnames(mtx))[[1]]
+  if (!is.null(row_col)) {
+    # overriding the existing name
+    df <- dplyr::rename(df, !!sym(row_col) := !!sym(dnn[[1]]))
+  } else {
     row_col <- dnn[[1]]
-    checkmate::assert_string(row_col, na.ok=FALSE, null.ok=FALSE)
-  } else {
-    dnn[[1]] <- row_col # overriding the existing name
   }
-  if (is.null(col_col)) {
+  # workaround df column being null (bug in as.data.frame.table()?)
+  if (is.null(df[[1]])) {
+    df[[1]] <- character(0)
+  }
+  if (is.null(df[[2]])) {
+    df[[2]] <- character(0)
+  }
+  col_col <- col_col %||% names(dimnames(mtx))[[2]]
+  if (!is.null(col_col)) {
+    # overriding the existing name
+    df <- dplyr::rename(df, !!sym(col_col) := !!sym(dnn[[2]]))
+  } else {
     col_col <- dnn[[2]]
-    checkmate::assert_string(col_col, na.ok=FALSE, null.ok=FALSE)
-  } else {
-    dnn[[2]] <- col_col # overriding the existing name
   }
-  df <- as.data.frame.table(mtx, dnn=dnn, stringsAsFactors=TRUE, responseName=val_col)
+  if (!rlang::has_name(df, val_col)) {
+    df[[val_col]] <- rlang::exec(typeof(skip_val), nrow(df))
+  }
   if (!is.null(skip_val)) {
     df <- dplyr::filter(df, !!sym(val_col) != skip_val)
   }
@@ -191,18 +203,18 @@ matrix2frame <- function(mtx, row_col = NULL, col_col = NULL, val_col = "w", ski
 
 # check if the index column exists and equals to 1:nrow
 # or create it otherwise
-ensure_primary_index_column <- function(df, index_col, id_col=NULL, ids_ordered=NULL,
+ensure_primary_index_column <- function(df, index_col, id_col=NA_character_, ids_ordered=NULL,
                                         create=FALSE, .var.name=checkmate::vname(df)) {
   checkmate::assert_data_frame(df, .var.name=.var.name)
-  if (!is.null(id_col)) {
+  if (!is.na(id_col)) {
     colname <- paste0(.var.name, "$", id_col)
-    if (!is.null(ids_ordered)) {
-      checkmate::assert_character(ids_ordered, any.missing=FALSE, names="unnamed", unique=TRUE)
-    }
     if (rlang::has_name(df, id_col)) {
       if (is.factor(df[[id_col]])) df[[id_col]] <- as.character(df[[id_col]])
       if (!is.null(ids_ordered)) {
+        checkmate::assert_character(ids_ordered, any.missing=FALSE, names="unnamed", unique=TRUE)
         checkmate::assert_set_equal(df[[id_col]], ids_ordered, ordered=FALSE, .var.name = colname)
+      } else {
+        checkmate::assert_character(as.character(df[[id_col]]), any.missing=FALSE, names="unnamed", unique=TRUE)
       }
     } else {
       stop("ID column '", id_col, "' not found in ", .var.name)
@@ -213,7 +225,7 @@ ensure_primary_index_column <- function(df, index_col, id_col=NULL, ids_ordered=
     checkmate::assert_integer(df[[index_col]], .var.name=colname)
     checkmate::assert_set_equal(df[[index_col]], seq_len(nrow(df)),
                                 ordered=FALSE, .var.name=colname)
-    if (!is.null(id_col)) {
+    if (!is.na(id_col)) {
       # check the order of the ids
       df_ids_ordered <- df[[id_col]]
       df_ids_ordered[df[[index_col]]] <- df_ids_ordered
@@ -222,9 +234,14 @@ ensure_primary_index_column <- function(df, index_col, id_col=NULL, ids_ordered=
     }
   } else {
     if (create) {
-      if (!is.null(id_col)) {
-        df[[index_col]] <- match(df[[id_col]], ids_ordered)
-        df <- dplyr::arrange_at(df, index_col)
+      if (!is.na(id_col)) {
+        if (!is.null(ids_ordered)) {
+          df[[index_col]] <- match(df[[id_col]], ids_ordered)
+          df <- dplyr::arrange_at(df, index_col)
+        } else {
+          df <- dplyr::arrange_at(df, id_col)
+          df[[index_col]] <- seq_len(nrow(df))
+        }
       } else {
         df[[index_col]] <- seq_len(nrow(df))
       }

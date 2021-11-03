@@ -1,7 +1,7 @@
 Package: msglm
 Type: Package
 Title: GLM models for Mass Spectrometry Data
-Version: 0.3.4
+Version: 0.3.6
 Date: 2021-10-05
 Authors@R:
     c(person(given = "Alexey", family = "Stukalov", role = c("aut", "cre"),
@@ -17,4 +17,4 @@ LinkingTo: cpp11, BH
 SystemRequirements: C++11
 RoxygenNote: 7.1.2
 Roxygen: list(markdown = TRUE, r6 = FALSE)
-Suggests: testthat (>= 2.1.0)
+Suggests: testthat (>= 3.1.0)

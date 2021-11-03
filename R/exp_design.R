@@ -13,12 +13,10 @@ effect_factor <- function(effects, factor_name, factor_levels, default = factor_
 #'        the rows are conditions, the columns are the effects
 #' @param conditions the data frame of conditions
 #' @param effects the data frame of effect with optional prior specification (FIXME)
-#' @param msexperimentXeffect optional experimental design matrix for
-#'        per-MS experiment effect specification. Normally it is not required as `conditionXeffect`
+#' @param msprobeXeffect optional experimental design matrix for
+#'        per-MS probe effect specification. Normally it is not required as `conditionXeffect`
 #'        matrix should be enough. It's reserved for the rare cases where the there is a high variability
 #'        in biological responses between the biological replicates.
-#' @param modelobject name of the MS object, which abundance would be modeled by MSGLM
-#' @param quantobject name of the MS object to take the intensity information from
 #' @param verbose
 #'
 #' @return *msglm_model* object
@@ -27,15 +25,10 @@ effect_factor <- function(effects, factor_name, factor_levels, default = factor_
 #' @examples
 msglm_model <- function(conditionXeffect,
                         conditions, effects,
-                        msexperimentXeffect = NULL,
-                        modelobject = c("protgroup", "protregroup", "ptmgroup"),
-                        quantobject = c("protgroup", "protregroup", "ptmgroup", "pepmodstate"),
+                        msprobeXeffect = NULL,
                         verbose = FALSE)
 {
-  modelobject <- match.arg(modelobject)
-  quantobject <- match.arg(quantobject)
-  if (verbose) message("Initializing MSGLM model for ", modelobject,
-                       "s using ", quantobject, " intensities")
+  if (verbose) message("Initializing MSGLM model")
 
   checkmate::assert_matrix(conditionXeffect, mode="numeric",
                            any.missing = FALSE, nrows = nrow(conditions),
@@ -47,15 +40,14 @@ msglm_model <- function(conditionXeffect,
     warning('The rank of conditionXeffect matrix (', rank_conditionXeffect,
             ') is lower than the number of effects (', nrow(effects), '), i.e. there are redundant effects')
   }
-
-  if (nrow(effects)< 1) {
-    warning('The number of effects is (', nrow(effects), ')')
+  if (nrow(effects) < 1) {
+    warning('No effects in the experimental design')
   }
 
   # remove intercept if it's in the design matrix
-  if ("(Intercept)" %in% rownames(conditionXeffect)) {
+  if ("(Intercept)" %in% colnames(conditionXeffect)) {
     if (verbose) warning('Removing (Intercept) effect from the conditionXeffect matrix (always present in the model)')
-    conditionXeffect <- conditionXeffect[rownames(conditionXeffect) != "(Intercept)",, .drop=FALSE]
+    conditionXeffect <- conditionXeffect[, colnames(conditionXeffect) != "(Intercept)", drop=FALSE]
   }
   # FIXME allow row/col permutations, but then fix the row/col order
   checkmate::assert_matrix(conditionXeffect, mode="numeric",
@@ -122,31 +114,29 @@ msglm_model <- function(conditionXeffect,
   }
 
   model_def <- structure(list(
-    modelobject = modelobject, quantobject = quantobject,
     effects = effects,
     conditions = conditions,
     conditionXeffect = conditionXeffect,
     verbose = verbose
-  ), class = "msglm_model")
-  if (!is.null(msexperimentXeffect)) {
-    if (verbose) message("MS experiment-specific experimental design specified")
-    checkmate::assert_matrix(msexperimentXeffect, mode="numeric", any.missing = FALSE)
-    msexp_dim <- names(dimnames(msexperimentXeffect))[[1]]
-    checkmate::assert_choice(msexp_dim, c("msrun", "mschannel"))
-    checkmate::assert_subset(colnames(msexp_dim), choices=effects$effect)
-    model_def$msexperimentXeffect <- msexperimentXeffect
+  ), class="msglm_model")
+  if (!is.null(msprobeXeffect)) {
+    if (verbose) message("MS probe-specific experimental design specified")
+    checkmate::assert_matrix(msprobeXeffect, mode="numeric", any.missing = FALSE)
+    msprobe_dim <- names(dimnames(msprobeXeffect))[[1]]
+    checkmate::assert_choice(msprobe_dim, c("msexperiment", "msprobe", "msrun", "mschannel"))
+    checkmate::assert_subset(colnames(msprobe_dim), choices=effects$effect)
+    model_def$msprobeXeffect <- msprobeXeffect
   }
 
   return(model_def)
 }
-
 
 #' Set batch effects to the MSGLM model.
 #'
 #' TODO longer description
 #'
 #' @param model_def *msglm_model* object
-#' @param msexperimentXbatchEffect
+#' @param msprobeXbatchEffect
 #' @param batch_effects
 #' @param applies_to
 #' @param verbose
@@ -156,7 +146,7 @@ msglm_model <- function(conditionXeffect,
 #'
 #' @examples
 set_batch_effects <- function(model_def,
-                              msexperimentXbatchEffect,
+                              msprobeXbatchEffect,
                               batch_effects = NULL,
                               applies_to = c('modelobject', 'quantobject'),
                               verbose = model_def$verbose
@@ -166,18 +156,20 @@ set_batch_effects <- function(model_def,
 
   id_col <- c(modelobject="batch_effect", quantobject="quant_batch_effect")[applies_to]
   df_name <- paste0(id_col, 's')
-  checkmate::assert_matrix(msexperimentXbatchEffect, mode="numeric", any.missing=FALSE,
+  checkmate::assert_matrix(msprobeXbatchEffect, mode="numeric", any.missing=FALSE,
                            min.rows = 1, min.cols = 1, row.names = "unique", col.names = "unique")
-  msexp_dim <- names(dimnames(msexperimentXbatchEffect))[[1]]
-  checkmate::assert_choice(msexp_dim, c("msrun", "mschannel"))
-  msexperiments <- rownames(msexperimentXbatchEffect)
-  if (is.null(msexperiments)) stop("No names for MS experiments in the rows of the matrix")
+  msprobe_dim <- names(dimnames(msprobeXbatchEffect))[[1]]
+  msprobe_dimnames_allowed <- c("msrun", "mschannel")
+  if (applies_to == "modelobject") msprobe_dimnames_allowed <- append(msprobe_dimnames_allowed, c("msexperiment", "msprobe"))
+  checkmate::assert_choice(msprobe_dim, msprobe_dimnames_allowed)
+  msprobes <- rownames(msprobeXbatchEffect)
+  if (is.null(msprobes)) stop("No names for MS probes in the rows of the matrix")
 
-  mtx_name <- paste0("msexperimentX",
-                     c(modelobject="batchEffect", quantobject="quantBatchEffect")[[applies_to]])
-  mtx_batch_effects <- colnames(msexperimentXbatchEffect)
+  mtx_name <- c(modelobject="msprobeXbatchEffect",
+                quantobject="mschannelXquantBatchEffect")[[applies_to]]
+  mtx_batch_effects <- colnames(msprobeXbatchEffect)
 
-  if (verbose) message("  * ", ncol(msexperimentXbatchEffect), " ", applies_to, "-level batch effect(s) specified")
+  if (verbose) message("  * ", ncol(msprobeXbatchEffect), " ", applies_to, "-level batch effect(s) specified")
 
   # process batch_effects
   if (!is.null(batch_effects)) {
@@ -203,7 +195,7 @@ set_batch_effects <- function(model_def,
                                     is_positive = FALSE)
   }
   # update model_def
-  model_def[[mtx_name]] <- msexperimentXbatchEffect
+  model_def[[mtx_name]] <- msprobeXbatchEffect
   model_def[[df_name]] <- batch_effects
   return(model_def)
 }
@@ -281,17 +273,4 @@ set_contrasts <- function(model_def,
     model_def$conditionXcontrast <- conditionXcontrast
   }
   return(model_def)
-}
-
-#' @export
-isSubobjectQuanted <- function(model_def) {
-  checkmate::assert_class(model_def, "msglm_model")
-  if (model_def$modelobject == model_def$quantobject) {
-    return (FALSE)
-  } else if (model_def$quantobject == "pepmodstate") {
-    return (TRUE)
-  } else {
-     stop("Unsupported combination of modelobject=", model_def$modelobject,
-         " and quantobject=", model_def$quantobject)
-  }
 }

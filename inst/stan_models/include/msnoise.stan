@@ -4,21 +4,17 @@
         return 0.5*(scaleHi+scaleLo)*(z-bend) + 0.5*(scaleHi-scaleLo)*sqrt((z-bend)*(z-bend)+smooth) + offs;
     }
 
-    // compresses x: x~0 -> logcompress(x)~x,
-    // logcompress(x0, s, k) = x0, where k = logcompress_k(x0, s)
-    // abs(x)>>0 -> logcompress(x)~sign(x)*pow(log(abs(x)), a)
-    real logcompress(real x, data real s, data real a, data real k) {
-      real t = fabs(s*x);
-      return x * (1 + k*pow(log1p(t), a)) / (1 + t);
+    // compresses x: pdf(Normal,x) >= outlierProb*pdf(Cauchy,x) -> cauchy_compress(x) = x
+    //               otherwise x is transformed so that pdf(Normal, compress(x)) = outlierProb*pdf(Cauchy, x)
+    // k modulates the smoothness of log_sum_exp(),
+    // k=4 make log_mix(..., x) match pdf(std_normal, cauchy_compress(x))
+    real cauchy_compress(real x, data real a, data real k) {
+      return fabs(x) - log1p_exp(k * (fabs(x) - sqrt(2 * log1p(square(x)) + a))) / k;
     }
-
-    vector logcompressv(vector x, data real s, data real a, data real k) {
-      vector[size(x)] t = fabs(s*x);
-      return x .* (1 + k*pow(log1p(t), a)) ./ (1 + t);
+    vector cauchy_compressv(vector x, data real a, data real k) {
+      return fabs(x) - inv(k) * log1p_exp(k * (fabs(x) - sqrt(2 * log1p(square(x)) + a)));
     }
-
-    real logcompress_k(data real x, data real s, data real a) {
-      real t = fabs(s*x);
-      return t/pow(log1p(t), a);
+    real cauchy_compress_a(data real outlierProb) {
+      return log(pi()/2) - 2 * log(outlierProb);
     }
 //}

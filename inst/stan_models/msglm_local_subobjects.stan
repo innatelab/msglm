@@ -108,20 +108,20 @@ data {
   real sigmaOffset;
   real sigmaBend;
   real sigmaSmooth;
+  real outlierProb;
 
   real zShift;
   real zScale;
 }
 
 transformed data {
+  real compress_a = cauchy_compress_a(outlierProb);
   vector[Nquanted] zScore = (log2(qData) - zShift) * zScale;
   vector[Nquanted] qLog2Std; // log2(sd(qData))-zShift
+  vector[Nquanted] qLogShift;
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
   int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
-  real<lower=0> q_s = 0.25;
-  real<lower=0> q_a = 0.25;
-  real<lower=0> q_k = logcompress_k(4.0, q_s, q_a);
 
   int<lower=1,upper=Nsubobjects> quant2subobj[Nquanted] = subobs2subobj[quant2subobs];
   int<lower=1,upper=Nobservations> quant2obs[Nquanted] = subobs2obs[quant2subobs];
@@ -185,6 +185,7 @@ transformed data {
       qLog2Std[i] = intensity_log2_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
       qDataNorm[i] = exp2(log2(qData[i]) - qLog2Std[i]);
       qLog2Std[i] -= zShift; // obs_labu is normalized to zShift
+      qLogShift[i] = -qLog2Std[i] * log(2);
     }
   }
 
@@ -512,7 +513,14 @@ model {
         }
 
         // model quantitations and missing data
-        logcompressv(exp2(q_labu - qLog2Std) - qDataNorm, q_s, q_a, q_k) ~ double_exponential(0.0, 1);
+        //{ // ~10% slower version with explicit normal/cauchy mixture
+        //  vector[Nquanted] delta = exp2(q_labu - qLog2Std) - qDataNorm;
+        //  for (i in 1:Nquanted) {
+        //    target += log_mix(outlierProb, cauchy_lpdf(delta[i] | 0, 1), std_normal_lpdf(delta[i]));
+        //  }
+        //}
+        // 10% faster version with cauchy_compressv() transform
+        cauchy_compressv(exp2(q_labu - qLog2Std) - qDataNorm, compress_a, 4.0) ~ std_normal();
         // soft-lower-limit for subobject intensities of reliable quantifications
         1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + zDetectionIntercept);
         0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + zDetectionIntercept));
@@ -561,7 +569,10 @@ generated quantities {
         // calculate log-likelihood per subobject
         subobj_llh = rep_vector(0.0, Nsubobjects);
         for (i in 1:Nquanted) {
-          subobj_llh[quant2subobj[i]] += double_exponential_lpdf(logcompress(exp2(q_labu[i] - qLog2Std[i]) - qDataNorm[i], q_s, q_a, q_k)) +
+          real delta = exp2(q_labu[i] - qLog2Std[i]) - qDataNorm[i];
+
+          subobj_llh[quant2subobj[i]] += log_mix(outlierProb, cauchy_lpdf(delta | 0, 1),
+                                                 std_normal_lpdf(delta)) + qLogShift[i] +
               bernoulli_logit_lpmf(1 | q_labu[i] * (zScale * zDetectionFactor) + zDetectionIntercept);
         }
         for (i in 1:Nmissed) {

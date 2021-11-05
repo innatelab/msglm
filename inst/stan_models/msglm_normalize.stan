@@ -23,15 +23,14 @@ data {
   real sigmaOffset;
   real sigmaBend;
   real sigmaSmooth;
+  real outlierProb;
 
   real zShift;
   real zScale;
 }
 
 transformed data {
-    real<lower=0> q_s = 0.25;
-    real<lower=0> q_a = 0.25;
-    real<lower=0> q_k = logcompress_k(4.0, q_s, q_a);
+    real compress_a = cauchy_compress_a(outlierProb);
     matrix[Nobjects, Nmschannels] zScore;
     matrix[Nobjects, Nmschannels] qLog2Std;
     matrix<lower=0>[Nobjects, Nmschannels] qDataScaled;
@@ -123,5 +122,5 @@ model {
     // operator to sum channel intensities in each mschannel and copy it to all mschannels
     sum_mschans = exp2(rep_matrix(total_mschan_shift', Nmschannels) - rep_matrix(total_mschan_shift, Nmschannels)).*sum_mask;
     //print("avg_exps=", average_mschans);
-    logcompressv(to_vector(qDataScaled) - to_vector((qData * sum_mschans) .* meanDenomScaled), q_s, q_a, q_k) ~ double_exponential(0.0, data_sigma);
+    cauchy_compressv(to_vector(qDataScaled) - to_vector((qData * sum_mschans) .* meanDenomScaled), compress_a, 4.0) * inv(data_sigma) ~ std_normal();
 }

@@ -1,5 +1,6 @@
 //functions {
-    real intensity_log2_std(real z, real scaleHi, real scaleLo, real offs, real bend, real smooth) {
+    real intensity_log2_std(real z, data real scaleHi, data real scaleLo,
+                            data real offs, data real bend, data real smooth) {
         return 0.5*(scaleHi+scaleLo)*(z-bend) + 0.5*(scaleHi-scaleLo)*sqrt((z-bend)*(z-bend)+smooth) + offs;
     }
 

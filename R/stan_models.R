@@ -51,7 +51,6 @@ to_standata <- function(obj, ...) UseMethod("to_standata")
 #'
 #' @param model_data the list with MS data an experimental design
 #'
-#' @param obj_labu_shift the average log-abundance of model objects
 #' @param effect_slab_df the *degrees of freedom* for the prior of object effect *slab* regularization parameter
 #' @param effect_slab_scale the *scale* parameter for the prior of object effect *slab* regularization parameter
 #' @param obj_labu_min minimal object log-abundance
@@ -131,7 +130,6 @@ to_standata.msglm_model_data <- function(model_data,
     NobjBatchEffects = nrow(model_data$object_batch_effects),
     obj_batch_effect2batch_effect = as.array(model_data$object_batch_effects$index_batch_effect),
 
-    obj_labu_shift = model_data$quantobj_labu_shift,
     obj_base_labu_sigma = 15.0,
     obj_labu_min = rlang::set_names(model_data$quantobj_labu_min, NULL),
     obj_labu_min_scale = obj_labu_min_scale,

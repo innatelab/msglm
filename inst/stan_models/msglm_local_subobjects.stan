@@ -80,7 +80,6 @@ data {
   int<lower=1, upper=NsubobjBatchEffects> subobsXsubobjbatcheff_v[subobsXsubobjbatcheff_Nw];
 
   // global model constants
-  real obj_labu_shift;   // shift to be applied to all XXX_labu variables to get the real log intensity
   real obj_labu_min; // minimal average abundance of an object
   real<lower=0> obj_labu_min_scale; // scale that defines the softness of lower abundance limit
 
@@ -115,9 +114,8 @@ data {
 }
 
 transformed data {
-  real mzShift = zShift - obj_labu_shift; // zShift for the missing observation intensity
   vector[Nquanted] zScore = (log2(qData) - zShift) * zScale;
-  vector[Nquanted] qLog2Std; // log2(sd(qData))-obj_labu_shift
+  vector[Nquanted] qLog2Std; // log2(sd(qData))-zShift
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
   int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
@@ -186,7 +184,7 @@ transformed data {
     for (i in 1:Nquanted) {
       qLog2Std[i] = intensity_log2_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
       qDataNorm[i] = exp2(log2(qData[i]) - qLog2Std[i]);
-      qLog2Std[i] -= obj_labu_shift; // obs_labu is modeled without obj_base
+      qLog2Std[i] -= zShift; // obs_labu is normalized to zShift
     }
   }
 
@@ -516,8 +514,8 @@ model {
         // model quantitations and missing data
         logcompressv(exp2(q_labu - qLog2Std) - qDataNorm, q_s, q_a, q_k) ~ double_exponential(0.0, 1);
         // soft-lower-limit for subobject intensities of reliable quantifications
-        1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
-        0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept)));
+        1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + zDetectionIntercept);
+        0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + zDetectionIntercept));
     }
 }
 
@@ -564,10 +562,10 @@ generated quantities {
         subobj_llh = rep_vector(0.0, Nsubobjects);
         for (i in 1:Nquanted) {
           subobj_llh[quant2subobj[i]] += double_exponential_lpdf(logcompress(exp2(q_labu[i] - qLog2Std[i]) - qDataNorm[i], q_s, q_a, q_k)) +
-              bernoulli_logit_lpmf(1 | q_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
+              bernoulli_logit_lpmf(1 | q_labu[i] * (zScale * zDetectionFactor) + zDetectionIntercept);
         }
         for (i in 1:Nmissed) {
-          subobj_llh[miss2subobj[i]] += bernoulli_logit_lpmf(0 | missing_sigmoid_scale[i] * m_labu[i] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
+          subobj_llh[miss2subobj[i]] += bernoulli_logit_lpmf(0 | missing_sigmoid_scale[i] * m_labu[i] * (zScale * zDetectionFactor) + zDetectionIntercept);
         }
     }
 }

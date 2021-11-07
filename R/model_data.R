@@ -390,8 +390,9 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
     if (nrow(msdata_df) != nsubobs) {
       if (verbose) warning(nrow(msdata_df) - nsubobs, " of ", nrow(msdata_df),
                            " ", quantobj, " MS intensities are duplicate, summing duplicate entries")
-      msdata_df <- dplyr::group_by(msdata_df, dplyr::across(!any_of("intensity"))) %>%
-        dplyr::summarise(intensity = sum(intensity, na.rm = TRUE),
+      msdata_df <- dplyr::group_by(msdata_df, dplyr::across(!any_of(c("intensity", "ident_type")))) %>%
+        dplyr::summarise(dplyr::across(intensity, ~sum(.x, na.rm = TRUE)),
+                         dplyr::across(any_of("ident_type"), ~min(.x, na.rm = TRUE)),
                          .groups="drop") %>%
         dplyr::mutate(intensity = if_else(intensity != 0, intensity, NA_real_))
     }

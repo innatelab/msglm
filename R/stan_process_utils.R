@@ -27,8 +27,8 @@ process_varspecs <- function(varspecs, vars_info, dims_info) {
       tibble(category = cat,
              var = vars_info[[cat]]$names,
              ci_target = case_when(str_detect(var, '_replCI$') ~ 'replicate',
-                                   TRUE ~ 'median') %>%
-                         factor(levels=c('median', 'replicate')))
+                                   TRUE ~ 'average') %>%
+                         factor(levels=c('average', 'replicate')))
   }))
   all_varspecs.df <- tibble(varspec = varspecs,
                             index_varspec = seq_along(varspecs)) %>%

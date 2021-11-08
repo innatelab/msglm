@@ -24,7 +24,8 @@ to_standata.mscalib <- function(mscalib, convert_base=FALSE, silent=TRUE) {
   return(mscalib[c('zShift', 'zScale',
                    'zDetectionFactor', 'zDetectionIntercept',
                    'sigmaScaleHi', 'sigmaScaleLo',
-                   'sigmaOffset', 'sigmaBend', 'sigmaSmooth')])
+                   'sigmaOffset', 'sigmaBend', 'sigmaSmooth',
+                   'outlierProb')])
 }
 
 # convert signal to zscore

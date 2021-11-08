@@ -57,7 +57,6 @@ data {
   int<lower=1, upper=NobjBatchEffects> obsXobjbatcheff_v[obsXobjbatcheff_Nw];
 
   // global model constants
-  real obj_labu_shift;   // shift to be applied to all XXX_labu variables to get the real log intensity
   real obj_labu_min; // minimal average abundance of an object
   real<lower=0> obj_labu_min_scale; // scale that defines the softness of lower abundance limit
 
@@ -83,20 +82,20 @@ data {
   real sigmaOffset;
   real sigmaBend;
   real sigmaSmooth;
+  real outlierProb;
 
   real zShift;
   real zScale;
 }
 
 transformed data {
-  real mzShift = zShift - obj_labu_shift; // zShift for the missing observation intensity
+  real compress_a = cauchy_compress_a(outlierProb);
   vector[Nquanted] zScore = (log2(qData) - zShift) * zScale;
-  vector[Nquanted] qLog2Std; // log2(sd(qData))-obj_labu_shift
+  vector[Nquanted] qLog2Std; // log2(sd(qData))-zShift
+  vector[Nquanted] qLogShift;
   vector<lower=0>[Nquanted] qDataNorm; // qData/sd(qData)
   int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
-  real<lower=0> q_s = 0.25;
-  real<lower=0> q_k = 1;
 
   int<lower=1> Nmschannels = Nprobes;
   int<lower=1,upper=Niactions> quant2iaction[Nquanted] = observation2iaction[quant2obs];
@@ -144,7 +143,8 @@ transformed data {
     for (i in 1:Nquanted) {
       qLog2Std[i] = intensity_log2_std(zScore[i], sigmaScaleHi, sigmaScaleLo, sigmaOffset, sigmaBend, sigmaSmooth);
       qDataNorm[i] = exp2(log2(qData[i]) - qLog2Std[i]);
-      qLog2Std[i] -= obj_labu_shift; // obs_labu is modeled without obj_base
+      qLog2Std[i] -= zShift; // obs_labu is normalized to zShift
+      qLogShift[i] = -qLog2Std[i] * log(2);
     }
   }
 
@@ -368,10 +368,17 @@ model {
         }
 
         // model quantitations and missing data
-        logcompressv(exp2(q_labu - qLog2Std) - qDataNorm, q_s, q_k) ~ double_exponential(0.0, 1);
+        //{ // ~10% slower version with explicit normal/cauchy mixture
+        //  vector[Nquanted] delta = exp2(q_labu - qLog2Std) - qDataNorm;
+        //  for (i in 1:Nquanted) {
+        //    target += log_mix(outlierProb, cauchy_lpdf(delta[i] | 0, 1), std_normal_lpdf(delta[i]));
+        //  }
+        //}
+        // 10% faster version with cauchy_compressv() transform
+        cauchy_compressv(exp2(q_labu - qLog2Std) - qDataNorm, compress_a, 4.0) ~ std_normal();
         // soft-lower-limit for object intensities of reliable quantifications
-        1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept));
-        0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + (-mzShift * zScale * zDetectionFactor + zDetectionIntercept)));
+        1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + zDetectionIntercept);
+        0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + zDetectionIntercept));
     }
 }
 

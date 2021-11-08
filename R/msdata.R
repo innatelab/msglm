@@ -501,13 +501,9 @@ import_msglm_data <- function(msdata, model_def = NULL,
   checkmate::assert_class(mscalib, "mscalib")
   res[[paste0(quantobject, "_mscalib")]] <- mscalib
 
-  quantobj_labu_shift_name <- paste0(quantobject, "_labu_shift")
-  res[[quantobj_labu_shift_name]] <- 0.95*log2(median(quantobj_intensities_df$intensity, na.rm=TRUE))
-  if (verbose) message(quantobj_labu_shift_name, "=", res[[quantobj_labu_shift_name]])
-
   quantobj_labu_min_name <- paste0(quantobject, "_labu_min")
   res[[quantobj_labu_min_name]] <- quantile(quantobj_intensities_df$intensity, min_intensity_quantile, na.rm=TRUE) %>% log2() -
-                                            res[[quantobj_labu_shift_name]] + min_intensity_offset
+                                            mscalib$zShift + min_intensity_offset
   if (verbose) message(quantobj_labu_min_name, "=", res[[quantobj_labu_min_name]])
 
   return (res)

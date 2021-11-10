@@ -23,6 +23,15 @@
       return ixs_distinct;
     }
 
+    // count how many type each group ix occurred
+    int[] group_sizes(int[] groupixs, int ngroups) {
+        int counts[ngroups] = rep_array(0, ngroups);
+        for (i in 1:num_elements(groupixs)) {
+          counts[groupixs[i]] += 1;
+        }
+        return counts;
+    }
+
     int[] one_to(int n) {
       int res[n];
       for (i in 1:n) res[i] = i;

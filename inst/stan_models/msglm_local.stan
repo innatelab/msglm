@@ -161,59 +161,12 @@ transformed data {
 
   // prepare obs_shiftXobs_shift0
   if (Nobservations0 > 0) {
-    int iaction2nobs[Niactions];
-
-    int iaction2nobs_2ndpass[Niactions];
-    int iaction2obs_shift0_offset[Niactions];
-
-    int obs_shiftXobs_shift0_offset;
-    int obs_shift0_offset;
-
-    iaction2nobs = rep_array(0, Niactions);
-    for (i in 1:Nobservations) {
-      int iact_ix;
-      iact_ix = observation2iaction[i];
-      iaction2nobs[iact_ix] += 1;
-    }
-    //print("iaction2nobs=", iaction2nobs);
-    obs_shift0_offset = 0;
-    obs_shiftXobs_shift0_offset = 0;
-    obs_shiftXobs_shift0_u[1] = 1;
-    iaction2nobs_2ndpass = rep_array(0, Niactions);
-    iaction2obs_shift0_offset = rep_array(0, Niactions);
-    for (i in 1:Nobservations) {
-        int iact_ix;
-        int iact_nobs;
-        iact_ix = observation2iaction[i];
-        //print("iact_ix[", i, "]=", iact_ix);
-        iact_nobs = iaction2nobs[iact_ix];
-        if (iact_nobs > 1) {
-            int nW = 0;
-            // (re)generate contr_poly for interaction FIXME pre-build contr_poly for 2..max_nobs
-            matrix[iact_nobs, iact_nobs-1] iact_obsXobs0 = contr_poly(iact_nobs);
-
-            if (iaction2nobs_2ndpass[iact_ix] == 0) {
-                // reserve (nobs-1) obs_shift0 variables
-                iaction2obs_shift0_offset[iact_ix] = obs_shift0_offset;
-                obs_shift0_offset += iact_nobs-1;
-                //print("obs_shift0_offset=", obs_shift0_offset);
-            }
-            iaction2nobs_2ndpass[iact_ix] += 1;
-            // add 2npass-th row of iact_obsXobs0 to the obsXobs0
-            for (j in 1:cols(iact_obsXobs0)) {
-              real w = iact_obsXobs0[iaction2nobs_2ndpass[iact_ix], j];
-              //if (w != 0) { // don't skip non-structural zeros for contr_poly (otherwise there's mismatch with contr_poly_Nw)
-                nW += 1;
-                obs_shiftXobs_shift0_v[obs_shiftXobs_shift0_offset + nW] = iaction2obs_shift0_offset[iact_ix] + j;
-                obs_shiftXobs_shift0_w[obs_shiftXobs_shift0_offset + nW] = w;
-              //}
-            }
-            obs_shiftXobs_shift0_u[i+1] = obs_shiftXobs_shift0_u[i] + nW;
-            obs_shiftXobs_shift0_offset += nW;
-        }
-    }
+    matrix[Nobservations, Nobservations0] obs_shiftXobs_shift0 = block_contr_poly(Niactions, observation2iaction, positive_infinity());
+    obs_shiftXobs_shift0_w = csr_extract_w_0(obs_shiftXobs_shift0, positive_infinity());
+    obs_shiftXobs_shift0_u = csr_extract_u(obs_shiftXobs_shift0);
+    obs_shiftXobs_shift0_v = csr_extract_v(obs_shiftXobs_shift0);
+    //print("obj_probe_shiftXshift0=", obs_shiftXobs_shift0);
   }
-  //print("obs_shiftXobs_shift0=", csr_to_dense_matrix(Nobservations, Nobservations0, obs_shiftXobs_shift0_w, obs_shiftXobs_shift0_v, obs_shiftXobs_shift0_u));
 
   {
     matrix[Niactions, Nobjects+NobjEffects] objeffx2iaction_op;

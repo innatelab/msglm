@@ -69,11 +69,11 @@ to_standata <- function(obj, ...) UseMethod("to_standata")
 to_standata.msglm_model_data <- function(model_data,
                               effect_slab_df = 4, effect_slab_scale = 2.5,
                               obj_labu_min_scale = 1,
-                              iact_repl_shift_tau=0.03, iact_repl_shift_df=4.0,
+                              iact_repl_shift_tau=0.05, iact_repl_shift_df=4.0,
                               hsprior_lambda_a_offset = 0.05,
                               hsprior_lambda_t_offset = 0.01,
                               batch_effect_sigma=0.5,
-                              subbatch_tau=0.3, subbatch_df=4, subbatch_c=10,
+                              subbatch_tau=1.0, subbatch_df=2, subbatch_c=10,
                               empty_observation_sigmoid_scale = 1.0,
                               verbose = FALSE)
 {

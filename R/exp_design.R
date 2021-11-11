@@ -148,24 +148,24 @@ msglm_model <- function(conditionXeffect,
 set_batch_effects <- function(model_def,
                               msprobeXbatchEffect,
                               batch_effects = NULL,
-                              applies_to = c('modelobject', 'quantobject'),
+                              applies_to = c('object', 'quantobject'),
                               verbose = model_def$verbose
 ){
   checkmate::assert_class(model_def, "msglm_model")
   applies_to <- match.arg(applies_to)
 
-  id_col <- c(modelobject="batch_effect", quantobject="quant_batch_effect")[applies_to]
+  id_col <- c(object="batch_effect", quantobject="quant_batch_effect")[applies_to]
   df_name <- paste0(id_col, 's')
   checkmate::assert_matrix(msprobeXbatchEffect, mode="numeric", any.missing=FALSE,
                            min.rows = 1, min.cols = 1, row.names = "unique", col.names = "unique")
   msprobe_dim <- names(dimnames(msprobeXbatchEffect))[[1]]
   msprobe_dimnames_allowed <- c("msrun", "mschannel")
-  if (applies_to == "modelobject") msprobe_dimnames_allowed <- append(msprobe_dimnames_allowed, c("msexperiment", "msprobe"))
+  if (applies_to == "object") msprobe_dimnames_allowed <- append(msprobe_dimnames_allowed, c("msexperiment", "msprobe"))
   checkmate::assert_choice(msprobe_dim, msprobe_dimnames_allowed)
   msprobes <- rownames(msprobeXbatchEffect)
   if (is.null(msprobes)) stop("No names for MS probes in the rows of the matrix")
 
-  mtx_name <- c(modelobject="msprobeXbatchEffect",
+  mtx_name <- c(object="msprobeXbatchEffect",
                 quantobject="mschannelXquantBatchEffect")[[applies_to]]
   mtx_batch_effects <- colnames(msprobeXbatchEffect)
 

@@ -78,9 +78,9 @@ mschannel_quantobj_statistics <- function(msdata, verbose=FALSE) {
 #'
 #' @param msdata list of various MS-related data frames
 #' @param model_def *msglm_model* object
-#' @param mscalib *mscalib* MS intensities noise model (on "quantobject" leve)
-#' @param modelobject name of the MS object, which abundance would be modeled by MSGLM
+#' @param object name of the MS object, which abundance would be modeled by MSGLM
 #' @param quantobject name of the MS object to take the intensity information from
+#' @param mscalib *mscalib* MS intensities noise model (on "quantobject" leve)
 #' @param verbose if TRUE, produces debugging output
 #'
 #' @return *msglm_data_collection* object with the data for all potential model objects
@@ -88,10 +88,10 @@ mschannel_quantobj_statistics <- function(msdata, verbose=FALSE) {
 #'
 #' @examples
 import_msglm_data <- function(msdata, model_def = NULL,
+                              object = c("protgroup", "protregroup", "ptmngroup"),
+                              object_cols = NULL,
+                              quantobject = object,
                               mscalib = get(paste0(quantobject, "_mscalib")),
-                              modelobject = c("protgroup", "protregroup", "ptmngroup"),
-                              modelobject_cols = NULL,
-                              quantobject = modelobject,
                               condition = NA_character_,
                               msexperiment = NA_character_,
                               msprobe = NA_character_,
@@ -105,42 +105,42 @@ import_msglm_data <- function(msdata, model_def = NULL,
 {
   checkmate::assert_list(msdata)
   res <- structure(list(), class="msglm_data_collection")
-  modelobject <- match.arg(modelobject)
-  modelobj_idcol <- paste0(modelobject, "_id")
-  checkmate::assert_choice(quantobject, c(modelobject, "pepmodstate"))
+  object <- match.arg(object)
+  obj_idcol <- paste0(object, "_id")
+  checkmate::assert_choice(quantobject, c(object, "pepmodstate"))
   quantobj_idcol <- paste0(quantobject, "_id")
-  if (verbose) message("Importing MS data for ", modelobject,
+  if (verbose) message("Importing MS data for ", object,
                        "s using ", quantobject, " intensities")
 
   res$msentities_extra_columns <- list()
 
-  modelobjs_dfname <- paste0(modelobject, "s")
-  if (rlang::has_name(msdata, modelobjs_dfname)) {
-    modelobjs_df <- msdata[[modelobjs_dfname]]
-    if (verbose) message("Found ", nrow(modelobjs_df), " ", modelobject, "(s)")
+  objs_dfname <- paste0(object, "s")
+  if (rlang::has_name(msdata, objs_dfname)) {
+    objs_df <- msdata[[objs_dfname]]
+    if (verbose) message("Found ", nrow(objs_df), " ", object, "(s)")
   } else {
-    stop("msdata$", modelobjs_dfname, " not found")
+    stop("msdata$", objs_dfname, " not found")
   }
-  if (is.null(modelobject_cols)) {
-    if (verbose) message('Guessing ', modelobject, ' columns to keep in the report')
-    modelobject_cols <- append(modelobject_cols,
-        dplyr::select(modelobjs_df, any_of(c("majority_protein_acs", "protein_acs",
+  if (is.null(object_cols)) {
+    if (verbose) message('Guessing ', object, ' columns to keep in the report')
+    object_cols <- append(object_cols,
+        dplyr::select(objs_df, any_of(c("majority_protein_acs", "protein_acs",
                        "gene_names", "protein_names"))) %>% colnames())
-    if (modelobject %in% c('ptmngroup')) {
-      modelobject_cols <- append(modelobject_cols,
-          dplyr::select(modelobjs_df, any_of(c("ptm_type", "nselptms", "ptm_pos", "ptm_AA_seq"))) %>%
+    if (object %in% c('ptmngroup')) {
+      object_cols <- append(object_cols,
+          dplyr::select(objs_df, any_of(c("ptm_type", "nselptms", "ptm_pos", "ptm_AA_seq"))) %>%
           colnames())
     }
-    modelobject_cols <- append(modelobject_cols,
-        dplyr::select(modelobjs_df, starts_with("is_")) %>% colnames())
-    modelobject_cols <- append(modelobject_cols,
-        dplyr::select(modelobjs_df, ends_with("_label")) %>% colnames())
+    object_cols <- append(object_cols,
+        dplyr::select(objs_df, starts_with("is_")) %>% colnames())
+    object_cols <- append(object_cols,
+        dplyr::select(objs_df, ends_with("_label")) %>% colnames())
   }
-  if (verbose) message("Model object (", modelobject, ") columns to use in fit results report: ",
-                       paste0(modelobject_cols, collapse=", "))
-  res$msentities_extra_columns$modelobject <- modelobject_cols
+  if (verbose) message("Model object (", object, ") columns to use in fit results report: ",
+                       paste0(object_cols, collapse=", "))
+  res$msentities_extra_columns$object <- object_cols
 
-  if (quantobject != modelobject) {
+  if (quantobject != object) {
     quantobjs_dfname <- paste0(quantobject, "s")
     if (rlang::has_name(msdata, quantobjs_dfname)) {
       quantobjs_df <- msdata[[quantobjs_dfname]]
@@ -149,8 +149,8 @@ import_msglm_data <- function(msdata, model_def = NULL,
       stop("msdata$", quantobjs_dfname, " not found")
     }
   } else {
-    quantobjs_dfname <- modelobjs_dfname
-    quantobjs_df <- modelobjs_df
+    quantobjs_dfname <- objs_dfname
+    quantobjs_df <- objs_df
   }
 
   # autodetect/check msglm entities
@@ -330,8 +330,8 @@ import_msglm_data <- function(msdata, model_def = NULL,
                           .var.name = paste0("msdata$", mschans_dfname))
 
   res$msentities <- c(
+    object = object,
     quantobject = quantobject,
-    modelobject = modelobject,
     condition = condition,
     msexperiment = msexp,
     msprobe = msprb,
@@ -397,81 +397,81 @@ import_msglm_data <- function(msdata, model_def = NULL,
   } else {
     stop("msdata$", quantobj_intensities_dfname, " not found")
   }
-  modelobj_idents_dfname <- paste0(modelobject, "_idents")
+  obj_idents_dfname <- paste0(object, "_idents")
   if (!rlang::has_name(msprbs_df, msexp_idcol)) {
     if (verbose) message("msdata$", msprbs_dfname, " does not have ", msexp_idcol,
-                         " ignoring ", modelobject, "-level identifications")
-  } else if (!rlang::has_name(msdata, modelobj_idents_dfname)) {
-    if (verbose) message("msdata$", modelobj_idents_dfname, " not found")
+                         " ignoring ", object, "-level identifications")
+  } else if (!rlang::has_name(msdata, obj_idents_dfname)) {
+    if (verbose) message("msdata$", obj_idents_dfname, " not found")
   } else {
-    modelobj_idents_df <- msdata[[modelobj_idents_dfname]]
-    if (!checkmate::test_data_frame(modelobj_idents_df)) {
-      if (verbose) warning("msdata$", modelobj_idents_dfname, " is not a data frame, ignoring")
+    obj_idents_df <- msdata[[obj_idents_dfname]]
+    if (!checkmate::test_data_frame(obj_idents_df)) {
+      if (verbose) warning("msdata$", obj_idents_dfname, " is not a data frame, ignoring")
     } else {
-      col_check <- checkmate::check_names(colnames(modelobj_idents_df),
-                        must.include = c(msexp_idcol, modelobj_idcol, "ident_type"),
+      col_check <- checkmate::check_names(colnames(obj_idents_df),
+                        must.include = c(msexp_idcol, obj_idcol, "ident_type"),
                         what = "column names")
       if (is.logical(col_check) && col_check) {
-        res[[modelobj_idents_dfname]] <- dplyr::semi_join(modelobj_idents_df,
-                                                          dplyr::select(msprbs_df, !!sym(msexp_idcol)),
-                                                          by=msexp_idcol)
+        res[[obj_idents_dfname]] <- dplyr::semi_join(obj_idents_df,
+                                                     dplyr::select(msprbs_df, !!sym(msexp_idcol)),
+                                                     by=msexp_idcol)
       } else {
-        if (verbose) warning("Detected msdata$", modelobj_idents_dfname, " problems, skipping: ", col_check)
+        if (verbose) warning("Detected msdata$", obj_idents_dfname, " problems, skipping: ", col_check)
       }
     }
   }
-  if (modelobject == quantobject) {
+  if (object == quantobject) {
     orig_nintensities <- nrow(quantobj_intensities_df)
     quantobj_intensities_df <- dplyr::filter(quantobj_intensities_df, !is.na(intensity))
     if (verbose) message(nrow(quantobj_intensities_df), " of ", orig_nintensities,
                          " ", quantobject, " intensity measurements selected")
-    orig_nmodelobjs <- nrow(modelobjs_df)
-    modelobjs_df <- dplyr::semi_join(modelobjs_df, quantobj_intensities_df, by=modelobj_idcol)
-    if (verbose) message(nrow(modelobjs_df), " of ", orig_nmodelobjs,
-                         " ", modelobject, "s selected")
+    orig_nobjs <- nrow(objs_df)
+    objs_df <- dplyr::semi_join(objs_df, quantobj_intensities_df, by=obj_idcol)
+    if (verbose) message(nrow(objs_df), " of ", orig_nobjs,
+                         " ", object, "s selected")
   } else if (quantobject == "pepmodstate") {
-    modelobj2quantobj_dfname = paste0(modelobject, "2", quantobject)
-    if (!rlang::has_name(msdata, modelobj2quantobj_dfname)) {
-      modelobj2pepmod_dfname = paste0(modelobject, "2pepmod")
-      if (verbose) warning("msdata$", modelobj2quantobj_dfname,
-                           " not found, trying msdata$", modelobj2pepmod_dfname)
-      if (!rlang::has_name(msdata, modelobj2pepmod_dfname)) {
-        stop("msdata$", modelobj2pepmod_dfname, " not found")
+    obj2quantobj_dfname = paste0(object, "2", quantobject)
+    if (!rlang::has_name(msdata, obj2quantobj_dfname)) {
+      obj2pepmod_dfname = paste0(object, "2pepmod")
+      if (verbose) warning("msdata$", obj2quantobj_dfname,
+                           " not found, trying msdata$", obj2pepmod_dfname)
+      if (!rlang::has_name(msdata, obj2pepmod_dfname)) {
+        stop("msdata$", obj2pepmod_dfname, " not found")
       }
-      modelobj2pepmod_df <- msdata[[modelobj2pepmod_dfname]]
-      modelobj2quantobj_df <- dplyr::inner_join(modelobj2pepmod_df,
+      obj2pepmod_df <- msdata[[obj2pepmod_dfname]]
+      obj2quantobj_df <- dplyr::inner_join(obj2pepmod_df,
             dplyr::select_at(quantobjs_df, c(quantobj_idcol, "pepmod_id")), by="pepmod_id") %>%
-        dplyr::select_at(c(modelobj_idcol, quantobj_idcol, "pepmod_id", "is_specific")) %>%
+        dplyr::select_at(c(obj_idcol, quantobj_idcol, "pepmod_id", "is_specific")) %>%
         dplyr::distinct()
     } else {
-      modelobj2quantobj_df <- msdata[[modelobj2quantobj_dfname]]
+      obj2quantobj_df <- msdata[[obj2quantobj_dfname]]
     }
-    checkmate::assert_data_frame(modelobj2quantobj_df,
-                                 .var.name=paste0("msdata$", modelobj2quantobj_dfname))
-    checkmate::assert_names(colnames(modelobj2quantobj_df),
-                            must.include=c(modelobj_idcol, quantobj_idcol, "is_specific"),
-                            .var.name = paste0("msdata$", modelobj2quantobj_dfname))
+    checkmate::assert_data_frame(obj2quantobj_df,
+                                 .var.name=paste0("msdata$", obj2quantobj_dfname))
+    checkmate::assert_names(colnames(obj2quantobj_df),
+                            must.include=c(obj_idcol, quantobj_idcol, "is_specific"),
+                            .var.name = paste0("msdata$", obj2quantobj_dfname))
     if (verbose) message("Filtering for specific and quantified ", quantobject,
-                         "s and corresponding ", modelobject, "s...")
+                         "s and corresponding ", object, "s...")
     quantobjs_orig_df <- quantobjs_df
     quantobj_intensities_orig_df <- quantobj_intensities_df
-    modelobjs_orig_df <- modelobjs_df
-    modelobj2quantobj_df <- dplyr::filter(modelobj2quantobj_df, is_specific)
+    objs_orig_df <- objs_df
+    obj2quantobj_df <- dplyr::filter(obj2quantobj_df, is_specific)
     # TODO require identification in a selected set of conditions
     # (e.g. for AP-MS data should be identified in AP-MS conditions,
     #  whereas identification in the background is not required)
     quantobj_intensities_df <- dplyr::filter(quantobj_intensities_df, !is.na(intensity)) %>%
-        dplyr::semi_join(modelobj2quantobj_df, by=quantobj_idcol)
+        dplyr::semi_join(obj2quantobj_df, by=quantobj_idcol)
     if (verbose) message("  * ", nrow(quantobj_intensities_df), " of ", nrow(quantobj_intensities_orig_df),
                          " specific ", quantobject, " intensity measurements selected")
     quantobjs_df <- dplyr::semi_join(quantobjs_df, quantobj_intensities_df, by=quantobj_idcol)
     if (verbose) message("  * ", nrow(quantobjs_df), " of ", nrow(quantobjs_orig_df),
                          " specific ", quantobject, "s selected")
-    modelobj2quantobj_df <- dplyr::semi_join(modelobj2quantobj_df, quantobjs_df, by=quantobj_idcol)
-    modelobjs_df <- dplyr::semi_join(modelobjs_df, modelobj2quantobj_df, by=modelobj_idcol)
-    if (verbose) message("  * ", nrow(modelobjs_df), " of ", nrow(modelobjs_orig_df),
-                         " ", modelobject, "s have specific ", quantobject, " quantitations")
-    res[[modelobj2quantobj_dfname]] <- modelobj2quantobj_df
+    obj2quantobj_df <- dplyr::semi_join(obj2quantobj_df, quantobjs_df, by=quantobj_idcol)
+    objs_df <- dplyr::semi_join(objs_df, obj2quantobj_df, by=obj_idcol)
+    if (verbose) message("  * ", nrow(objs_df), " of ", nrow(objs_orig_df),
+                         " ", object, "s have specific ", quantobject, " quantitations")
+    res[[obj2quantobj_dfname]] <- obj2quantobj_df
     res[[quantobjs_dfname]] <- quantobjs_df
 
     quantobj_idents_dfname <- paste0(quantobject, "_idents")
@@ -489,11 +489,11 @@ import_msglm_data <- function(msdata, model_def = NULL,
       if (verbose) warning("msdata$", quantobj_idents_dfname, " not found")
     }
   }
-  res[[modelobjs_dfname]] <- modelobjs_df
-  res$modelobjects <- dplyr::mutate(modelobjs_df,
-                                    object_id = !!sym(modelobj_idcol),
-                                    object_label = !!sym(paste0(modelobject, "_label")),
-                                    chunk = row_number())
+  res[[objs_dfname]] <- objs_df
+  res$objects <- dplyr::mutate(objs_df,
+                               object_id = !!sym(obj_idcol),
+                               object_label = !!sym(paste0(object, "_label")),
+                               chunk = row_number())
   res[[quantobj_intensities_dfname]] <- quantobj_intensities_df
   if (verbose) message("Calculating MS channel (", mschan, ") ", quantobject, " statistics...")
   res[[paste0(mschan, "_", quantobject, "_stats")]] <- mschannel_quantobj_statistics(res, verbose=verbose)

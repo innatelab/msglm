@@ -341,8 +341,8 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
   msprb_idcol <- msprb
   mschan <- msdata$msentities[['mschannel']]
   mschan_idcol <- mschan
-  modelobj <- msdata$msentities[['modelobject']]
-  modelobj_idcol <- paste0(modelobj, "_id")
+  obj <- msdata$msentities[['object']]
+  obj_idcol <- paste0(obj, "_id")
   quantobj <- msdata$msentities[['quantobject']]
   quantobj_idcol <- paste0(quantobj, "_id")
   intensities_dfname <- paste0(quantobj, "_intensities")
@@ -350,28 +350,28 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
     stop("No intensities (", intensities_dfname, " data frame) found in msdata")
   }
 
-  if (modelobj == quantobj) {
-    # modelobj is quanted directly
+  if (obj == quantobj) {
+    # obj is quanted directly
     intensities_df <- dplyr::select(msdata[[intensities_dfname]],
-                                    object_id=!!sym(modelobj_idcol), msprobe=!!sym(msprb_idcol),
+                                    object_id=!!sym(obj_idcol), msprobe=!!sym(msprb_idcol),
                                     intensity, any_of("ident_type"))
     msdata_df <- dplyr::left_join(model_data$object_msprobes,
                                   intensities_df, by = c("object_id", "msprobe")) %>%
         annotate_msdata(model_def) %>%
         dplyr::arrange(index_object_msprobe)
   } else {
-    # quant specific quantobjects of modelobj
-    modelobj2quantobj_df <- msdata[[paste0(modelobj, "2", quantobj)]]
-    qobjs_df <- dplyr::inner_join(modelobj2quantobj_df,
-                                  dplyr::select(model_data$objects, !!sym(modelobj_idcol), object_id, index_object),
-                                  by=modelobj_idcol) %>%
+    # quant specific quantobjects of object
+    obj2quantobj_df <- msdata[[paste0(obj, "2", quantobj)]]
+    qobjs_df <- dplyr::inner_join(obj2quantobj_df,
+                                  dplyr::select(model_data$objects, !!sym(obj_idcol), object_id, index_object),
+                                  by=obj_idcol) %>%
       dplyr::filter(is_specific) %>%
       dplyr::inner_join(dplyr::select(msdata[[paste0(quantobj, "s")]], !!sym(quantobj_idcol),
                                       any_of(c("msfraction", "charge"))),
                         by=quantobj_idcol) %>%
       dplyr::mutate(quantobject_id = !!sym(quantobj_idcol))
     if (nrow(qobjs_df) == 0L) stop("No specific ", quantobj, "s found for ",
-                                   modelobj_idcol, "=", model_data$object_id)
+                                   obj_idcol, "=", model_data$object_id)
     if (verbose) message(nrow(qobjs_df), " specific ", quantobj, "(s) found")
     intensities_df <- dplyr::select(msdata[[intensities_dfname]],
                                     quantobject_id=!!sym(quantobj_idcol), mschannel=!!sym(mschan_idcol),
@@ -386,7 +386,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                           by=c("index_msprobe")) %>%
         dplyr::left_join(intensities_df, by=c("quantobject_id", "mschannel"))
     if (all(is.na(msdata_df$intensity))) stop("No quantifications for ", nrow(qobjs_df), " specific ",
-                                              quantobj, "(s) of ", modelobj_idcol, "=", model_data$object_id)
+                                              quantobj, "(s) of ", obj_idcol, "=", model_data$object_id)
     nqobj_probes <- nrow(dplyr::distinct(msdata_df, quantobject_id, mschannel))
     if (nrow(msdata_df) != nqobj_probes) {
       if (verbose) warning(nrow(msdata_df) - nqobj_probes, " of ", nrow(msdata_df),
@@ -440,7 +440,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
       dplyr::arrange(index_object, index_object_msprobe, index_quantobject) %>%
       dplyr::mutate(index_quantobject_msprobe = row_number())
   #} else {
-  #   stop("Unsupported combination of modelobject=", modelobj,
+  #   stop("Unsupported combination of object=", obj,
   #       " and quantobject=", quantobj)
   }
   # separately index quantifications and missing data
@@ -449,8 +449,8 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                               index_mdata = if_else(!is_observed, cumsum(!is_observed), NA_integer_))
   message(nrow(model_data$msdata), " ",
           if (rlang::has_name(model_data$msdata, 'index_quantobject_msprobe'))
-            quantobj else modelobj, '-in-msprobe(s) of ',
-          n_distinct(model_data$msdata$index_object), ' ', modelobj, '(s)',
+            quantobj else obj, '-in-msprobe(s) of ',
+          n_distinct(model_data$msdata$index_object), ' ', obj, '(s)',
           if (rlang::has_name(model_data$msdata, 'index_quantobject'))
             paste0(' with ', n_distinct(model_data$msdata$index_quantobject), ' ',
                    quantobj, '(s)') else '', ': ',
@@ -483,32 +483,32 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
   checkmate::assert_class(msdata, "msglm_data_collection")
   model_data <- list(model_def = model_def, object_id = object_ids,
                      msentities = msdata$msentities)
-  modelobj <- msdata$msentities[['modelobject']]
-  modelobj_idcol <- paste0(modelobj, "_id")
+  obj <- msdata$msentities[['object']]
+  obj_idcol <- paste0(obj, "_id")
 
   quantobj <- msdata$msentities[['quantobject']]
 
-  if (!rlang::has_name(msdata, paste0(modelobj, "s"))) {
-    stop("No model object (", modelobj, ") information found in MS data")
+  if (!rlang::has_name(msdata, paste0(obj, "s"))) {
+    stop("No model object (", obj, ") information found in MS data")
   }
-  modelobjs_df <- msdata$modelobjects
-  modelobj_cols <- msdata$msentities_extra_columns$modelobject
+  objs_df <- msdata$objects
+  obj_cols <- msdata$msentities_extra_columns$object
   # FIXME remove this if
-  if (is.null(modelobj_cols)) {
-    if (verbose) warning("msdata$msentities_extra_columns$modelobject not found, resorting to temorary guess")
-    modelobj_cols <- (c(intersect(c("majority_protein_acs", "protein_acs",
-                     "gene_names", "protein_names"), colnames(modelobjs_df)),
-         str_subset(colnames(modelobjs_df), "^is_")) %>% unique())
+  if (is.null(obj_cols)) {
+    if (verbose) warning("msdata$msentities_extra_columns$object not found, resorting to temorary guess")
+    obj_cols <- (c(intersect(c("majority_protein_acs", "protein_acs",
+                     "gene_names", "protein_names"), colnames(objs_df)),
+         str_subset(colnames(objs_df), "^is_")) %>% unique())
     if (verbose) {
-      message("Model object (", modelobj, ") columns to use: ", paste0(modelobj_cols, collapse=", "))
+      message("Model object (", obj, ") columns to use: ", paste0(obj_cols, collapse=", "))
     }
   }
-  model_data$objects <- dplyr::filter(modelobjs_df, object_id %in% object_ids) %>%
-      dplyr::select_at(c("object_id", "object_label", modelobj_idcol,
-                         modelobj_cols) %>% unique()) %>%
+  model_data$objects <- dplyr::filter(objs_df, object_id %in% object_ids) %>%
+      dplyr::select_at(c("object_id", "object_label", obj_idcol,
+                         obj_cols) %>% unique()) %>%
       dplyr::arrange(object_id) %>%
       dplyr::mutate(index_object = row_number())
-  missing_obj_ids <- setdiff(object_ids, unique(modelobjs_df$object_id))
+  missing_obj_ids <- setdiff(object_ids, unique(objs_df$object_id))
   if (length(missing_obj_ids) > 0) {
     stop("Objects not found: ", paste0(missing_obj_ids, ", "))
   }

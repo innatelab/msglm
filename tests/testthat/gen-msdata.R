@@ -2,27 +2,27 @@ require(tibble)
 require(dplyr)
 require(stringr)
 
-gen_objects <- function(modelobject, n, quantobject = NA_character_,
+gen_objects <- function(object, n, quantobject = NA_character_,
                         avg_npepmods = 5, avg_ncharges = 1.5,
                         labu_mean = 10, labu_sigma = 5, quantobj_labu_shift_shape = 3) {
-    modelobj_id <- dplyr::sym(paste0(modelobject, "_id"))
-    modelobj_label <- dplyr::sym(paste0(modelobject, "_label"))
-    modelobjs_df = tibble(modelobj_id = seq_len(n),
-                          !!modelobj_id := modelobj_id,
-                          !!modelobj_label := paste0(modelobject, "_", !!modelobj_id),
-                          labu_base = rnorm(n, mean=labu_mean, sd=labu_sigma))
+    obj_id <- dplyr::sym(paste0(object, "_id"))
+    obj_label <- dplyr::sym(paste0(object, "_label"))
+    objs_df = tibble(obj_id = seq_len(n),
+                     !!obj_id := obj_id,
+                     !!obj_label := paste0(object, "_", !!obj_id),
+                     labu_base = rnorm(n, mean=labu_mean, sd=labu_sigma))
     if (!is.na(quantobject)) {
-        modelobjs_df <- dplyr::mutate(modelobjs_df, npepmods = 1 + rpois(length(labu_base), avg_npepmods - 1))
+        objs_df <- dplyr::mutate(objs_df, npepmods = 1 + rpois(length(labu_base), avg_npepmods - 1))
         quantobj_id <- dplyr::sym(paste0(quantobject, "_id"))
         quantobj_label <- dplyr::sym(paste0(quantobject, "_label"))
-        pepmods_df <- dplyr::group_by(modelobjs_df, !!modelobj_id, modelobj_id) %>%
+        pepmods_df <- dplyr::group_by(objs_df, !!obj_id, obj_id) %>%
             dplyr::group_modify(~{
-                tibble(pepmod_label = paste0(.x[[modelobj_label]], "_", seq_len(.x$npepmods)),
+                tibble(pepmod_label = paste0(.x[[obj_label]], "_", seq_len(.x$npepmods)),
                        labu_shift = c(0, -rgamma(.x$npepmods - 1L, quantobj_labu_shift_shape)),
                        ncharges = 1L + rpois(.x$npepmods, avg_ncharges - 1))
             }) %>% dplyr::ungroup() %>%
             dplyr::mutate(pepmod_id = row_number())
-        quantobjs_df <- dplyr::group_by(pepmods_df, !!modelobj_id, modelobj_id,
+        quantobjs_df <- dplyr::group_by(pepmods_df, !!obj_id, obj_id,
                                         pepmod_id, pepmod_label) %>%
             dplyr::group_modify(~{
                 tibble(charge = 2L + seq_len(.x$ncharges),
@@ -36,7 +36,7 @@ gen_objects <- function(modelobject, n, quantobject = NA_character_,
         quantobjs_df <- NULL
         pepmods_df <- NULL
     }
-    return(list(modelobjects = modelobjs_df, pepmods = pepmods_df, quantobjects = quantobjs_df))
+    return(list(objects = objs_df, pepmods = pepmods_df, quantobjects = quantobjs_df))
 }
 
 gen_effects <- function(effects_df, effect_range = c(-10, 10)) {
@@ -47,16 +47,16 @@ gen_effects <- function(effects_df, effect_range = c(-10, 10)) {
     dplyr::mutate(value = pmax(effect_range[[1]], pmin(value, effect_range[[2]])))
 }
 
-gen_modelobj_effects <- function(modelobjs_df, effects_df, effect_range = c(-10, 10)) {
-    dplyr::group_by(modelobjs_df, modelobj_id) %>%
+gen_obj_effects <- function(objs_df, effects_df, effect_range = c(-10, 10)) {
+    dplyr::group_by(objs_df, obj_id) %>%
     dplyr::group_modify(~{
         gen_effects(effects_df = effects_df, effect_range = effect_range) %>%
         dplyr::mutate(labu_base= .x$labu_base)
     }) %>% dplyr::ungroup()
 }
 
-gen_modelobj_conditions <- function(model_def, modelobjXeffects_df) {
-    dplyr::group_by(objXeffects_df, modelobj_id) %>%
+gen_obj_conditions <- function(model_def, objXeffects_df) {
+    dplyr::group_by(objXeffects_df, obj_id) %>%
     dplyr::group_modify(~{
         effect_values <- rlang::set_names(.x$value, .x$effect)
         objcond_values <- model_def$conditionXeffect %*% effect_values[colnames(model_def$conditionXeffect)]
@@ -65,7 +65,7 @@ gen_modelobj_conditions <- function(model_def, modelobjXeffects_df) {
     }) %>% dplyr::ungroup()
 }
 
-gen_modelobj_intensities <- function(objconds_df, msprobes_df, labu_base_shift = 0.0, replicate_sigma = 0.1) {
+gen_obj_intensities <- function(objconds_df, msprobes_df, labu_base_shift = 0.0, replicate_sigma = 0.1) {
     dplyr::inner_join(objconds_df, dplyr::select(msprobes_df, msprobe, condition), by="condition") %>%
     dplyr::mutate(replicate_shift = rnorm(n(), 0, replicate_sigma),
                   intensity = 2^(value + replicate_shift + labu_base_shift))
@@ -83,13 +83,13 @@ gen_quantobj_intensities <- function(objconds_df, quantobjs_df, mschannels_df,
 gen_msdata <- function(model_def, mschannels_df,
                        msprobe="msprobe", mschannel=msprobe,
                        msfraction = "msfraction", mstag = "mstag",
-                       modelobject = "protgroup", quantobject = NA_character_,
-                       nmodelobjects = 10) {
+                       object = "protgroup", quantobject = NA_character_,
+                       nobjects = 10) {
     res <- list()
-    objects <- gen_objects(modelobject, n = nmodelobjects, quantobject = quantobject)
-    res[[paste0(modelobject, 's')]] <- objects$modelobjects
-    res$object_effects <- gen_modelobj_effects(objects$objects, model_def$effects)
-    res$object_conditions <- gen_modelobj_conditions(model_def, res$object_effects)
+    objects <- gen_objects(object, n = nobjects, quantobject = quantobject)
+    res[[paste0(object, 's')]] <- objects$objects
+    res$object_effects <- gen_obj_effects(objects$objects, model_def$effects)
+    res$object_conditions <- gen_obj_conditions(model_def, res$object_effects)
     intensities_cols <- c("intensity")
     #if (rlang::has_name(mschannels_df, "msfraction")) {
     #    intensities_cols[[msfraction]] <- "msfraction"
@@ -112,14 +112,14 @@ gen_msdata <- function(model_def, mschannels_df,
         intensities_cols[[mschannel]] <- "mschannel"
         res[[paste0(quantobject, "_intensities")]] <- gen_quantobj_intensities(res$object_conditions, objects$quantobjects, mschannels_df) %>%
             dplyr::select_at(intensities_cols)
-        res[[paste0(modelobject, "2pepmod")]] <- dplyr::select_at(objects$pepmods, paste0(c(modelobject, "pepmod"), "_id")) %>%
+        res[[paste0(object, "2pepmod")]] <- dplyr::select_at(objects$pepmods, paste0(c(object, "pepmod"), "_id")) %>%
             dplyr::mutate(is_specific = TRUE)
-        res[[paste0(modelobject, "2", quantobject)]] <- dplyr::select_at(objects$quantobjects, paste0(c(modelobject, quantobject), "_id")) %>%
+        res[[paste0(object, "2", quantobject)]] <- dplyr::select_at(objects$quantobjects, paste0(c(object, quantobject), "_id")) %>%
             dplyr::mutate(is_specific = TRUE)
     } else {
-        intensities_cols[[paste0(modelobject, "_id")]] <- "modelobj_id"
+        intensities_cols[[paste0(object, "_id")]] <- "obj_id"
         intensities_cols[[msprobe]] <- "msprobe"
-        res[[paste0(modelobject, "_intensities")]] <- gen_obj_intensities(res$object_conditions, mschannels_df) %>%
+        res[[paste0(object, "_intensities")]] <- gen_obj_intensities(res$object_conditions, mschannels_df) %>%
             dplyr::select_at(intensities_cols)
     }
     mschan_cols <- character()

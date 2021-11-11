@@ -253,14 +253,14 @@ stan_model_name <- function(standata) {
   model_def <- model_data$model_def
   res <- c(msglm_model = "msglm_local",
            msglmm_model = "msglmm_local")[class(model_def)[[1]]]
-  modelobj <- model_data$msentities[['modelobject']]
+  obj <- model_data$msentities[['object']]
   quantobj <- model_data$msentities[['quantobject']]
-  if (modelobj == quantobj) {
+  if (obj == quantobj) {
     # do nothing
   } else if (quantobj == "pepmodstate") {
     res <- paste0(res, '_quantobjects')
   } else {
-     stop("Unsupported combination of modelobject=", modelobj,
+     stop("Unsupported combination of object=", obj,
           " and quantobject=", quantobj)
   }
   return(res)

@@ -78,9 +78,12 @@ mschannel_quantobj_statistics <- function(msdata, verbose=FALSE) {
 #'
 #' @param msdata list of various MS-related data frames
 #' @param model_def *msglm_model* object
-#' @param object name of the MS object, which abundance would be modeled by MSGLM
-#' @param quantobject name of the MS object to take the intensity information from
-#' @param mscalib *mscalib* MS intensities noise model (on "quantobject" leve)
+#' @param object type of the MS object, which abundance would be modeled by MSGLM
+#'               (protein group, PTM group etc)
+#' @param quantobject type of the object, for which the MS-derived quantifications
+#'               are provided. Defaults to the same type as model `object`,
+#'               but alternatively could be a MS1 peak intensity (*pepmodstate*)
+#' @param mscalib *mscalib* noise model for quantifications (at *quantobject* level)
 #' @param verbose if TRUE, produces debugging output
 #'
 #' @return *msglm_data_collection* object with the data for all potential model objects

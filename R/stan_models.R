@@ -190,9 +190,9 @@ to_standata.msglm_model_data <- function(model_data,
     res$quant2obj_probe <- as.array(model_data$msdata$index_object_msprobe[!is.na(model_data$msdata$index_qdata)])
     res$miss2obj_probe <- as.array(model_data$msdata$index_object_msprobe[!is.na(model_data$msdata$index_mdata)])
   }
-  if (rlang::has_name(model_data, 'index_mscalib')) {
-    res$Nmsprotocols <- n_distinct(model_data$mschannels$index_mscalib)
-    res$mschannel2msproto <- as.array(model_data$mschannels$index_mscalib)
+  if (rlang::has_name(model_data, 'index_msprotocol')) {
+    res$Nmsprotocols <- n_distinct(model_data$mschannels$index_msprotocol)
+    res$mschannel2msproto <- as.array(model_data$mschannels$index_msprotocol)
   }
   message(res$NobjConditions, " object-in-condition(s) of ", res$Nobjects, " object(s)",
           if (rlang::has_name(res, "Nquantobjects")) paste0(" with ", res$Nquantobjects, " quantobject(s)") else "", ",",

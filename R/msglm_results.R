@@ -40,7 +40,7 @@ msglm_dims <- function(model_data)
     res$quantobject_batch_effect <- model_data$quantobject_batch_effects %>%
         dplyr::left_join(res$quantobject, by = c('index_quantobject', 'quantobject_id'))
   }
-  res$mscalib <- dplyr::select(model_data$mschannels, index_mscalib,
+  res$msprotocol <- dplyr::select(model_data$mschannels, index_msprotocol,
                                any_of("instrument")) %>%
     dplyr::distinct()
   res$object_condition <- dplyr::select(model_data$object_conditions, index_object_condition,

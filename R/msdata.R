@@ -102,6 +102,7 @@ import_msglm_data <- function(msdata, model_def = NULL,
                               msrun = NA_character_,
                               msfraction = NA_character_,
                               mstag = NA_character_,
+                              msprotocol = NA_character_,
                               min_intensity_quantile = 0.001,
                               min_intensity_offset = -5,
                               verbose = FALSE)
@@ -329,6 +330,18 @@ import_msglm_data <- function(msdata, model_def = NULL,
     if (verbose) message("Assuming msrun=mschannel=", mschan)
     msrun <- mschan
   }
+  if (!is.na(msprotocol)) {
+    msproto <- msprotocol
+    if (verbose) message("Using MS protocol column ", msproto)
+  } else if (rlang::has_name(mschans_df, "msprotocol")) {
+    msproto <- "msprotocol"
+    if (verbose) message("Detected MS protocol column ", msproto)
+  } else {
+    msproto <- NA_character_
+  }
+  if (!is.na(msproto)) {
+    mschan_required_cols <- append(mschan_required_cols, msproto)
+  }
   checkmate::assert_names(names(mschans_df), must.include = unique(mschan_required_cols),
                           .var.name = paste0("msdata$", mschans_dfname))
 
@@ -341,7 +354,8 @@ import_msglm_data <- function(msdata, model_def = NULL,
     msrun = msrun,
     mschannel = mschan,
     mstag = mstag,
-    msfraction = msfrac)
+    msfraction = msfrac,
+    msprotocol = msproto)
 
   msprb_idcol <- msprb
   msexp_idcol <- msexp

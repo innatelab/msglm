@@ -568,7 +568,8 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
     mschan_cols <- c(mschannel = mschan_idcol, msprobe = msprb_idcol,
                      msrun = msdata$msentities[['msrun']],
                      msfraction = msdata$msentities[['msfraction']],
-                     mstag = msdata$msentities[['mstag']])
+                     mstag = msdata$msentities[['mstag']],
+                     msprotocol = msdata$msentities[['msprotocol']])
     checkmate::assert_names(colnames(mschans_df),
                             must.include = Filter(Negate(is.na), mschan_cols))
     mschans_df <- dplyr::select_at(mschans_df, Filter(Negate(is.na), mschan_cols))
@@ -642,7 +643,12 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
   model_data$mschannels <- dplyr::mutate(mschans_df,
       index_msrun = match(msrun, unique(msrun)),
       index_mschannel = row_number(),
-      index_mscalib = 1L) # FIXME there could be multiple mscalib per dataset
+      index_msprotocol = if (rlang::has_name(mschans_df, "msprotocol")) {
+          match(msprotocol, unique(msprotocol))
+        } else {
+          1L
+        }
+    )
 
   # all objects X all conditions (including virtual)
   # FIXME rename objectXcondition

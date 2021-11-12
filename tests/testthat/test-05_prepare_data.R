@@ -102,7 +102,7 @@ test_that(paste0(obj, "/", obj, " model, no msfractions, ",
         condition="condition",
         msexperiment=if_else(is.na(mstag), msprobe, NA_character_), msprobe=msprobe,
         msrun=if_else(is.na(mstag), msprobe, NA_character_), mschannel=msprobe,
-        mstag=mstag, msfraction=NA_character_))
+        mstag=mstag, msfraction=NA_character_, msprotocol=NA_character_))
 
     msdata[[paste0(msprobe, "_shifts")]] <- msprobe_shifts_df
 
@@ -146,7 +146,7 @@ test_that(paste0(obj, "/pepmodstate model, no msfractions, ",
         condition="condition",
         msexperiment=if_else(is.na(mstag), msprobe, NA_character_), msprobe=msprobe,
         msrun=if_else(is.na(mstag), msprobe, NA_character_), mschannel=msprobe,
-        mstag=mstag, msfraction=NA_character_))
+        mstag=mstag, msfraction=NA_character_, msprotocol=NA_character_))
 
     msdata[[paste0(msprobe, "_shifts")]] <- msprobe_shifts_df
     model_data1 <- msglm_data(model_def, msdata, 1L)
@@ -201,7 +201,7 @@ test_that(paste0(obj, "/pepmodstate model, msfractions, ",
         condition="condition",
         msexperiment=if_else(is.na(mstag), msprobe, NA_character_), msprobe=msprobe,
         msrun=if_else(is.na(mstag), mschannel, NA_character_), mschannel=mschannel,
-        mstag=mstag, msfraction="msfraction"))
+        mstag=mstag, msfraction="msfraction", msprotocol = NA_character_))
     expect_tibble(msdata[[msprobes_dfname]], nrows=nrow(msprobes_df))
     expect_names(names(msdata[[msprobes_dfname]]), must.include = c("condition", msprobe))
     expect_tibble(msdata[[mschannels_dfname]], nrows=nrow(mschannels_df))
@@ -224,7 +224,7 @@ test_that(paste0(obj, "/pepmodstate model, msfractions, ",
         condition="condition",
         msexperiment=if_else(is.na(mstag), msprobe, NA_character_), msprobe=msprobe,
         msrun=if_else(is.na(mstag), mschannel, NA_character_), mschannel=mschannel,
-        mstag=mstag, msfraction="msfraction"))
+        mstag=mstag, msfraction="msfraction", msprotocol=NA_character_))
     expect_tibble(msdata[[msprobes_dfname]], nrows=nrow(msprobes_df))
     expect_tibble(msdata[[mschannels_dfname]], nrows=nrow(mschannels_df))
 
@@ -262,7 +262,7 @@ test_that(paste0(obj, "/pepmodstate model, msfractions, ",
         condition="condition",
         msexperiment=if_else(is.na(mstag), msprobe, NA_character_), msprobe=msprobe,
         msrun=if_else(is.na(mstag), mschannel, NA_character_), mschannel=mschannel,
-        mstag=mstag, msfraction="msfraction"))
+        mstag=mstag, msfraction="msfraction", msprotocol=NA_character_))
 
     if (mschannel != msprobe) {
         msdata[[paste0(mschannel, "_shifts")]] <- tibble(

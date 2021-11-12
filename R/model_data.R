@@ -171,10 +171,6 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
                                                index_quant_batch_effect = integer(0),
                                                is_positive = logical(0))
     }
-    # remove reference quantobject (one with the smallest index of EACH object in the model) from quant batch effects
-    qobjs_df <- dplyr::group_by(model_data$quantobjects, index_object) %>%
-      dplyr::filter(index_quantobject > min(index_quantobject)) %>%
-      dplyr::ungroup()
     qobj_probeXbatcheff_df <- dplyr::full_join(matrix2frame(mschannelXquantBatchEffect,
                                                             row_col="mschannel", col_col="quant_batch_effect"),
                                                dplyr::select(model_data$quantobjects, index_object, index_quantobject, quantobject_id),
@@ -192,6 +188,53 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
         dplyr::group_by(.x, index_quant_batch_effect) %>%
         dplyr::filter(n() < nmschans) %>%
         dplyr::ungroup()
+      }) %>%
+      # remove reference quantobject for each object (one with the smallest index
+      # among those that are detected in all batch_effect groups)
+      dplyr::group_by(index_object) %>%
+      dplyr::group_modify(~{
+        # TODO make igraph dependency optional
+        # indentify quant_batch_effect groups that don't share probes between each other
+        # (which means that quant_batch_effects should have 1 degree-of-freedom less,
+        #  because intensities in these groups are, strictly speaking, not comparable)
+        # quant batch effects can share probes if the same biological sample (i.e. probe)
+        # was analysed more than once
+        probe2batcheff_df <- dplyr::select(.x, index_msprobe, index_quant_batch_effect) %>%
+          dplyr::transmute(index_msprobe, index_quant_batch_effect,
+                           probe_id = paste0("p", index_msprobe),
+                           batcheff_id = paste0("e", index_quant_batch_effect)) %>%
+          dplyr::distinct()
+        probe2batcheff_graph <- igraph::graph_from_data_frame(
+          dplyr::select(probe2batcheff_df, batcheff_id, probe_id), directed = FALSE)
+        batcheffs <- as.integer(igraph::components(probe2batcheff_graph)$membership)
+        batcheffs_df <- dplyr::select(probe2batcheff_df, batcheff_id, index_quant_batch_effect) %>%
+          dplyr::distinct() %>% dplyr::inner_join(
+            tibble::as_tibble(batcheffs, rownames = "batcheff_id"),
+            by = "batcheff_id") %>%
+          dplyr::select(index_quant_batch_effect,
+                        index_quant_batch_effect_group = value)
+        ngroups <- dplyr::n_distinct(batcheffs_df$index_quant_batch_effect_group)
+
+        if (ngroups > 1L) {
+          .x <- dplyr::inner_join(.x, batcheffs_df, by="index_quant_batch_effect")
+          # select potential reference objects that are shared by effect groups
+          overlap_qobjs_df <- dplyr::group_by(.x, index_quantobject) %>%
+            dplyr::summarise(ngroups_qobj = n_distinct(index_quant_batch_effect_group), .groups = "drop") %>%
+            dplyr::filter(ngroups_qobj == ngroups)
+          if (nrow(overlap_qobjs_df) > 0L) {
+            # remove one reference quantobject batch effects from each group to
+            # eliminate redundancy
+            del_qobj_batch_effs_df <- dplyr::semi_join(.x, overlap_qobjs_df, by ="index_quantobject") %>%
+              dplyr::filter(index_quant_batch_effect > 0L) %>%
+              dplyr::arrange(index_quant_batch_effect_group, index_quantobject, index_quant_batch_effect) %>%
+              dplyr::group_by(index_quant_batch_effect) %>%
+              dplyr::filter(row_number() == 1L) %>% dplyr::ungroup()
+            .x <- dplyr::anti_join(.x, del_qobj_batch_effs_df,
+                                   by =c("index_quant_batch_effect",
+                                         "index_quantobject"))
+          }
+        }
+        .x
       }) %>% dplyr::ungroup() %>%
       dplyr::filter(index_quant_batch_effect > 0L) %>%
       dplyr::mutate(quantobject_batch_effect = paste0(quant_batch_effect, '@', quantobject_id)) %>%

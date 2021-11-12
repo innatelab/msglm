@@ -2,7 +2,7 @@ image: rocker/verse
 
 variables:
   # changing the snapshot will cause the rebuild of the msglm dependencies
-  R_DEPS_SNAPSHOT: RDeps-20211026
+  R_DEPS_SNAPSHOT: RDeps-20211111
   # msglm is installed to R_LIBS_USER
   R_LIBS_USER: "$CI_PROJECT_DIR/.ci/lib/R/library"
   # dependencies are installed to R_LIBS_SITE

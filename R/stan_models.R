@@ -74,6 +74,7 @@ to_standata.msglm_model_data <- function(model_data,
                               hsprior_lambda_a_offset = 0.05, hsprior_lambda_t_offset = 0.01,
                               batch_effect_sigma=0.5,
                               quant_batch_tau=1.0, quant_batch_df=2, quant_batch_c=10,
+                              quantobject_shift_df=2.0, quantobject_shift_sigma=1.0,
                               empty_msprobe_sigmoid_scale = 1.0,
                               verbose = FALSE)
 {
@@ -171,6 +172,9 @@ to_standata.msglm_model_data <- function(model_data,
       # TODO support different noise models
       Nmsprotocols = 0L,
       mschannel2msproto = integer(0),
+
+      qobj_shift_df = quantobject_shift_df,
+      qobj_shift_sigma = quantobject_shift_sigma,
 
       # quantobject-specific batch effects
       NquantBatchEffects = n_distinct(model_data$quantobject_batch_effects$index_quant_batch_effect),

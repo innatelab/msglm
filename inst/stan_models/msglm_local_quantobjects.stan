@@ -96,6 +96,9 @@ data {
   real<lower=0> obj_probe_shift_df;  // degrees of freedom for object-in-msprobe shift
   real<lower=0> batch_effect_sigma;
 
+  real<lower=0> qobj_shift_sigma;    // sigma parameter of qobj_shift distribu
+  real<lower=0> qobj_shift_df;       // df parameter of qobj_shift distribu
+
   real<lower=0> quant_batch_effect_tau;
   real<lower=0> quant_batch_effect_df;
   real<lower=0> quant_batch_effect_c;
@@ -390,7 +393,7 @@ model {
       obj_batch_effect_unscaled_other ~ std_normal();
     }
     if (Nquantobjects > 0) {
-      qobj_shift ~ cauchy(0, 1);
+      qobj_shift ~ student_t(qobj_shift_df, 0, qobj_shift_sigma);
       if (NqobjBatchEffects > 0) {
         qobj_batch_effect_lambda_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * quant_batch_effect_df, 0.5 * quant_batch_effect_df);
         qobj_batch_effect_lambda_a - hsprior_lambda_a_offset ~ std_normal();

@@ -177,11 +177,23 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
       dplyr::ungroup()
     qobj_probeXbatcheff_df <- dplyr::full_join(matrix2frame(mschannelXquantBatchEffect,
                                                             row_col="mschannel", col_col="quant_batch_effect"),
-                                               dplyr::select(qobjs_df, index_object, index_quantobject, quantobject_id),
+                                               dplyr::select(model_data$quantobjects, index_object, index_quantobject, quantobject_id),
                                                by = character()) %>%
       dplyr::inner_join(dplyr::select(quant_batch_effects_df, quant_batch_effect, index_quant_batch_effect), by="quant_batch_effect") %>%
-      dplyr::left_join(dplyr::select(model_data$msdata, mschannel, index_object, index_quantobject, index_quantobject_msprobe),
-                       by=c("index_object", "index_quantobject", "mschannel")) %>%
+      dplyr::right_join(dplyr::select(model_data$msdata, mschannel, index_msprobe, index_object, index_quantobject, index_quantobject_msprobe),
+                        by=c("index_object", "index_quantobject", "mschannel")) %>%
+      # index msdata without batch effect as 0 (needed for ref quant object removal later)
+      dplyr::mutate(index_quant_batch_effect = replace_na(index_quant_batch_effect, 0L)) %>%
+      dplyr::group_by(index_quantobject) %>%
+      # remove batch effects that are present in all msdata of a given quantobject
+      # (otherwise it creates redundancy)
+      dplyr::group_modify(~{
+        nmschans <- n_distinct(.x$mschannel)
+        dplyr::group_by(.x, index_quant_batch_effect) %>%
+        dplyr::filter(n() < nmschans) %>%
+        dplyr::ungroup()
+      }) %>% dplyr::ungroup() %>%
+      dplyr::filter(index_quant_batch_effect > 0L) %>%
       dplyr::mutate(quantobject_batch_effect = paste0(quant_batch_effect, '@', quantobject_id)) %>%
       dplyr::arrange(index_quant_batch_effect, index_quantobject_msprobe)
     model_data$quantobject_batch_effects <- dplyr::select(qobj_probeXbatcheff_df,

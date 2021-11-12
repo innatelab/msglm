@@ -390,6 +390,7 @@ annotate_msdata <- function(msdata_df, model_def, verbose = model_def$verbose,
 prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$verbose,
                            max_quantobjects = 20L,
                            specificity_quantobject_group_cols = NULL,
+                           eager_msprotocols = FALSE,
                            ...) {
   model_def <- model_data$model_def
   msprb <- msdata$msentities[['msprobe']]
@@ -442,7 +443,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
         dplyr::left_join(intensities_df, by=c("quantobject_id", "mschannel"))
     if (all(is.na(msdata_df$intensity))) stop("No quantifications for ", nrow(qobjs_df), " specific ",
                                               quantobj, "(s) of ", obj_idcol, "=", model_data$object_id)
-    if (n_distinct(msdata_df$index_msprotocol) > 1L) {
+    if (!eager_msprotocols && n_distinct(msdata_df$index_msprotocol) > 1L) {
       # removing missing quantitations if a given quantobject is completely missing in a given msprotocol
       msdata_df <- dplyr::group_by(msdata_df, quantobject_id, index_msprotocol) %>%
         dplyr::filter(any(!is.na(intensity))) %>%
@@ -526,6 +527,10 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
 #' @param model_def *msglm_model* object with MSGLM model definition
 #' @param msdata *msglm_data_collection* object with all MS data
 #' @param object_ids vector of *model objects* IDs to analyze
+#' @param eager_msprotocols if FALSE, missing data entries are created only for
+#'        the probes of MS protocols, where given quantobjects were identified,
+#'        if TRUE, missing data entries are created for all MS probe regardless
+#'        of the MS protocol
 #' @param verbose
 #'
 #' @return object of *msglm_model_data* class
@@ -539,6 +544,7 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
                        max_quantobjects = 20L,
                        specificity_msexp_group_cols = msdata$msentities[['condition']],
                        cooccurrence_msexp_group_cols = msdata$msentities[['msprobe']],
+                       eager_msprotocols = FALSE,
                        ...) {
   checkmate::assert_class(model_def, "msglm_model")
   checkmate::assert_class(msdata, "msglm_data_collection")
@@ -740,6 +746,7 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
   }
 
   model_data <- prepare_msdata(model_data, msdata, max_quantobjects=max_quantobjects,
+                               eager_msprotocols=eager_msprotocols,
                                verbose=verbose, ...)
   model_data <- prepare_expanded_effects(model_data, verbose=verbose)
 

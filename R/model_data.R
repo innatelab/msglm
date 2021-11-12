@@ -378,7 +378,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                                     intensity, any_of("ident_type"))
     msdata_df <- dplyr::inner_join(dplyr::select(model_data$object_msprobes, index_msprobe, index_object_msprobe, index_object, object_id),
                                    dplyr::select(qobjs_df, index_object, quantobject_id, any_of("msfraction")), by="index_object") %>%
-        dplyr::inner_join(dplyr::select(model_data$mschannels, index_mschannel, mschannel, index_msprobe, any_of("msfraction")),
+        dplyr::inner_join(dplyr::select(model_data$mschannels, index_mschannel, mschannel, index_msprobe, index_msprotocol, any_of(c("msfraction", "msprotocol"))),
                           by = c("index_msprobe", intersect("msfraction", colnames(qobjs_df)))) %>%
         dplyr::inner_join(dplyr::select(model_data$msprobe, index_msprobe, msprobe,
                                         spec_msexp_group, cooccur_msexp_group,
@@ -387,6 +387,12 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
         dplyr::left_join(intensities_df, by=c("quantobject_id", "mschannel"))
     if (all(is.na(msdata_df$intensity))) stop("No quantifications for ", nrow(qobjs_df), " specific ",
                                               quantobj, "(s) of ", obj_idcol, "=", model_data$object_id)
+    if (n_distinct(msdata_df$index_msprotocol) > 1L) {
+      # removing missing quantitations if a given quantobject is completely missing in a given msprotocol
+      msdata_df <- dplyr::group_by(msdata_df, quantobject_id, index_msprotocol) %>%
+        dplyr::filter(any(!is.na(intensity))) %>%
+        dplyr::ungroup()
+    }
     nqobj_probes <- nrow(dplyr::distinct(msdata_df, quantobject_id, mschannel))
     if (nrow(msdata_df) != nqobj_probes) {
       if (verbose) warning(nrow(msdata_df) - nqobj_probes, " of ", nrow(msdata_df),

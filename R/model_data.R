@@ -536,6 +536,10 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
   checkmate::assert_names(colnames(msprbs_orig_df),
                           must.include = Filter(Negate(is.na), msprb_cols))
   msprbs_df <- dplyr::select_at(msprbs_orig_df, Filter(Negate(is.na), msprb_cols))
+  checkmate::assert_character(as.character(msprbs_df$msprobe), unique=TRUE, any.missing=FALSE)
+  checkmate::assert_subset(as.character(msprbs_df$condition), model_def$conditions$condition)
+  checkmate::assert_set_equal(unique(as.character(msprbs_df$condition)),
+                              dplyr::filter(model_def$conditions, !is_virtual)$condition)
   if (!is.null(specificity_msexp_group_cols)) {
     msprbs_df <- dplyr::bind_cols(msprbs_df, dplyr::transmute(msprbs_orig_df,
                                   spec_msexp_group = factor(paste(!!!syms(specificity_msexp_group_cols)))))
@@ -548,10 +552,6 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
   } else {
     msprbs_df <- dplyr::mutate(msprbs_df, cooccur_msexp_group = NA_integer_)
   }
-  checkmate::assert_character(as.character(msprbs_df$msprobe), unique=TRUE, any.missing=FALSE)
-  checkmate::assert_subset(as.character(msprbs_df$condition), model_def$conditions$condition)
-  checkmate::assert_set_equal(unique(as.character(msprbs_df$condition)),
-                              dplyr::filter(model_def$conditions, !is_virtual)$condition)
   # fill missing columns with NA
   for (col in setdiff(names(msprb_cols), colnames(msprbs_df))) {
     if (verbose) message("Adding empty ", col, " column to MS probe information")

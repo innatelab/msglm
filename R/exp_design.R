@@ -200,19 +200,28 @@ set_batch_effects <- function(model_def,
   return(model_def)
 }
 
-#' Title
+#' Set *contrasts* for the MSGLM model.
 #'
-#' @param model_def
-#' @param metaconditionXcontrast
-#' @param conditionXcontrast
-#' @param verbose
+#' TODO description
 #'
-#' @return updated msglm_model object
+#' @param model_def *msglm_model* object
+#' @param metaconditionXcontrast matrix that defines *contrasts* (matrix columns)
+#'        as linear combinations of *metaconditions* (matrix rows)
+#' @param conditionXmetacondition optional logical matrix defining *metaconditions*
+#'        (matrix columns) as subsets of model's *conditions* (matrix rows). If
+#'        this matrix is not specified, it is assumed that *metaconditions* are
+#'        identical to *conditions*
+#' @param contrasts optional data frame defining the properties of *contrasts*
+#' @param conditionXcontrast optional data frame defining the property of each
+#'        individual *condition* in each individual *contrast*
+#' @param verbose provide extended diagnostic output
+#'
+#' @return updated *msglm_model* object
 #' @export
 #'
 #' @examples
 set_contrasts <- function(model_def,
-                          metaconditionXcontrast = NULL,
+                          metaconditionXcontrast,
                           conditionXmetacondition = NULL,
                           contrasts = NULL,
                           conditionXcontrast = NULL,

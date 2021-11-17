@@ -55,25 +55,25 @@ gen_modelobj_effects <- function(modelobjs_df, effects_df, effect_range = c(-10,
     }) %>% dplyr::ungroup()
 }
 
-gen_interactions <- function(model_def, modelobjXeffects_df) {
-    dplyr::group_by(modelobjXeffects_df, modelobj_id) %>%
+gen_modelobj_conditions <- function(model_def, modelobjXeffects_df) {
+    dplyr::group_by(objXeffects_df, modelobj_id) %>%
     dplyr::group_modify(~{
         effect_values <- rlang::set_names(.x$value, .x$effect)
-        iaction_values <- model_def$conditionXeffect %*% effect_values[colnames(model_def$conditionXeffect)]
+        objcond_values <- model_def$conditionXeffect %*% effect_values[colnames(model_def$conditionXeffect)]
         tibble(condition = rownames(model_def$conditionXeffect),
-               value = as.vector(iaction_values) + .x$labu_base[[1]])
+               value = as.vector(objcond_values) + .x$labu_base[[1]])
     }) %>% dplyr::ungroup()
 }
 
-gen_modelobj_intensities <- function(iactions_df, msprobes_df, labu_base_shift = 0.0, replicate_sigma = 0.1) {
-    dplyr::inner_join(iactions_df, dplyr::select(msprobes_df, msprobe, condition), by="condition") %>%
+gen_modelobj_intensities <- function(objconds_df, msprobes_df, labu_base_shift = 0.0, replicate_sigma = 0.1) {
+    dplyr::inner_join(objconds_df, dplyr::select(msprobes_df, msprobe, condition), by="condition") %>%
     dplyr::mutate(replicate_shift = rnorm(n(), 0, replicate_sigma),
                   intensity = 2^(value + replicate_shift + labu_base_shift))
 }
 
-gen_quantobj_intensities <- function(iactions_df, quantobjs_df, mschannels_df,
+gen_quantobj_intensities <- function(objconds_df, quantobjs_df, mschannels_df,
                                      labu_base_shift = 0.0, replicate_sigma = 0.1) {
-    dplyr::inner_join(iactions_df, dplyr::select(mschannels_df, msprobe, any_of("mschannel"), condition) %>% dplyr::distinct(),
+    dplyr::inner_join(objconds_df, dplyr::select(mschannels_df, msprobe, any_of("mschannel"), condition) %>% dplyr::distinct(),
                       by="condition") %>%
     dplyr::mutate(replicate_shift = rnorm(n(), 0, replicate_sigma)) %>%
     dplyr::inner_join(quantobjs_df) %>%
@@ -88,8 +88,8 @@ gen_msdata <- function(model_def, mschannels_df,
     res <- list()
     objects <- gen_objects(modelobject, n = nmodelobjects, quantobject = quantobject)
     res[[paste0(modelobject, 's')]] <- objects$modelobjects
-    res$object_effects <- gen_modelobj_effects(objects$modelobjects, model_def$effects)
-    res$interactions <- gen_interactions(model_def, res$object_effects)
+    res$object_effects <- gen_modelobj_effects(objects$objects, model_def$effects)
+    res$object_conditions <- gen_modelobj_conditions(model_def, res$object_effects)
     intensities_cols <- c("intensity")
     #if (rlang::has_name(mschannels_df, "msfraction")) {
     #    intensities_cols[[msfraction]] <- "msfraction"
@@ -110,7 +110,7 @@ gen_msdata <- function(model_def, mschannels_df,
         }
         intensities_cols[[paste0(quantobject, "_id")]] <- "quantobj_id"
         intensities_cols[[mschannel]] <- "mschannel"
-        res[[paste0(quantobject, "_intensities")]] <- gen_quantobj_intensities(res$interactions, objects$quantobjects, mschannels_df) %>%
+        res[[paste0(quantobject, "_intensities")]] <- gen_quantobj_intensities(res$object_conditions, objects$quantobjects, mschannels_df) %>%
             dplyr::select_at(intensities_cols)
         res[[paste0(modelobject, "2pepmod")]] <- dplyr::select_at(objects$pepmods, paste0(c(modelobject, "pepmod"), "_id")) %>%
             dplyr::mutate(is_specific = TRUE)
@@ -119,7 +119,7 @@ gen_msdata <- function(model_def, mschannels_df,
     } else {
         intensities_cols[[paste0(modelobject, "_id")]] <- "modelobj_id"
         intensities_cols[[msprobe]] <- "msprobe"
-        res[[paste0(modelobject, "_intensities")]] <- gen_modelobj_intensities(res$interactions, mschannels_df) %>%
+        res[[paste0(modelobject, "_intensities")]] <- gen_obj_intensities(res$object_conditions, mschannels_df) %>%
             dplyr::select_at(intensities_cols)
     }
     mschan_cols <- character()

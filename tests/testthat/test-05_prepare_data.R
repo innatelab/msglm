@@ -116,11 +116,11 @@ test_that(paste0(modelobj, "/", modelobj, " model, no msfractions, ",
     stan_data1 <- to_standata(model_data1)
     expect_list(stan_data1)
     expect_names(names(stan_data1), must.include=c("Nconditions", "Nobjects",
-        "Nprobes", "Nobservations",
+        "Nprobes", "NobjProbes",
         "Nmschannels", "mschannel_shift",
         "Neffects", "NobjEffects", "NbatchEffects", "NobjBatchEffects",
-        "Niactions", "Nquanted", "Nmissed",
-        "iactXobjeff_Nw", "obsXobjbatcheff_Nw"))
+        "NobjConditions", "Nquanted", "Nmissed",
+        "obj_condXeff_Nw", "obj_probeXbatcheff_Nw"))
 
     model_data2 <- msglm_data(model_def, msdata, 2L)
     expect_s3_class(model_data2, "msglm_model_data")
@@ -151,11 +151,11 @@ test_that(paste0(modelobj, "/pepmodstate model, no msfractions, ",
     model_data1 <- msglm_data(model_def, msdata, 1L)
     expect_s3_class(model_data1, "msglm_model_data")
     expect_names(names(model_data1), must.include = c("model_def", "object_id", "msentities",
-                 "objects", "subobjects", "msprobes", "mschannels"))
+                 "objects", "quantobjects", "msprobes", "mschannels"))
     expect_tibble(model_data1$objects)
     expect_equal(model_data1$object_id, 1L)
     expect_equal(unique(model_data1$objects$object_id), 1L)
-    expect_equal(unique(model_data1$subobjects$index_object), 1L)
+    expect_equal(unique(model_data1$quantobjects$index_object), 1L)
 })
 
 }
@@ -268,22 +268,22 @@ test_that(paste0(modelobj, "/pepmodstate model, msfractions, ",
     model_data1 <- msglm_data(model_def, msdata, 1L)
     expect_s3_class(model_data1, "msglm_model_data")
     expect_names(names(model_data1), must.include = c("model_def", "object_id", "msentities",
-                 "objects", "subobjects", "msprobes", "mschannels"))
+                 "objects", "quantobjects", "msprobes", "mschannels"))
     expect_tibble(model_data1$objects)
     expect_equal(model_data1$object_id, 1L)
     expect_equal(unique(model_data1$objects$object_id), 1L)
-    expect_equal(unique(model_data1$subobjects$object_id), 1L)
+    expect_equal(unique(model_data1$quantobjects$object_id), 1L)
 
     stan_data1 <- to_standata(model_data1)
     expect_list(stan_data1)
     expect_names(names(stan_data1), must.include=c(
-        "Nconditions", "Nobjects", "Nsubobjects",
-        "Nprobes", "Nobservations", "Nsubobservations",
+        "Nconditions", "Nobjects", "Nquantobjects",
+        "Nprobes", "NobjProbes", "NqobjProbes",
         "Nmschannels", "mschannel_shift",
         "Neffects", "NobjEffects", "NbatchEffects", "NobjBatchEffects",
-        "NquantBatchEffects", "NsubobjBatchEffects",
-        "Niactions", "Nquanted", "Nmissed",
-        "iactXobjeff_Nw", "obsXobjbatcheff_Nw", "subobsXsubobjbatcheff_Nw"))
+        "NquantBatchEffects", "NqobjBatchEffects",
+        "NobjConditions", "Nquanted", "Nmissed",
+        "obj_condXeff_Nw", "obj_probeXbatcheff_Nw", "qobj_probeXqbatcheff_Nw"))
 })
 
 }}}

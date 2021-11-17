@@ -5,99 +5,99 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
   model_def <- model_data$model_def
 
   # FIXME use model_def class information
-  is_glmm <- rlang::has_name(model_def, "supXcond.mtxs") &&
+  is_glmm <- rlang::has_name(model_def, "mixtureXcondition.mtxs") &&
              rlang::has_name(model_def, "mixeffects.df")
   if (is_glmm) {
     if (verbose) message("Detected mixeffects data for GLMM model")
-    supXcond.mtxs <- model_def$supXcond.mtxs
+    mixtureXcondition.mtxs <- model_def$mixtureXcondition.mtxs
     mixcoefXeff.mtx <- model_def$mixcoefXeff.mtx
     # "GLMM" mixing model
-    if (any(names(supXcond.mtxs) != rownames(mixcoefXeff.mtx))) {
-      stop("Mismatch between supXcond.mtxs matrix names and mix coefficient names")
+    if (any(names(mixtureXcondition.mtxs) != rownames(mixcoefXeff.mtx))) {
+      stop("Mismatch between mixtureXcondition.mtxs matrix names and mix coefficient names")
     }
     mixeffects_df <- model_def$mixeffects
     if (any(mixeffects_df$mixeffect != colnames(mixcoefXeff.mtx))) {
       stop("Mismatch between mixcoefXeff.mtx matrix colnames and mix effect names")
     }
-    for (i in seq_along(supXcond.mtxs)) {
-      if (any(colnames(supXcond.mtxs[[i]]) != model_data$conditions$condition)) {
-        stop("Mismatch between supXcond.mtxs[[", names(supXcond.mtxs)[[i]],
+    for (i in seq_along(mixtureXcondition.mtxs)) {
+      if (any(colnames(mixtureXcondition.mtxs[[i]]) != model_data$conditions$condition)) {
+        stop("Mismatch between mixtureXcondition.mtxs[[", names(mixtureXcondition.mtxs)[[i]],
              "]] matrix colnames and condition names")
       }
-      if (any(rownames(supXcond.mtxs[[i]]) != model_data$supconditions$supcondition)) {
-        stop("Mismatch between supXcond.mtxs[[", names(supXcond.mtxs)[[i]],
-             "]] matrix rownames and supcondition names")
+      if (any(rownames(mixtureXcondition.mtxs[[i]]) != model_data$mixtures$mixture)) {
+        stop("Mismatch between mixtureXcondition.mtxs[[", names(mixtureXcondition.mtxs)[[i]],
+             "]] matrix rownames and mixture names")
       }
     }
     model_data$mixeffects <- mixeffects_df
     model_data$mixcoefs <- tibble(mixcoef = rownames(mixcoefXeff.mtx))
     model_data$mixcoefXeff <- mixcoefXeff.mtx
-    model_data$supXcond <- supXcond.mtxs
+    model_data$mixtureXcondition <- mixtureXcondition.mtxs
     conditions <- levels(model_data$conditions$condition)
-    sactXiact.mtxs <- lapply(model_data$supXcond, function(supXcond.mtx){
-      res <- extrude_matrix(supXcond.mtx,
-                            model_data$superactions$index_object,
-                            model_data$superactions$index_supcondition,
-                            blockdim = "index_object", rowixdim = "index_supaction",
-                            coldim = "interaction_id", corecoldim = "condition_id")
+    obj_mixXcond.mtxs <- lapply(model_data$mixtureXcondition, function(mixtureXcondition.mtx){
+      res <- extrude_matrix(mixtureXcondition.mtx,
+                            model_data$object_mixtures$index_object,
+                            model_data$object_mixtures$index_mixture,
+                            blockdim = "index_object", rowixdim = "index_object_mixture",
+                            coldim = "object_condition_id", corecoldim = "condition_id")
       names(dimnames(res$mtx)) <- c("sact", "iact")
       res$mtx <- res$mtx[, colSums(abs(res$mtx)) != 0.0, drop=FALSE]
-      res$df <- dplyr::rename(res$df, condition=eff, iaction_id=objeff)
-      res$iaction_df <- dplyr::rename(res$objeff_df, condition=eff,
-                                      iaction_id=objeff,
+      res$df <- dplyr::rename(res$df, condition=eff, objcond_id=objeff)
+      res$objconds_df <- dplyr::rename(res$objeff_df, condition=eff,
+                                      objcond_id=objeff,
                                       index_object=obj)
       res$objeff_df <- NULL
       return(res)
     }) %>% pivot_wider(id_cols = )
-    # collect all used interaction ids to use as factor levels
-    iaction_ids = unique(unlist(lapply(sactXiact.mtxs, function(x) x$iaction_df$iaction_id)))
-    # convert condition and iaction_id into factor
-    sactXiact.mtxs <- lapply(sactXiact.mtxs, function(x) {
+    # collect all used object_condition ids to use as factor levels
+    objcond_ids = unique(unlist(lapply(obj_mixXcond.mtxs, function(x) x$objconds_df$objcond_id)))
+    # convert condition and objcond_id into factor
+    obj_mixXcond.mtxs <- lapply(obj_mixXcond.mtxs, function(x) {
       x$df <- mutate(x$df,
                      condition = factor(condition, levels=conditions),
-                     iaction_id = factor(iaction_id, levels=iaction_ids))
-      x$iaction_df <- mutate(x$iaction_df,
+                     objcond_id = factor(objcond_id, levels=objcond_ids))
+      x$objconds_df <- mutate(x$objconds_df,
                              condition = factor(condition, levels=conditions),
-                             iaction_id = factor(iaction_id, levels=iaction_ids))
+                             objcond_id = factor(objcond_id, levels=objcond_ids))
       return(x)
     })
-    model_data$interactions <- dplyr::distinct(dplyr::bind_rows(lapply(sactXiact.mtxs, function(x) x$iaction_df))) %>%
+    model_data$object_conditions <- dplyr::distinct(dplyr::bind_rows(lapply(obj_mixXcond.mtxs, function(x) x$objconds_df))) %>%
       dplyr::mutate(index_condition = as.integer(condition)) %>%
-      dplyr::mutate(index_interaction = row_number(),
+      dplyr::mutate(index_object_condition = row_number(),
              is_virtual = FALSE)
-    model_data$mixtions <- dplyr::bind_rows(lapply(names(sactXiact.mtxs), function(mixcoef){
+    model_data$mixtions <- dplyr::bind_rows(lapply(names(obj_mixXcond.mtxs), function(mixcoef){
       tibble::tibble(mixcoef = mixcoef,
-                     iaction_id = factor(colnames(sactXiact.mtxs[[mixcoef]]$mtx), levels=iaction_ids))
+                     objcond_id = factor(colnames(obj_mixXcond.mtxs[[mixcoef]]$mtx), levels=objcond_ids))
     })) %>%
       dplyr::mutate(mixtion_ix = row_number(),
-                    mixtion = paste0(mixcoef, " ", iaction_id),
+                    object_premix = paste0(mixcoef, " ", objcond_id),
                     mixcoef = factor(mixcoef, levels=rownames(mixcoefXeff.mtx)),
                     mixcoef_ix = replace_na(as.integer(mixcoef), 0L)) %>%
-    dplyr::left_join(dplyr::select(model_data$interactions, iaction_id, index_interaction)) %>%
+    dplyr::left_join(dplyr::select(model_data$object_conditions, objcond_id, index_object_condition)) %>%
     dplyr::arrange(mixtion_ix)
-    model_data$supactXmixt <- bind_cols(lapply(sactXiact.mtxs, function(x) x$mtx))
-    dimnames(model_data$supactXmixt) <- list(superaction = model_data$superactions$supaction_id,
-                                             mixtion = model_data$mixtions$mixtion)
+    model_data$object_mixtureXpremix <- bind_cols(lapply(obj_mixXcond.mtxs, function(x) x$mtx))
+    dimnames(model_data$object_mixtureXpremix) <- list(object_mixture = model_data$object_mixtures$object_mixture_id,
+                                                       object_premix = model_data$object_premixes$object_premix)
   } else {
-    iaction_ids <- unique(model_data$interactions$iaction_id)
-    obs_ids <- unique(model_data$observations$observation_id)
+    objcond_ids <- unique(model_data$object_conditions$objcond_id)
+    objprobe_ids <- unique(model_data$object_msprobes$objprobe_id)
   }
 
-  iactXobjeff_df <- dplyr::full_join(matrix2frame(model_def$conditionXeffect, row_col="condition", col_col = "effect"),
+  obj_condXeff_df <- dplyr::full_join(matrix2frame(model_def$conditionXeffect, row_col="condition", col_col = "effect"),
                                      dplyr::select(model_data$objects, index_object, object_id),
                                      by = character()) %>%
     dplyr::inner_join(dplyr::select(model_def$effects, effect, index_effect), by="effect") %>%
-    dplyr::inner_join(dplyr::select(model_data$interactions, index_interaction, index_object, condition),
+    dplyr::inner_join(dplyr::select(model_data$object_conditions, index_object_condition, index_object, condition),
                       by=c("index_object", "condition")) %>%
     dplyr::mutate(object_effect = paste0(effect, '@', object_id))
-  model_data$object_effects <- dplyr::select(iactXobjeff_df, index_object, object_id,
+  model_data$object_effects <- dplyr::select(obj_condXeff_df, index_object, object_id,
                                              index_effect, effect, object_effect) %>%
     dplyr::distinct() %>%
     dplyr::arrange(index_object, index_effect) %>%
     dplyr::mutate(index_object_effect = row_number())
-  model_data$iactXobjeff <- frame2matrix(iactXobjeff_df, row_col="index_interaction", col_col="object_effect",
-                                         rows=model_data$interactions$index_interaction,
-                                         cols=model_data$object_effects$object_effect)
+  model_data$object_conditionXeffect <- frame2matrix(obj_condXeff_df, row_col="index_object_condition", col_col="object_effect",
+                                          rows=model_data$object_conditions$index_object_condition,
+                                          cols=model_data$object_effects$object_effect)
 
   msprobeXeffect_name <- "msprobeXeffect"
   msprb <- model_data$msentities[['msprobe']]
@@ -108,20 +108,20 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
     if (msprb_dim != msprb_idcol) {
       stop("Name of model_def$", msprobeXeffect_name, " rows dimension (", msprb_dim, ") inconsistent with ", msprb_idcol)
     }
-    obsXobjeff_df <- dplyr::full_join(matrix2frame(model_def[[msprobeXeffect_name]], row_col="condition", col_col = msprb_idcol),
-                                      dplyr::select(model_data$objects, index_object, object_id),
-                                      by = character()) %>%
-      dplyr::inner_join(dplyr::select(model_data$observations, index_observation, index_object, index_mschannel, !!sym(msprb_idcol)),
+    obj_probeXeff_df <- dplyr::full_join(matrix2frame(model_def[[msprobeXeffect_name]], row_col="condition", col_col = msprb_idcol),
+                                         dplyr::select(model_data$objects, index_object, object_id),
+                                         by = character()) %>%
+      dplyr::inner_join(dplyr::select(model_data$object_msprobes, index_object_msprobe, index_object, index_mschannel, !!sym(msprb_idcol)),
                         by=c("index_object", msprb_idcol)) %>%
       dplyr::mutate(object_effect = paste0(effect, '@', object_id))
   } else {
-    obsXobjeff_df <- dplyr::inner_join(iactXobjeff_df,
-                                       dplyr::select(model_data$observations, index_interaction, index_observation),
-                                       by="index_interaction")
+    obj_probeXeff_df <- dplyr::inner_join(obj_condXeff_df,
+                                          dplyr::select(model_data$object_msprobes, index_object_condition, index_object_msprobe),
+                                          by="index_object_condition")
   }
-  model_data$obsXobjeff <- frame2matrix(obsXobjeff_df, row_col="index_observation", col_col="object_effect",
-                                        rows=model_data$observations$index_observation,
-                                        cols=model_data$object_effects$object_effect)
+  model_data$object_msprobeXeffect <- frame2matrix(obj_probeXeff_df, row_col="index_object_msprobe", col_col="object_effect",
+                                           rows=model_data$object_msprobes$index_object_msprobe,
+                                           cols=model_data$object_effects$object_effect)
 
   if (rlang::has_name(model_def, "msprobeXbatchEffect")) {
     msprobeXbatchEffect <- model_def$msprobeXbatchEffect
@@ -136,26 +136,26 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
                                        index_batch_effect = integer(0),
                                        is_positive = logical(0))
   }
-  obsXobjbatcheff_df <- dplyr::full_join(matrix2frame(msprobeXbatchEffect, row_col="msprobe", col_col="batch_effect"),
-                                         dplyr::select(model_data$objects, index_object, object_id, object_label),
-                                         by = character()) %>%
+  obj_probeXbatcheff_df <- dplyr::full_join(matrix2frame(msprobeXbatchEffect, row_col="msprobe", col_col="batch_effect"),
+                                            dplyr::select(model_data$objects, index_object, object_id, object_label),
+                                            by = character()) %>%
     dplyr::inner_join(dplyr::select(batch_effects_df, batch_effect, index_batch_effect), by="batch_effect") %>%
-    dplyr::left_join(dplyr::select(model_data$observations, msprobe, index_object, index_observation),
+    dplyr::left_join(dplyr::select(model_data$object_msprobes, msprobe, index_object, index_object_msprobe),
                      by=c("index_object", "msprobe")) %>%
     dplyr::mutate(object_batch_effect = paste0(batch_effect, '@', object_id))
-  model_data$object_batch_effects <- dplyr::select(obsXobjbatcheff_df,
+  model_data$object_batch_effects <- dplyr::select(obj_probeXbatcheff_df,
                                                    object_batch_effect,
                                                    index_batch_effect, batch_effect,
                                                    index_object, object_id) %>%
     dplyr::distinct() %>%
     dplyr::arrange(index_object, index_batch_effect) %>%
     dplyr::mutate(index_object_batch_effect = row_number())
-  model_data$obsXobjbatcheff <- frame2matrix(obsXobjbatcheff_df, row_col="index_observation", col_col="object_batch_effect",
-                                             rows=if (nrow(obsXobjbatcheff_df) > 0) {
-                                                    model_data$observations$index_observation
+  model_data$object_msprobeXbatch_effect <- frame2matrix(obj_probeXbatcheff_df, row_col="index_object_msprobe", col_col="object_batch_effect",
+                                                rows=if (nrow(obj_probeXbatcheff_df) > 0) {
+                                                    model_data$object_msprobes$index_object_msprobe
                                                   } else integer(0),
-                                             cols=model_data$object_batch_effects$object_batch_effect)
-  if (rlang::has_name(model_data, "subobjects")) {
+                                                cols=model_data$object_batch_effects$object_batch_effect)
+  if (rlang::has_name(model_data, "quantobjects")) {
     if (rlang::has_name(model_def, "mschannelXquantBatchEffect")) {
       mschannelXquantBatchEffect <- model_def$mschannelXquantBatchEffect
       mschan <- model_data$msentities[['mschannel']]
@@ -171,33 +171,34 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
                                                index_quant_batch_effect = integer(0),
                                                is_positive = logical(0))
     }
-    # remove reference subobject (one with the smallest index of EACH object in the model) from quant batch effects
-    subobjs_df <- dplyr::group_by(model_data$subobjects, index_object) %>%
-      dplyr::filter(index_subobject > min(index_subobject)) %>%
+    # remove reference quantobject (one with the smallest index of EACH object in the model) from quant batch effects
+    qobjs_df <- dplyr::group_by(model_data$quantobjects, index_object) %>%
+      dplyr::filter(index_quantobject > min(index_quantobject)) %>%
       dplyr::ungroup()
-    subobsXsubobjbatcheff_df <- dplyr::full_join(matrix2frame(mschannelXquantBatchEffect,
-                                                              row_col="mschannel", col_col="quant_batch_effect"),
-                                                 dplyr::select(subobjs_df, index_object, index_subobject, subobject_id),
-                                                 by = character()) %>%
+    qobj_probeXbatcheff_df <- dplyr::full_join(matrix2frame(mschannelXquantBatchEffect,
+                                                            row_col="mschannel", col_col="quant_batch_effect"),
+                                               dplyr::select(qobjs_df, index_object, index_quantobject, quantobject_id),
+                                               by = character()) %>%
       dplyr::inner_join(dplyr::select(quant_batch_effects_df, quant_batch_effect, index_quant_batch_effect), by="quant_batch_effect") %>%
-      dplyr::left_join(dplyr::select(model_data$msdata, mschannel, index_object, index_subobject, index_subobservation),
-                       by=c("index_object", "index_subobject", "mschannel")) %>%
-      dplyr::mutate(subobject_batch_effect = paste0(quant_batch_effect, '@', subobject_id)) %>%
-      dplyr::arrange(index_quant_batch_effect, index_subobservation)
-    model_data$subobject_batch_effects <- dplyr::select(subobsXsubobjbatcheff_df,
-                                                        subobject_batch_effect,
+      dplyr::left_join(dplyr::select(model_data$msdata, mschannel, index_object, index_quantobject, index_quantobject_msprobe),
+                       by=c("index_object", "index_quantobject", "mschannel")) %>%
+      dplyr::mutate(quantobject_batch_effect = paste0(quant_batch_effect, '@', quantobject_id)) %>%
+      dplyr::arrange(index_quant_batch_effect, index_quantobject_msprobe)
+    model_data$quantobject_batch_effects <- dplyr::select(qobj_probeXbatcheff_df,
+                                                        quantobject_batch_effect,
                                                         index_quant_batch_effect, quant_batch_effect,
-                                                        index_subobject, subobject_id) %>%
+                                                        index_quantobject, quantobject_id) %>%
       dplyr::distinct() %>%
-      dplyr::arrange(index_subobject, index_quant_batch_effect) %>%
-      dplyr::mutate(index_subobject_batch_effect = row_number())
-    model_data$subobsXsubobjbatcheff <- frame2matrix(subobsXsubobjbatcheff_df,
-                                                     row_col="index_subobservation",
-                                                     col_col="subobject_batch_effect",
-                                                     rows = if (nrow(subobsXsubobjbatcheff_df)>0) {
-                                                              model_data$msdata$index_subobservation
-                                                            } else integer(0),
-                                                     cols = model_data$subobject_batch_effects$subobject_batch_effect)
+      dplyr::arrange(index_quantobject, index_quant_batch_effect) %>%
+      dplyr::mutate(index_quantobject_batch_effect = row_number())
+    model_data$quantobject_msprobeXquant_batch_effect <- frame2matrix(
+            qobj_probeXbatcheff_df,
+            row_col="index_quantobject_msprobe",
+            col_col="quantobject_batch_effect",
+            rows = if (nrow(qobj_probeXbatcheff_df)>0) {
+                    model_data$msdata$index_quantobject_msprobe
+                  } else integer(0),
+            cols = model_data$quantobject_batch_effects$quantobject_batch_effect)
   }
 
   return(model_data)
@@ -270,26 +271,26 @@ cluster_msprofiles <- function(msdata, mschannel_stats, obj_col, mschannel_col, 
            dplyr::select(-tmp_profile_cluster, -`__index_msobject__`))
 }
 
-# annotate msdata (full subobject X msrun Cartesian product)
+# annotate msdata (full quantobject X msrun Cartesian product)
 # as reliable (column name) according to
 # the specificity of observing the quant object in the MS experiment groups
 # defined by `msprobe$spec_msexp_group`
-# or by co-occurrence of distinct quant subobjects in the given MS experiment group
+# or by co-occurrence of distinct quant quantobjects in the given MS experiment group
 # defined by `msprobe$cooccur_msexp_group`
 annotate_msdata <- function(msdata_df, model_def, verbose = model_def$verbose,
                             specificity_pvalue = 1E-3,
                             specificity_quantobject_group_cols = NULL,
-                            observation_fdr = 0.01,
+                            quantobject_fdr = 0.01,
                             cooccurrence_pvalue = 1E-3) {
   if (verbose) message("Identifying reliable quantifications")
   msdata_df <- dplyr::mutate(msdata_df, is_observed = !is.na(intensity))
 
   spec_quantobj_group_cols <- c('object_id', specificity_quantobject_group_cols %||%
                                        intersect(colnames(msdata_df),
-                                                 c('subobject_id', 'object_id'))) %>% unique()
+                                                 c('quantobject_id', 'object_id'))) %>% unique()
   spec_id_cols <- c("spec_msexp_group", spec_quantobj_group_cols)
 
-  # calculate probabilities that observations of an object are specific to the given interaction
+  # calculate probabilities that object_msprobes of an object are specific to the given object_condition
   spec_stats_df <- dplyr::group_by(msdata_df, spec_msexp_group, !!!syms(spec_quantobj_group_cols)) %>%
     dplyr::summarise(nms_observed = sum(is_observed), nms_missed = sum(!is_observed),
                      .groups = "drop") %>%
@@ -302,16 +303,16 @@ annotate_msdata <- function(msdata_df, model_def, verbose = model_def$verbose,
   msdata_df <- dplyr::left_join(msdata_df,
       dplyr::select_at(spec_stats_df, c(spec_id_cols, 'is_reliable')),
       by = spec_id_cols)
-  if (rlang::has_name(msdata_df, 'subobject_id')) {
-    # calculate probabilities that all quantitations of subobjects in a given observation are false discoveries
+  if (rlang::has_name(msdata_df, 'quantobject_id')) {
+    # calculate probabilities that all quantitations of quantobjects in a given object_msprobe are false discoveries
     cooccur_stats_df <- dplyr::group_by(msdata_df, object_id, cooccur_msexp_group) %>%
-      dplyr::summarise(nsubobj_observed = n_distinct(subobject_id[is_observed]),
+      dplyr::summarise(nqobj_observed = n_distinct(quantobject_id[is_observed]),
                        .groups = "drop") %>%
       dplyr::inner_join(dplyr::group_by(msdata_df, object_id) %>%
-                        dplyr::summarise(nsubobj_total = n_distinct(subobject_id),
+                        dplyr::summarise(nqobj_total = n_distinct(quantobject_id),
                                          .groups = "drop"), by="object_id") %>%
-      dplyr::mutate(is_cooccurring = pbinom(nsubobj_observed - 1L, nsubobj_total,
-                                            observation_fdr, lower.tail=FALSE) <= cooccurrence_pvalue)
+      dplyr::mutate(is_cooccurring = pbinom(nqobj_observed - 1L, nqobj_total,
+                                            quantobject_fdr, lower.tail=FALSE) <= cooccurrence_pvalue)
 
     msdata_df <- dplyr::left_join(msdata_df,
         dplyr::select(cooccur_stats_df, object_id, cooccur_msexp_group, is_cooccurring),
@@ -319,7 +320,7 @@ annotate_msdata <- function(msdata_df, model_def, verbose = model_def$verbose,
         dplyr::mutate(is_reliable = is_reliable | is_cooccurring,
                       is_cooccurring = NULL)
     if (rlang::has_name(msdata_df, "ident_type")) {
-      msdata_df <- dplyr::group_by(msdata_df, subobject_id, spec_msexp_group) %>%
+      msdata_df <- dplyr::group_by(msdata_df, quantobject_id, spec_msexp_group) %>%
         dplyr::mutate(is_reliable = is_reliable | any(ident_type %in% c("MULTI-MSMS"))) %>%
         dplyr::ungroup()
     }
@@ -329,10 +330,10 @@ annotate_msdata <- function(msdata_df, model_def, verbose = model_def$verbose,
   return(msdata_df)
 }
 
-# select relevant msdata and subobjects from msdata_df
-# and define model_data$subobjects and model_data$observations
+# select relevant msdata and quantobjects from msdata_df
+# and define model_data$quantobjects and model_data$object_msprobes
 prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$verbose,
-                           max_subobjects = 20L,
+                           max_quantobjects = 20L,
                            specificity_quantobject_group_cols = NULL,
                            ...) {
   model_def <- model_data$model_def
@@ -354,41 +355,41 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
     intensities_df <- dplyr::select(msdata[[intensities_dfname]],
                                     object_id=!!sym(modelobj_idcol), msprobe=!!sym(msprb_idcol),
                                     intensity, any_of("ident_type"))
-    msdata_df <- dplyr::left_join(model_data$observations,
+    msdata_df <- dplyr::left_join(model_data$object_msprobes,
                                   intensities_df, by = c("object_id", "msprobe")) %>%
         annotate_msdata(model_def) %>%
-        dplyr::arrange(index_observation)
+        dplyr::arrange(index_object_msprobe)
   } else {
     # quant specific quantobjects of modelobj
     modelobj2quantobj_df <- msdata[[paste0(modelobj, "2", quantobj)]]
-    subobjs_df <- dplyr::inner_join(modelobj2quantobj_df,
-                                    dplyr::select(model_data$objects, !!sym(modelobj_idcol), object_id, index_object),
-                                    by=modelobj_idcol) %>%
+    qobjs_df <- dplyr::inner_join(modelobj2quantobj_df,
+                                  dplyr::select(model_data$objects, !!sym(modelobj_idcol), object_id, index_object),
+                                  by=modelobj_idcol) %>%
       dplyr::filter(is_specific) %>%
       dplyr::inner_join(dplyr::select(msdata[[paste0(quantobj, "s")]], !!sym(quantobj_idcol),
                                       any_of(c("msfraction", "charge"))),
                         by=quantobj_idcol) %>%
-      dplyr::mutate(subobject_id = !!sym(quantobj_idcol))
-    if (nrow(subobjs_df) == 0L) stop("No specific ", quantobj, "s found for ",
-                                     modelobj_idcol, "=", model_data$object_id)
-    if (verbose) message(nrow(subobjs_df), " specific ", quantobj, "(s) found")
+      dplyr::mutate(quantobject_id = !!sym(quantobj_idcol))
+    if (nrow(qobjs_df) == 0L) stop("No specific ", quantobj, "s found for ",
+                                   modelobj_idcol, "=", model_data$object_id)
+    if (verbose) message(nrow(qobjs_df), " specific ", quantobj, "(s) found")
     intensities_df <- dplyr::select(msdata[[intensities_dfname]],
-                                    subobject_id=!!sym(quantobj_idcol), mschannel=!!sym(mschan_idcol),
+                                    quantobject_id=!!sym(quantobj_idcol), mschannel=!!sym(mschan_idcol),
                                     intensity, any_of("ident_type"))
-    msdata_df <- dplyr::inner_join(dplyr::select(model_data$observations, index_msprobe, index_observation, index_object, object_id),
-                                   dplyr::select(subobjs_df, index_object, subobject_id, any_of("msfraction")), by="index_object") %>%
+    msdata_df <- dplyr::inner_join(dplyr::select(model_data$object_msprobes, index_msprobe, index_object_msprobe, index_object, object_id),
+                                   dplyr::select(qobjs_df, index_object, quantobject_id, any_of("msfraction")), by="index_object") %>%
         dplyr::inner_join(dplyr::select(model_data$mschannels, index_mschannel, mschannel, index_msprobe, any_of("msfraction")),
-                          by = c("index_msprobe", intersect("msfraction", colnames(subobjs_df)))) %>%
+                          by = c("index_msprobe", intersect("msfraction", colnames(qobjs_df)))) %>%
         dplyr::inner_join(dplyr::select(model_data$msprobe, index_msprobe, msprobe,
                                         spec_msexp_group, cooccur_msexp_group,
                                         any_of(specificity_quantobject_group_cols)),
                           by=c("index_msprobe")) %>%
-        dplyr::left_join(intensities_df, by=c("subobject_id", "mschannel"))
-    if (all(is.na(msdata_df$intensity))) stop("No quantifications for ", nrow(subobjs_df), " specific ",
+        dplyr::left_join(intensities_df, by=c("quantobject_id", "mschannel"))
+    if (all(is.na(msdata_df$intensity))) stop("No quantifications for ", nrow(qobjs_df), " specific ",
                                               quantobj, "(s) of ", modelobj_idcol, "=", model_data$object_id)
-    nsubobs <- nrow(dplyr::distinct(msdata_df, subobject_id, mschannel))
-    if (nrow(msdata_df) != nsubobs) {
-      if (verbose) warning(nrow(msdata_df) - nsubobs, " of ", nrow(msdata_df),
+    nqobj_probes <- nrow(dplyr::distinct(msdata_df, quantobject_id, mschannel))
+    if (nrow(msdata_df) != nqobj_probes) {
+      if (verbose) warning(nrow(msdata_df) - nqobj_probes, " of ", nrow(msdata_df),
                            " ", quantobj, " MS intensities are duplicate, summing duplicate entries")
       msdata_df <- dplyr::group_by(msdata_df, dplyr::across(!any_of(c("intensity", "ident_type")))) %>%
         dplyr::summarise(dplyr::across(intensity, ~sum(.x, na.rm = TRUE)),
@@ -401,11 +402,11 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                                  ...)
 
     # arrange pepmodstates by object, by profile cluster and by the number of quantitations
-    subobject_group_size <- model_def$subobject_group_size %||% (max_subobjects %/% 2)
-    subobj_info_cols <- intersect(colnames(subobjs_df), c("pepmod_id", "msfraction", "charge"))
+    quantobject_group_size <- model_def$quantobject_group_size %||% (max_quantobjects %/% 2)
+    qobj_info_cols <- intersect(colnames(qobjs_df), c("pepmod_id", "msfraction", "charge"))
 
-    subobj_stats_df <- msdata_df %>%
-      dplyr::group_by(index_object, subobject_id) %>%
+    qobj_stats_df <- msdata_df %>%
+      dplyr::group_by(index_object, quantobject_id) %>%
       dplyr::summarise(n_quants = sum(!is.na(intensity)),
                        intensity_med = median(intensity, na.rm=TRUE),
                        .groups = "drop") %>%
@@ -413,31 +414,31 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
         dplyr::group_by(msdata_df, index_object) %>%
         dplyr::group_modify(~ cluster_msprofiles(.x, dplyr::rename(msdata[[paste0(mschan, "_", quantobj, "_stats")]],
                                                                    mschannel = !!sym(mschan_idcol)),
-                                                 obj_col='subobject_id', mschannel_col="mschannel")) %>%
+                                                 obj_col='quantobject_id', mschannel_col="mschannel")) %>%
         dplyr::ungroup(),
-        by = c("subobject_id", "index_object")) %>%
-      dplyr::left_join(dplyr::select(subobjs_df, object_id, subobject_id, is_specific,
-                                     any_of(quantobj_idcol), !!!syms(subobj_info_cols)),
-                       by = 'subobject_id') %>%
+        by = c("quantobject_id", "index_object")) %>%
+      dplyr::left_join(dplyr::select(qobjs_df, object_id, quantobject_id, is_specific,
+                                     any_of(quantobj_idcol), !!!syms(qobj_info_cols)),
+                       by = 'quantobject_id') %>%
       dplyr::arrange(index_object, profile_cluster,
                      desc(is_specific), desc(n_quants), desc(intensity_med),
-                     !!!syms(subobj_info_cols)) %>%
+                     !!!syms(qobj_info_cols)) %>%
       dplyr::group_by(index_object, profile_cluster) %>%
-      dplyr::mutate(index_subobject_group = row_number() %/% subobject_group_size, # put objects within cluster into groups of 20
-                    index_subobject_local = row_number() %% subobject_group_size) %>%
+      dplyr::mutate(index_quantobject_group = row_number() %/% quantobject_group_size, # put objects within cluster into groups of 20
+                    index_quantobject_local = row_number() %% quantobject_group_size) %>%
       dplyr::ungroup()
     # take the first group of 10 objects from each cluster, then continue with the second group etc
-    model_data$subobjects <- subobj_stats_df %>%
-      dplyr::arrange(index_object, index_subobject_group, profile_cluster, index_subobject_local) %>%
-      dplyr::mutate(index_subobject = row_number()) %>%
-      dplyr::filter(index_subobject <= max_subobjects) # remove less abundant subobjects of rich objects
-    if (verbose) message(nrow(model_data$subobjects), " ", quantobj, "(s) from ",
-                         n_distinct(model_data$subobjects$profile_cluster), " cluster(s) selected")
+    model_data$quantobjects <- qobj_stats_df %>%
+      dplyr::arrange(index_object, index_quantobject_group, profile_cluster, index_quantobject_local) %>%
+      dplyr::mutate(index_quantobject = row_number()) %>%
+      dplyr::filter(index_quantobject <= max_quantobjects) # remove less abundant quantobjects of rich objects
+    if (verbose) message(nrow(model_data$quantobjects), " ", quantobj, "(s) from ",
+                         n_distinct(model_data$quantobjects$profile_cluster), " cluster(s) selected")
     msdata_df <- dplyr::inner_join(msdata_df,
-                                   dplyr::select(model_data$subobjects, index_object, index_subobject, subobject_id),
-                                   by=c("index_object", "subobject_id")) %>%
-      dplyr::arrange(index_object, index_observation, index_subobject) %>%
-      dplyr::mutate(index_subobservation = row_number())
+                                   dplyr::select(model_data$quantobjects, index_object, index_quantobject, quantobject_id),
+                                   by=c("index_object", "quantobject_id")) %>%
+      dplyr::arrange(index_object, index_object_msprobe, index_quantobject) %>%
+      dplyr::mutate(index_quantobject_msprobe = row_number())
   #} else {
   #   stop("Unsupported combination of modelobject=", modelobj,
   #       " and quantobject=", quantobj)
@@ -447,11 +448,11 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                               index_qdata = if_else(is_observed, cumsum(is_observed), NA_integer_),
                               index_mdata = if_else(!is_observed, cumsum(!is_observed), NA_integer_))
   message(nrow(model_data$msdata), " ",
-          if (rlang::has_name(model_data$msdata, 'index_subobservation'))
-            'subobservation' else 'observation', '(s) of ',
+          if (rlang::has_name(model_data$msdata, 'index_quantobject_msprobe'))
+            quantobj else modelobj, '-in-msprobe(s) of ',
           n_distinct(model_data$msdata$index_object), ' ', modelobj, '(s)',
-          if (rlang::has_name(model_data$msdata, 'index_subobject'))
-            paste0(' with ', n_distinct(model_data$msdata$index_subobject), ' ',
+          if (rlang::has_name(model_data$msdata, 'index_quantobject'))
+            paste0(' with ', n_distinct(model_data$msdata$index_quantobject), ' ',
                    quantobj, '(s)') else '', ': ',
           sum(model_data$msdata$is_observed), " quantitation(s) (",
           sum(model_data$msdata$is_reliable), " reliable), ",
@@ -474,7 +475,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
 msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbose,
                        mschannel_extra_cols = character(0),
                        mschannel_shift_col = paste0("total_", msdata$msentities[['mschannel']], "_shift"),
-                       max_subobjects = 20L,
+                       max_quantobjects = 20L,
                        specificity_msexp_group_cols = msdata$msentities[['condition']],
                        cooccurrence_msexp_group_cols = msdata$msentities[['msprobe']],
                        ...) {
@@ -645,35 +646,33 @@ msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbos
 
   # all objects X all conditions (including virtual)
   # FIXME rename objectXcondition
-  model_data$interactions <- dplyr::full_join(dplyr::select(model_data$objects, object_id, index_object),
+  model_data$object_conditions <- dplyr::full_join(dplyr::select(model_data$objects, object_id, index_object),
                                               dplyr::select(model_def$conditions, index_condition, is_virtual, condition),
                                               by=character()) %>%
-    dplyr::mutate(iaction_id = paste(condition, object_id)) %>%
+    dplyr::mutate(objcond_id = paste(condition, object_id)) %>%
     dplyr::arrange(index_condition, index_object) %>%
-    dplyr::mutate(index_interaction = row_number())
+    dplyr::mutate(index_object_condition = row_number())
 
   # all objects X all MS channels (only those with actual experiments)
   # FIXME rename objectXmschannel
-  model_data$observations <- dplyr::inner_join(model_data$interactions, model_data$msprobes,
+  model_data$object_msprobes <- dplyr::inner_join(model_data$object_conditions, model_data$msprobes,
                                                by = c("index_condition", "condition")) %>%
-    dplyr::arrange(index_object, index_interaction, index_msprobe) %>%
-    dplyr::mutate(index_observation = row_number(),
-                  observation_id = paste0(object_id, '_', msprobe))
+    dplyr::arrange(index_object, index_object_condition, index_msprobe) %>%
+    dplyr::mutate(index_object_msprobe = row_number(),
+                  objprobe_id = paste0(object_id, '_', msprobe))
 
-  model_data$quantobj_mscalib <- msdata[[paste0(quantobj, "_mscalib")]]
-  model_data$quantobj_labu_shift <- msdata[[paste0(quantobj, '_labu_shift')]]
-  model_data$quantobj_labu_min <- msdata[[paste0(quantobj, '_labu_min')]]
-  logbase <- logintensityBase(model_data$quantobj_mscalib, silent=TRUE)
+  model_data$quantobject_mscalib <- msdata[[paste0(quantobj, "_mscalib")]]
+  model_data$quantobject_labu_min <- msdata[[paste0(quantobj, '_labu_min')]]
+  logbase <- logintensityBase(model_data$quantobject_mscalib, silent=TRUE)
   if (logbase != 2) {
     warning("msdata$", quantobj, "_mscalib logintensityBase=", logbase,
             " converting mscalib model and log-intensities to log2-based ones")
-    model_data$quantobj_mscalib <- convert_logintensityBase(model_data$quantobj_mscalib, new_base=2)
+    model_data$quantobject_mscalib <- convert_logintensityBase(model_data$quantobject_mscalib, new_base=2)
     #k <- log(logbase) / log(2)
-    #model_data$quantobj_labu_shift <- model_data$quantobj_labu_shift * k
     #model_data$quantobj_labu_min <- model_data$quantobj_labu_min * k
   }
 
-  model_data <- prepare_msdata(model_data, msdata, max_subobjects=max_subobjects,
+  model_data <- prepare_msdata(model_data, msdata, max_quantobjects=max_quantobjects,
                                verbose=verbose, ...)
   model_data <- prepare_expanded_effects(model_data, verbose=verbose)
 

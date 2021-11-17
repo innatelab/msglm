@@ -1,19 +1,19 @@
 # variables description for msglm_local model
 msglm.vars_info <- list(
-  global = list(names=c('subobj_shift_sigma', 'effect_slab_c'),# 'batch_effect_slab_c'),
-                dims=c()),#obj_shift_sigma', 'obj_effect_tau'), dims = c() ),
+  global = list(names=c('effect_slab_c'),# 'batch_effect_slab_c'),
+                dims=c()),#'qobj_shift_sigma', 'obj_effect_tau'), dims = c() ),
   #batch_effects = list(names = c('batch_effect_sigma'),
   #                     dims = c('batch_effect')),
-  interactions = list(names=c('iact_repl_shift_sigma', 'iaction_labu', 'iaction_labu_replCI'),
-                      dims=c('interaction')),
-  observations = list(names=c('obs_labu', "obs_repl_shift", "obs_batch_shift"),
-                      dims=c('observation')),
-  subobjects = list(names=c('subobj_shift', 'subobj_llh'),
-                    dims=c('subobject')),
-  #subobject_batch_shifts = list(names=c('subobs_batch_shift'),
-  #                              dims=c('subobservations')),
-  subobject_batch_effects = list(names=c('subobj_batch_effect', 'subobj_batch_effect_sigma'),
-                                 dims=c('subobject_batch_effect')),
+  object_conditions = list(names=c('obj_probe_shift_sigma', 'obj_cond_labu', 'obj_cond_labu_replCI'),
+                           dims=c('object_condition')),
+  object_msprobes = list(names=c('obj_probe_labu', "obj_probe_shift", "obj_probe_batch_shift"),
+                         dims=c('object_msprobe')),
+  quantobjects = list(names=c('qobj_shift', 'qobj_llh'),
+                      dims=c('quantobject')),
+  #quantobject_batch_shifts = list(names=c('qobj_batch_shift'),
+  #                                dims=c('quantobject_msprobe')),
+  quantobject_batch_effects = list(names=c('qobj_batch_effect', 'qobj_batch_effect_sigma'),
+                                   dims=c('quantobject_batch_effect')),
   objects = list(names=c('obj_base_labu', 'obj_base_labu_replCI'), #"obj_base_repl_shift_sigma"),
                  dims=c('object')),
   object_effects = list(names=c('obj_effect_sigma', 'obj_effect', 'obj_effect_replCI'),# 'obj_effect_repl_shift_sigma'),
@@ -53,28 +53,29 @@ to_standata <- function(obj, ...) UseMethod("to_standata")
 #'
 #' @param effect_slab_df the *degrees of freedom* for the prior of object effect *slab* regularization parameter
 #' @param effect_slab_scale the *scale* parameter for the prior of object effect *slab* regularization parameter
-#' @param obj_labu_min minimal object log-abundance
-#' @param obj_labu_min_scale how strongly the estimates below *obj_labu_min* would be penalized (smaller = more stringent)
-#' @param iact_repl_shift_tau the *tau* parameter for the prior of biochemical log-abundance variation between the replicates
-#' @param iact_repl_shift_df the *degrees of freedom* parameter for the prior of biochemical log-abundance variation between the replicates
+#' @param object_labu_min minimal object log-abundance
+#' @param object_labu_min_scale how strongly the estimates below *obj_labu_min* would be penalized (smaller = more stringent)
+#' @param object_msprobe_shift_tau the *tau* parameter for the prior of biochemical log-abundance variation between the *probes* (replicates) of the same *condition*
+#' @param object_msprobe_shift_df the *degrees of freedom* parameter for the prior of biochemical log-abundance variation between the *probes* (replicates) of the same *condition*
 #' @param hsprior_lambda_a_offset offset from zero for the "a" parameter of horseshoe priors. Helps NUTS integration step
 #' @param hsprior_lambda_t_offset offset from zero for the "a" parameter of horseshoe priors. Helps NUTS integration step
 #' @param batch_effect_sigma sigma parameter for the normal distribution prior of batch effects
-#' @param subbatch_tau
-#' @param subbatch_df
-#' @param subbatch_c
-#' @param empty_observation_sigmoid_scale
+#' @param quant_batch_tau
+#' @param quant_batch_df
+#' @param quant_batch_c
+#' @param empty_msprobe_sigmoid_scale how match the lower bound prior of object-in-msprobe abundance
+#'                                    is relaxed if there are no MS observations of the object in a given MS probe
 #'
 #' @export
 to_standata.msglm_model_data <- function(model_data,
                               effect_slab_df = 4, effect_slab_scale = 2.5,
-                              obj_labu_min_scale = 1,
-                              iact_repl_shift_tau=0.05, iact_repl_shift_df=4.0,
+                              object_labu_min_scale = 1,
+                              object_msprobe_shift_tau=0.03, object_msprobe_shift_df=4.0,
                               hsprior_lambda_a_offset = 0.05,
                               hsprior_lambda_t_offset = 0.01,
                               batch_effect_sigma=0.5,
-                              subbatch_tau=1.0, subbatch_df=2, subbatch_c=10,
-                              empty_observation_sigmoid_scale = 1.0,
+                              quant_batch_tau=1.0, quant_batch_df=2, quant_batch_c=10,
+                              empty_msprobe_sigmoid_scale = 1.0,
                               verbose = FALSE)
 {
   model_def <- model_data$model_def
@@ -84,17 +85,18 @@ to_standata.msglm_model_data <- function(model_data,
   ensure_primary_index_column(model_data$mschannels, 'index_mschannel')
 
   is_glmm <- rlang::inherits_all(model_def, "msglmm_model")
-  xaction_ix_col <- if (is_glmm) "index_superaction" else "index_interaction"
-  obs_df <- dplyr::select(model_data$observations, index_observation, index_msprobe,
-                          index_object, !!xaction_ix_col)
-  if (any(obs_df$index_observation != seq_len(nrow(obs_df)))) {
-    stop("model_data$msdata not ordered by observations / have missing observations")
+  xaction_ix_col <- if (is_glmm) "index_object_mixture" else "index_object_condition"
+  objprobes_df <- dplyr::select(model_data$object_msprobes, index_object_msprobe, index_msprobe,
+                                index_object, !!xaction_ix_col)
+  if (any(objprobes_df$index_object_msprobe != seq_len(nrow(objprobes_df)))) {
+    stop("model_data$msdata not ordered by object probe / have missing object probe indices")
   }
-  msdata_obs_flags.df <- dplyr::group_by(model_data$msdata, index_observation) %>%
-    dplyr::transmute(is_empty_observation = all(is.na(intensity))) %>%
+  msdata_objprobe_flags.df <- dplyr::group_by(model_data$msdata, index_object_msprobe) %>%
+    # FIXME set as non-empty if there are idents
+    dplyr::transmute(is_empty_msprobe = all(is.na(intensity))) %>%
     dplyr::ungroup()
-  checkmate::assert_set_equal(msdata_obs_flags.df$index_observation,
-                              model_data$msdata$index_observation, ordered=TRUE)
+  checkmate::assert_set_equal(msdata_objprobe_flags.df$index_object_msprobe,
+                              model_data$msdata$index_object_msprobe, ordered=TRUE)
 
   missing_mask <- is.na(model_data$msdata$intensity)
   res <- list(
@@ -103,8 +105,8 @@ to_standata.msglm_model_data <- function(model_data,
 
     Nprobes = nrow(model_data$msprobes),
 
-    Nobservations = nrow(obs_df),
-    observation2probe = as.array(obs_df$index_msprobe),
+    NobjProbes = nrow(objprobes_df),
+    obj_probe2probe = as.array(objprobes_df$index_msprobe),
 
     Nmschannels = n_distinct(model_data$mschannels$index_mschannel),
     mschannel_shift = as.array(model_data$mschannels$mschannel_shift),
@@ -131,98 +133,94 @@ to_standata.msglm_model_data <- function(model_data,
     obj_batch_effect2batch_effect = as.array(model_data$object_batch_effects$index_batch_effect),
 
     obj_base_labu_sigma = 15.0,
-    obj_labu_min = rlang::set_names(model_data$quantobj_labu_min, NULL),
-    obj_labu_min_scale = obj_labu_min_scale,
+    obj_labu_min = rlang::set_names(model_data$quantobject_labu_min, NULL),
+    obj_labu_min_scale = object_labu_min_scale,
 
-    Niactions = nrow(model_data$interactions),
-    iaction2obj = as.array(model_data$interactions$index_object),
+    NobjConditions = nrow(model_data$object_conditions),
+    obj_cond2obj = as.array(model_data$object_conditions$index_object),
 
     Nquanted = sum(!missing_mask),
     Nmissed = sum(missing_mask),
-    missing_sigmoid_scale = as.array(if_else(msdata_obs_flags.df$is_empty_observation[missing_mask],
-                                             empty_observation_sigmoid_scale, 1.0)),
+    missing_sigmoid_scale = as.array(if_else(msdata_objprobe_flags.df$is_empty_msprobe[missing_mask],
+                                             empty_msprobe_sigmoid_scale, 1.0)),
     qData = as.array(model_data$msdata$intensity[!missing_mask]),
     quant_isreliable = as.array(model_data$msdata$is_reliable[!missing_mask]),
 
     hsprior_lambda_a_offset = hsprior_lambda_a_offset,
     hsprior_lambda_t_offset = hsprior_lambda_t_offset,
-    iact_repl_shift_tau = iact_repl_shift_tau, iact_repl_shift_df = iact_repl_shift_df
+
+    obj_probe_shift_tau = object_msprobe_shift_tau,
+    obj_probe_shift_df = object_msprobe_shift_df
   ) %>%
-    modifyList(to_standata(model_data$quantobj_mscalib, silent=!verbose)) %>%
-    modifyList(matrix2stancsr(model_data$iactXobjeff, "iactXobjeff")) %>%
-    modifyList(matrix2stancsr(model_data$obsXobjbatcheff, "obsXobjbatcheff"))
+    modifyList(to_standata(model_data$quantobject_mscalib, silent=!verbose)) %>%
+    modifyList(matrix2stancsr(model_data$object_conditionXeffect, "obj_condXeff")) %>%
+    modifyList(matrix2stancsr(model_data$object_msprobeXbatch_effect, "obj_probeXbatcheff"))
 
-  res <- modifyList(res, observationXiaction_to_standata(model_data))
+  res <- modifyList(res, object_msprobeXcondition_to_standata(model_data))
 
-  if (rlang::has_name(model_data, "subobjects")) {
-    # data have subobjects
-    subobj_data <- list(
-      Nsubobjects = nrow(model_data$subobjects),
-      subobj2obj = as.array(model_data$subobjects$index_object),
-      Nsubobservations = nrow(model_data$msdata),
-      quant2subobs = as.array(model_data$msdata$index_subobservation[!is.na(model_data$msdata$index_qdata)]),
-      miss2subobs = as.array(model_data$msdata$index_subobservation[!is.na(model_data$msdata$index_mdata)]),
-      subobs2subobj = as.array(model_data$msdata$index_subobject),
-      subobs2mschannel = as.array(model_data$msdata$index_mschannel),
-      subobs2obs = as.array(model_data$msdata$index_observation),
+  if (rlang::has_name(model_data, "quantobjects")) {
+    # data have quantobjects
+    qobj_data <- list(
+      Nquantobjects = nrow(model_data$quantobjects),
+      quantobj2obj = as.array(model_data$quantobjects$index_object),
+      NqobjProbes = nrow(model_data$msdata),
+      quant2qobj_probe = as.array(model_data$msdata$index_quantobject_msprobe[!is.na(model_data$msdata$index_qdata)]),
+      miss2qobj_probe = as.array(model_data$msdata$index_quantobject_msprobe[!is.na(model_data$msdata$index_mdata)]),
+      qobj_probe2quantobj = as.array(model_data$msdata$index_quantobject),
+      qobj_probe2mschannel = as.array(model_data$msdata$index_mschannel),
+      qobj_probe2obj_probe = as.array(model_data$msdata$index_object_msprobe),
       # TODO support different noise models
       Nmsprotocols = 0L,
       mschannel2msproto = integer(0),
 
-      # subobject-specific batch effects
-      NquantBatchEffects = n_distinct(model_data$subobject_batch_effects$index_quant_batch_effect),
-      quant_batch_effect_tau = subbatch_tau,
-      quant_batch_effect_df = subbatch_df,
-      quant_batch_effect_c = subbatch_c,
-      quant_batch_effect_is_positive = as.array(if (nrow(model_data$subobject_batch_effects)>0)
+      # quantobject-specific batch effects
+      NquantBatchEffects = n_distinct(model_data$quantobject_batch_effects$index_quant_batch_effect),
+      quant_batch_effect_tau = quant_batch_tau,
+      quant_batch_effect_df = quant_batch_df,
+      quant_batch_effect_c = quant_batch_c,
+      quant_batch_effect_is_positive = as.array(if (nrow(model_data$quantobject_batch_effects)>0)
                                                 as.integer(model_def$quant_batch_effects$is_positive)
                                                 else integer(0)),
-      NsubobjBatchEffects = nrow(model_data$subobject_batch_effects),
-      subobj_batch_effect2quant_batch_effect = as.array(model_data$subobject_batch_effects$index_quant_batch_effect)
+      NqobjBatchEffects = nrow(model_data$quantobject_batch_effects),
+      qobj_batch_effect2quant_batch_effect = as.array(model_data$quantobject_batch_effects$index_quant_batch_effect)
     ) %>%
-    modifyList(matrix2stancsr(model_data$subobsXsubobjbatcheff, "subobsXsubobjbatcheff"))
-    res <- modifyList(res, subobj_data)
+    modifyList(matrix2stancsr(model_data$quantobject_msprobeXquant_batch_effect, "qobj_probeXqbatcheff"))
+    res <- modifyList(res, qobj_data)
   } else {
-    res$quant2obs <- as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_qdata)])
-    res$miss2obs <- as.array(model_data$msdata$index_observation[!is.na(model_data$msdata$index_mdata)])
+    res$quant2obj_probe <- as.array(model_data$msdata$index_object_msprobe[!is.na(model_data$msdata$index_qdata)])
+    res$miss2obj_probe <- as.array(model_data$msdata$index_object_msprobe[!is.na(model_data$msdata$index_mdata)])
   }
   if (rlang::has_name(model_data, 'index_mscalib')) {
     res$Nmsprotocols <- n_distinct(model_data$mschannels$index_mscalib)
     res$mschannel2msproto <- as.array(model_data$mschannels$index_mscalib)
   }
-  if (rlang::has_name(res, "Nsubobjects")) {
-    message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s) with ",
-            res$Nsubobjects, " subobject(s), ",
-            res$Nquanted, " quantitation(s) (", sum(res$quant_isreliable), " reliable), ",
-            res$Nmissed, " missed (", sum(msdata_obs_flags.df$is_empty_observation), " in empty observations)")
-  } else {
-    message(res$Niactions, " interaction(s) of ", res$Nobjects, " object(s), ",
-            res$Nquanted, " quantitation(s) (", sum(res$quant_isreliable), " reliable), ",
-            res$Nmissed, " missed (", sum(msdata_obs_flags.df$is_empty_observation), " in empty observations)")
-  }
+  message(res$NobjConditions, " object-in-condition(s) of ", res$Nobjects, " object(s)",
+          if (rlang::has_name(res, "Nquantobjects")) paste0(" with ", res$Nquantobjects, " quantobject(s)") else "", ",",
+          res$Nquanted, " quantitation(s) (", sum(res$quant_isreliable), " reliable), ",
+          res$Nmissed, " missed (", sum(msdata_objprobe_flags.df$is_empty_msprobe), " in empty object probe(s))")
   return(structure(res, class="msglm_standata", msglm_model_data=model_data))
 }
 
-observationXiaction_to_standata <- function(model_data) {
-  UseMethod("observationXiaction_to_standata")
+object_msprobeXcondition_to_standata <- function(model_data) {
+  UseMethod("object_msprobeXcondition_to_standata")
 }
 
-observationXiaction_to_standata.msglm_model_data <- function(model_data) {
-  res <- matrix2stancsr(model_data$obsXobjeff, "obsXobjeff")
-  res$observation2iaction <- as.array(model_data$observations$index_interaction)
+object_msprobeXcondition_to_standata.msglm_model_data <- function(model_data) {
+  res <- matrix2stancsr(model_data$object_msprobeXeffect, "obj_probeXeff")
+  res$obj_probe2obj_cond <- as.array(model_data$object_msprobes$index_object_condition)
   return(res)
 }
 
-observationXiaction_to_standata.msglmm_model_data <- function(model_data) {
+object_msprobeXcondition_to_standata.msglmm_model_data <- function(model_data) {
   model_def <- model_data$model_def
   ensure_primary_index_column(model_def$mixeffects, 'index_mixeffect')
 
   # FIXME remove model_def$mixeffects <- maybe_rename(model_def$mixeffects, c("prior_mean" = "mean", "prior_tau" = "tau"))
-  message("Setting GLMM interaction data...")
+  message("Setting GLMM object mixtures data...")
   res <- list(
-    Nsupactions = nrow(model_data$superactions),
-    observation2supaction = as.array(model_data$observations$index_superaction),
-    supaction2obj = as.array(model_data$superactions$index_object),
+    NobjMixtures = nrow(model_data$object_mixtures),
+    obj_probe2obj_mix = as.array(model_data$object_msprobes$index_object_mixture),
+    obj_mix2obj = as.array(model_data$object_mixtures$index_object),
 
     Nmix = nrow(model_def$mixcoefXeff),
     NmixEffects = nrow(model_def$mixeffects),
@@ -231,7 +229,7 @@ observationXiaction_to_standata.msglmm_model_data <- function(model_data) {
     mixcoefXeff = as.matrix(model_def$mixcoefXeff),
 
     Nmixtions = nrow(model_data$mixtions),
-    mixt2iact = as.array(model_data$mixtions$index_interaction),
+    mixt2obj_cond = as.array(model_data$mixtions$index_object_condition),
     mixt2mix = as.array(model_data$mixtions$mixcoef_ix)
   )
   return(res)
@@ -260,7 +258,7 @@ stan_model_name <- function(standata) {
   if (modelobj == quantobj) {
     # do nothing
   } else if (quantobj == "pepmodstate") {
-    res <- paste0(res, '_subobjects')
+    res <- paste0(res, '_quantobjects')
   } else {
      stop("Unsupported combination of modelobject=", modelobj,
           " and quantobject=", quantobj)
@@ -292,12 +290,12 @@ fit_model.msglm_standata <- function(standata, method = c("mcmc", "variational")
     } else {
       msglm.vars_info
     }
-    if (!rlang::has_name(standata, "Nsubobjects")) {
-      # exclude subobject-related
-      vars_info$subobjects <- NULL
-      vars_info$subobject_subbatch_effects <- NULL
+    if (!rlang::has_name(standata, "Nquantobjects")) {
+      # exclude quantobject-related
+      vars_info$quantobjects <- NULL
+      vars_info$quantobject_batch_effects <- NULL
       vars_info$global$names <- setdiff(vars_info$global$names,
-                                        c('subobj_shift_sigma'))
+                                        c('qobj_shift_sigma'))
     }
     message("Running Stan (", method, " mode)...")
     stanmodel <- msglm_stan_model(stan_model_name(standata))

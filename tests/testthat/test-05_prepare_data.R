@@ -2,7 +2,7 @@ context("data preration pipleine")
 
 library(checkmate)
 
-source("gen-msdata.R")
+source(test_path("gen-msdata.R"))
 
 # generate simplest model
 conditions_df = tibble(infection = factor(c("control", "virus", "control", "virus"), levels=c("control", "virus")),
@@ -45,7 +45,8 @@ msprobe_shifts_df <- tibble(!!sym(msprobe) := msprobes_df$msprobe,
 
 test_that(paste0(obj, "/", obj, " model, no msfractions, ",
           if_else(!is.na(mstag), "", "no "), "mstags, specifying ", msprobe, "s"), {
-    orig_msdata <- gen_msdata(model_def, msprobes_df, msprobe = msprobe,
+    orig_msdata <- gen_msdata(model_def, dplyr::mutate(msprobes_df, mschannel=msprobe),
+                              msprobe = msprobe,
                               object = obj, nobjects = 3)
     msprobes_dfname <- paste0(msprobe, "s")
     if (!(msprobe %in% c("msrun", "mschannel"))) {
@@ -58,13 +59,13 @@ test_that(paste0(obj, "/", obj, " model, no msfractions, ",
         bad_msdata <- orig_msdata
         bad_msdata[[msprobes_dfname]] <- NULL
         expect_error(import_msglm_data(bad_msdata, model_def, mscalib, object=obj),
-                    "Cannot autodetect MS probes")
+                     "Cannot autodetect MS probes")
         bad_msdata <- orig_msdata
         if (!(msprobe %in% c("msrun", "mschannel"))) {
             bad_msdata[[msprobes_dfname]] <- dplyr::mutate(orig_msdata[[msprobes_dfname]],
                                                            raw_file = NULL)
             expect_error(import_msglm_data(bad_msdata, model_def, mscalib, object=obj),
-                        "Cannot autodetect MS channels")
+                         "Cannot autodetect MS channels")
         }
     })
 
@@ -75,7 +76,7 @@ test_that(paste0(obj, "/", obj, " model, no msfractions, ",
         })
     }
 
-    test_that("bad idents frame is skipped without error", {
+    test_that(paste0("bad ", obj, "_idents frame (", obj, " X ", msprobe, ") is skipped without error"), {
         bad_idents_msdata <- orig_msdata
         bad_idents_msdata[[paste0(obj, "_idents")]] <- tibble()
         msdata <- import_msglm_data(bad_idents_msdata, model_def, object=obj, mscalib=mscalib)
@@ -120,6 +121,8 @@ test_that(paste0(obj, "/", obj, " model, no msfractions, ",
         "Nmschannels", "mschannel_shift",
         "Neffects", "NobjEffects", "NbatchEffects", "NobjBatchEffects",
         "NobjConditions", "Nquanted", "Nmissed",
+        "quant2mschannel", "miss2mschannel",
+        "quant2obj_probe", "miss2obj_probe", "qData",
         "obj_condXeff_Nw", "obj_probeXbatcheff_Nw"))
 
     model_data2 <- msglm_data(model_def, msdata, 2L)
@@ -138,6 +141,9 @@ test_that(paste0(obj, "/pepmodstate model, no msfractions, ",
     msprobes_dfname <- paste0(msprobe, "s")
     orig_msdata[[msprobes_dfname]] <- dplyr::rename(msprobes_df, !!sym(msprobe) := msprobe) %>%
         dplyr::mutate(raw_file = paste0(!!sym(msprobe), ".raw"))
+    if (msprobe != "msprobe") {
+        orig_msdata[[msprobes_dfname]]$msprobe <- NULL
+    }
     msdata <- import_msglm_data(orig_msdata, model_def,
                                 object = obj, quantobject = "pepmodstate",
                                 mscalib = mscalib)
@@ -289,6 +295,7 @@ test_that(paste0(obj, "/pepmodstate model, msfractions, ",
         "Neffects", "NobjEffects", "NbatchEffects", "NobjBatchEffects",
         "NquantBatchEffects", "NqobjBatchEffects",
         "NobjConditions", "Nquanted", "Nmissed",
+        "quant2qobj_probe", "miss2qobj_probe", "qData",
         "obj_condXeff_Nw", "obj_probeXbatcheff_Nw", "qobj_probeXqbatcheff_Nw"))
 })
 

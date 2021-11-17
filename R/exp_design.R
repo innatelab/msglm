@@ -229,7 +229,9 @@ set_batch_effects <- function(model_def,
                                     is_positive = FALSE)
   }
   # update model_def
+  if (rlang::has_name(model_def, mtx_name)) warning("Redefining ", mtx_name)
   model_def[[mtx_name]] <- batchEffectMatrix
+  if (rlang::has_name(model_def, df_name)) warning("Redefining ", df_name)
   model_def[[df_name]] <- batch_effects
   return(model_def)
 }
@@ -301,6 +303,7 @@ set_contrasts <- function(model_def,
   }
 
   # update model_def
+  if (rlang::has_name(model_def, "conditionXmetacondition")) warning("Redefining conditionXmetacondition")
   model_def$conditionXmetacondition <- conditionXmetacondition
   model_def$metaconditionXcontrast <- metaconditionXcontrast
   model_def$contrasts <- contrasts

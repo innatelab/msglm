@@ -189,7 +189,7 @@ set_batch_effects <- function(model_def,
       checkmate::assert_logical(batch_effects$is_positive, any.missing = FALSE)
     }
   } else {
-    if (verbose) message('No batch_effect frame provided, using default batch effects settings')
+    if (verbose) message('No batch_effects frame provided, using default batch effects settings')
     batch_effects <- tibble::tibble(!!sym(paste0("index_", id_col)) := seq_along(mtx_batch_effects),
                                     !!sym(id_col) := mtx_batch_effects,
                                     is_positive = FALSE)

@@ -54,7 +54,7 @@ test_that(paste0(obj, "/", obj, " model, no msfractions, ",
                                                         raw_file = paste0(!!sym(msprobe), ".raw"))
     }
 
-    test_that(paste0("import fails if no ", msprobe, " data probided"), {
+    test_that(paste0("import fails if no ", msprobe, " data provided"), {
         bad_msdata <- orig_msdata
         bad_msdata[[msprobes_dfname]] <- NULL
         expect_error(import_msglm_data(bad_msdata, model_def, mscalib, object=obj),

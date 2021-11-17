@@ -175,6 +175,10 @@ import_msglm_data <- function(msdata, model_def = NULL,
     if (verbose) message("Detected msdata$", msruns_def_dfname,
                          ", no msfractions. Setting msexperiment=", msrun_def)
     msexp <- msrun_def
+  } else if (rlang::has_name(msdata, msruns_def_dfname)
+             && rlang::has_name(msdata[[msruns_def_dfname]], "msexperiment")) {
+    if (verbose) message("Detected msdata", msruns_def_dfname, "$msexperiment column")
+    msexp <- "msexperiment"
   } else {
     msexp <- NA_character_
   }
@@ -186,9 +190,6 @@ import_msglm_data <- function(msdata, model_def = NULL,
   } else if (rlang::has_name(msdata, "msprobes")) {
     if (verbose) message("Detected msdata$msprobes frame")
     msprb <- "msprobe"
-  } else if (is.na(mstag) && !is.na(msexp) && rlang::has_name(msdata, paste0(msexp, "s"))) {
-    if (verbose) message("No msprobe and mstag columns specified, defaulting to msprobe=", msexp)
-    msprb <- msexp
   } else {
     msprb <- NA_character_
   }
@@ -197,71 +198,77 @@ import_msglm_data <- function(msdata, model_def = NULL,
     if (verbose) message("Using msdata$", msprbs_dfname, " as MS probes source")
     msprbs_df <- msdata[[msprbs_dfname]]
   } else {
-    if (rlang::has_name(msdata, mschans_def_dfname)) {
-      msprb_src_dfname <- mschans_def_dfname
-      msprb_src <- mschan_def
+    # detect which data frame may contain msprobe information
+    msprbs_src_dfname <- if (rlang::has_name(msdata, mschans_def_dfname)) {
+      mschans_def_dfname
     } else if (rlang::has_name(msdata, msruns_def_dfname)) {
-      msprb_src_dfname <- msruns_def_dfname
-      msprb_src <- msrun_def
+      msruns_def_dfname
+    } else if (!is.na(msexp) && rlang::has_name(msdata, paste0(msexp, "s"))) {
+      paste0(msexp, "s")
     } else {
       stop("Cannot autodetect MS probes/experiments/channels/runs frame. ",
            "Make sure msprobe/msexperiment/mschannel/msrun= parameter set correctly and corresponding frames exist.")
     }
-    msfrac <- dplyr::coalesce(msfraction, "msfraction")
-    if (rlang::has_name(msdata[[msprb_src_dfname]], msfrac)) {
-      if (verbose) message("Generating MS probes from msdata$", msprb_src_dfname,
-                           " by removing MS fractions")
-      msprbs_src_df <- msdata[[msprb_src_dfname]]
-      checkmate::assert_data_frame(msprbs_src_df, .var.name = paste0("msdata$", msprb_src_dfname))
-      if (is.na(msprb)) {
-        if (rlang::has_name(msprbs_src_df, "msprobe")) {
-          msprb <- "msprobe"
-        } else if (!is.na(msexp) && is.na(mstag) && rlang::has_name(msprbs_src_df, msexp)) {
-          msprb <- msexp
-        } else if (is.na(msexp) && is.na(mstag) && rlang::has_name(msprbs_src_df, "msexperiment")) {
-          msprb <- "msexperiment"
-        } else {
-          msprb <- if_else(is.na(mstag) && msprb_src_dfname == msruns_def_dfname, "msexperiment", "msprobe")
-        }
-      }
-      if (!rlang::has_name(msprbs_src_df, msprb)) {
-        # generate msprobe column in the source data frame
-        msprb_key_cols <- intersect(c('condition', 'replicate', mstag), colnames(msprbs_src_df))
-        if (verbose) message("Trying to generate ", msprb, " column using: ",
-                             paste0(msprb_key_cols, collapse=", "))
-        msprbs_df <- dplyr::distinct_at(msprbs_src_df, msprb_key_cols, .keep_all = TRUE) %>%
-          dplyr::mutate(!!sym(msprb) := paste(!!!syms(msprb_key_cols), sep='_'))
-        # update the source frame with msprb column
-        msprb_src_df <- dplyr::inner_join(msdata[[msprb_src_dfname]],
-            dplyr::select_at(msprbs_df, c(msprb, msprb_key_cols)), by=msprb_key_cols)
-        if (nrow(msprb_src_df) != nrow(msdata[[msprb_src_dfname]])) {
-          stop("MSGLM failed to detect columns uniquely identifying ", msprb, ".",
-               "Plese add ", msprb, " column to your msdata$", msprb_src_dfname,
-               " experimental design data frame")
-        }
-        msdata[[msprb_src_dfname]] <- msprb_src_df
+
+    if (verbose) message("Generating MS probes from msdata$", msprbs_src_dfname)
+    msprbs_src_df <- msdata[[msprbs_src_dfname]]
+    checkmate::assert_data_frame(msprbs_src_df, .var.name = paste0("msdata$", msprbs_src_dfname))
+    if (is.na(msprb)) {
+      # detect which column/msentity should be used as msprobe (taking the data from msprbs_src_df)
+      has_msfrac <- !is.na(msfraction) || rlang::has_name(msprbs_src_df, "msfraction")
+      has_mstag <- !is.na(mstag) || rlang::has_name(msprbs_src_df, "mstag")
+
+      if (rlang::has_name(msprbs_src_df, "msprobe")) {
+        msprb <- "msprobe"
+      } else if (!has_mstag &&
+                 (rlang::has_name(msprbs_src_df, msexp) ||
+                  msprbs_src_dfname == paste0(msexp, "s"))) {
+        msprb <- msexp
+      } else if (!has_mstag && !has_msfrac &&
+                 (rlang::has_name(msprbs_src_df, msrun_def) ||
+                  msprbs_src_dfname == msruns_def_dfname)) {
+        msprb <- msrun_def
+      } else if (!has_msfrac &&
+                 (rlang::has_name(msprbs_src_df, mschan_def) ||
+                  msprbs_src_dfname == mschans_def_dfname)) {
+        msprb <- mschan_def
       } else {
-        msprbs_df <- msprbs_src_df
+        # the name of the msprobe column to autogenerate
+        msprb <- if (rlang::has_name(msprbs_src_df, msrun_def) ||
+                     msprbs_src_dfname == msruns_def_dfname) "msexperiment" else "msprobe"
       }
-      # try to exclude columns that vary between msfractions
-      msprbs_df <- dplyr::select(msprbs_df, -!!sym(msprb_src), -!!sym(msfrac)) %>%
-          dplyr::select_if(~n_distinct(paste0(.x, "_", msprbs_df[[msprb]])) == n_distinct(msprbs_df[[msprb]])) %>%
-          dplyr::distinct(!!sym(msprb), .keep_all=TRUE)
-    } else {
-      if (is.na(msprb)) {
-        if (verbose) message("Detected msdata$", msprb_src_dfname, ", no msfractions. Setting msprobe=", msprb_src_def)
-        msprb <- msprb_src
-      }
-      msprbs_df <- msdata[[msprb_src_dfname]]
     }
+    if (!rlang::has_name(msprbs_src_df, msprb)) {
+      # generate msprobe column in the source data frame
+      msprb_key_cols <- intersect(c('condition', 'replicate', mstag), colnames(msprbs_src_df))
+      if (verbose) message("Trying to generate ", msprb, " column using: ",
+                            paste0(msprb_key_cols, collapse=", "))
+      msprbids_df <- dplyr::distinct_at(msprbs_src_df, msprb_key_cols) %>%
+        dplyr::mutate(!!sym(msprb) := paste(!!!syms(msprb_key_cols), sep='_'))
+      # update the source frame with msprb column
+      msprbs_src_df <- dplyr::inner_join(msdata[[msprbs_src_dfname]],
+          dplyr::select_at(msprbids_df, c(msprb, msprb_key_cols)), by=msprb_key_cols)
+      if (nrow(msprbs_src_df) != nrow(msdata[[msprbs_src_dfname]])) {
+        stop("MSGLM failed to detect columns uniquely identifying ", msprb, ".",
+              "Plese add ", msprb, " column to your msdata$", msprbs_src_dfname,
+              " experimental design data frame")
+      }
+      msdata[[msprbs_src_dfname]] <- msprbs_src_df
+    }
+    msprbs_df <- msprbs_src_df
+    # try to exclude columns that vary within msprobes
+    n_msprbs <- n_distinct(msprbs_df[[msprb]])
+    msprbs_df <- dplyr::select(msprbs_df, !!sym(msprb),
+            where(~n_distinct(paste0(.x, "_", msprbs_df[[msprb]])) == n_msprbs)) %>%
+        dplyr::distinct(!!sym(msprb), .keep_all=TRUE)
     msprbs_dfname <- paste0(msprb, "s")
   }
 
   checkmate::assert_data_frame(msprbs_df, .var.name = paste0("msdata$", msprbs_dfname))
   msprb_req_cols <- c(condition, msprb)
-  if (!is.na(msexp)) msprb_req_cols <- unique(c(msprb_req_cols, msexp))
   if (!is.na(mstag)) msprb_req_cols <- c(msprb_req_cols, mstag)
-  checkmate::assert_names(names(msprbs_df), must.include = msprb_req_cols)
+  checkmate::assert_names(names(msprbs_df), must.include = msprb_req_cols,
+                          .var.name = paste0("msdata$", msprbs_dfname))
   if (is.na(mstag)) {
     if (rlang::has_name(msprbs_df, "mstag")) {
       if (!is.na(msexp) && (msexp == msprb)) {
@@ -285,25 +292,28 @@ import_msglm_data <- function(msdata, model_def = NULL,
   if (msprb == mschan_def) {
     mschan = msprb
     mschans_dfname <- msprbs_dfname
+    mschans_df <- msprbs_df
   } else if (rlang::has_name(msdata, mschans_def_dfname)) {
     mschan <- mschan_def
     mschans_dfname <- mschans_def_dfname
+    mschans_df <- msdata[[mschans_dfname]]
   } else if (is.na(mstag) && rlang::has_name(msdata, msruns_def_dfname)) {
     mschan <- msrun_def
     mschans_dfname <- msruns_def_dfname
+    mschans_df <- msdata[[mschans_dfname]]
   } else if (!is.na(msfraction)) {
     stop("MS entities declared to contain fractions (", msfraction,
           " column), but no MS channels/MS runs frame found")
   } else if (is.na(mschannel) && is.na(msfraction) && rlang::has_name(msprbs_df, "raw_file")) {
     mschan <- msprb
     mschans_dfname <- msprbs_dfname
+    mschans_df <- msprbs_df
   } else {
     stop("Cannot autodetect MS channels data, specify mschannel= argument")
   }
   checkmate::assert_character(mschans_dfname, any.missing = FALSE)
   if (verbose) message(if_else(mschans_dfname == msprbs_dfname, "Reusing", "Using"),
                        " msdata$", mschans_dfname, " as MS channels source")
-  mschans_df <- msdata[[mschans_dfname]]
   checkmate::assert_data_frame(mschans_df, .var.name = paste0("msdata$", mschans_dfname))
 
   mschan_required_cols <- c(msprb, mschan)

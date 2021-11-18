@@ -536,20 +536,20 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
 #'        the probes of MS protocols, where given quantobjects were identified,
 #'        if TRUE, missing data entries are created for all MS probe regardless
 #'        of the MS protocol
-#' @param verbose
+#' @param verbose generate verbose diagnostic output
 #'
 #' @return object of *msglm_model_data* class
 #' @export
 #'
 #' @examples
 #' @seealso [msglm_model()], [import_msglm_data()], [to_standata()]
-msglm_data <- function(model_def, msdata, object_ids, verbose = model_def$verbose,
-                       mschannel_extra_cols = character(0),
+msglm_data <- function(model_def, msdata, object_ids,
                        mschannel_shift_col = paste0("total_", msdata$msentities[['mschannel']], "_shift"),
                        max_quantobjects = 20L,
                        specificity_msexp_group_cols = msdata$msentities[['condition']],
                        cooccurrence_msexp_group_cols = msdata$msentities[['msprobe']],
                        eager_msprotocols = FALSE,
+                       verbose = model_def$verbose,
                        ...) {
   checkmate::assert_class(model_def, "msglm_model")
   checkmate::assert_class(msdata, "msglm_data_collection")

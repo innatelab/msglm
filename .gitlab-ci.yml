@@ -27,6 +27,7 @@ stages:
   when: always
   paths:
     - $R_LIBS_USER
+    - $CI_PROJECT_DIR/man
 
 .cache-template: &rdeps_cache
   key: $R_DEPS_SNAPSHOT
@@ -57,6 +58,7 @@ build:
   before_script:
     - mkdir -p $R_LIBS_USER
   script:
+    - Rscript -e 'devtools::document()'
     - Rscript -e 'devtools::install()'
   cache:
     <<: *rdeps_cache
@@ -99,7 +101,6 @@ pages:
   before_script:
     - mkdir public
   script:
-    - Rscript -e 'devtools::document()'
     - R CMD Rd2pdf --output=public/${CI_PROJECT_NAME}-${CI_COMMIT_BRANCH}.pdf --no-preview --batch .
   cache:
     <<: *rdeps_cache

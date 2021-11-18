@@ -15,14 +15,17 @@ effect_factor <- function(effects, factor_name, factor_levels, default = factor_
 #' @param effects the data frame of effect with optional prior specification (FIXME)
 #' @param msprobeXeffect optional experimental design matrix for
 #'        per-MS probe effect specification. Normally it is not required as `conditionXeffect`
-#'        matrix should be enough. It's reserved for the rare cases where the there is a high variability
-#'        in biological responses between the biological replicates.
-#' @param verbose
+#'        matrix already specifies the study design. It's reserved for the rare cases where
+#'        the there is a high variability in the scale of biological responses
+#'        between the biological replicates, and the coefficients of `msprobeXeffect`
+#'        matrix could be used to "normalize" the scale of effects in each MS probe.
+#' @param verbose show extended diagnostic output
 #'
 #' @return *msglm_model* object
 #' @export
 #'
 #' @examples
+#' @seealso [set_batch_effects()], [set_contrasts()]
 msglm_model <- function(conditionXeffect,
                         conditions, effects,
                         msprobeXeffect = NULL,
@@ -134,7 +137,7 @@ msglm_model <- function(conditionXeffect,
 #' Set *batch effects* for the MSGLM model.
 #'
 #' The batch effects are those that influence the measured data
-#' (so they should be taken into account when fitting the model),
+#' (so they should be considered when fitting the model),
 #' but don't represent the primary interest of the study (so
 #' they should be defined separately from the ones in `conditionXeffect`
 #' matrix). Batch effects are taken into account when fitting the
@@ -148,9 +151,9 @@ msglm_model <- function(conditionXeffect,
 #'     use of different sample preparation protocols, reagent batches etc.
 #'   * *quantobject-level* batch effects that happen when the sample is being
 #'     measured by MS. These effects cannot alter the contents of MS *probe*,
-#'     but rather how it is measured by MS, which MS1 peaks (i.e. *quantobjects*)
-#'     are identified identified and their relative intensities. Any alterations
-#'     to MS protocol can introduce such batch effects: use of different MS
+#'     but rather how it is measured by MS: which MS1 peaks (i.e. *quantobjects*)
+#'     are identified and their relative intensities. Any alterations to
+#'     MS protocol can introduce such batch effects: use of different MS
 #'     instrument, LC system, gradient, fractionation, batch of MS-specific
 #'     reagents etc.
 #'
@@ -179,6 +182,7 @@ msglm_model <- function(conditionXeffect,
 #' @export
 #'
 #' @examples
+#' @seealso [msglm_model()]
 set_batch_effects <- function(model_def,
                               batchEffectMatrix,
                               batch_effects = NULL,
@@ -248,14 +252,15 @@ set_batch_effects <- function(model_def,
 #'        this matrix is not specified, it is assumed that *metaconditions* are
 #'        identical to *conditions*
 #' @param contrasts optional data frame defining the properties of *contrasts*
-#' @param conditionXcontrast optional data frame defining the property of each
-#'        individual *condition* in each individual *contrast*
+#' @param conditionXcontrast optional data frame defining how specific *conditions*
+#'        are used in individual *contrast*
 #' @param verbose provide extended diagnostic output
 #'
 #' @return updated *msglm_model* object
 #' @export
 #'
 #' @examples
+#' @seealso [msglm_model()]
 set_contrasts <- function(model_def,
                           metaconditionXcontrast,
                           conditionXmetacondition = NULL,

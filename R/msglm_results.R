@@ -18,14 +18,14 @@ msglm_dims <- function(model_data)
   model_def <- model_data$model_def
   # FIXME use model_data class
   is_glmm <- "mixeffects" %in% names(model_data)
-  xaction_ix_col <- if (is_glmm) "glm_supaction_ix" else "index_interaction"
-  xdition_ix_col <- if (is_glmm) "supcondition_ix" else "index_condition"
-  xdition_col <-  if (is_glmm) "supcondition" else "condition"
+  xaction_ix_col <- if (is_glmm) "index_object_mixture" else "index_object_condition"
+  xdition_ix_col <- if (is_glmm) "index_mixture" else "index_condition"
+  xdition_col <-  if (is_glmm) "mixture" else "condition"
 
   objs_df <- model_data$objects
   res <- list(iteration = NULL,
     mschannel = model_data$mschannels,
-    observation = model_data$observations %>%
+    object_msprobe = model_data$object_msprobes %>%
         dplyr::distinct() %>%
         dplyr::inner_join(objs_df, by=c("index_object", "object_id")),
     object = model_data$objects, # use full object information
@@ -35,16 +35,16 @@ msglm_dims <- function(model_data)
     object_batch_effect = model_data$object_batch_effects %>%
         dplyr::inner_join(objs_df, by=c("index_object", "object_id"))
   )
-  if ("subobjects" %in% names(model_data)) {
-    res$subobject <- model_data$subobjects
-    res$subobject_batch_effect <- model_data$subobject_batch_effects %>%
-        dplyr::left_join(res$subobject, by = c('index_subobject', 'subobject_id'))
+  if ("quantobjects" %in% names(model_data)) {
+    res$quantobject <- model_data$quantobjects
+    res$quantobject_batch_effect <- model_data$quantobject_batch_effects %>%
+        dplyr::left_join(res$quantobject, by = c('index_quantobject', 'quantobject_id'))
   }
-  res$mscalib <- dplyr::select(model_data$mschannels, index_mscalib,
+  res$msprotocol <- dplyr::select(model_data$mschannels, index_msprotocol,
                                any_of("instrument")) %>%
     dplyr::distinct()
-  res$interaction <- dplyr::select(model_data$interactions, index_interaction,
-                                   index_object, iaction_id, index_condition, condition, is_virtual) %>%
+  res$object_condition <- dplyr::select(model_data$object_conditions, index_object_condition,
+                                        index_object, objcond_id, index_condition, condition, is_virtual) %>%
     dplyr::inner_join(objs_df, by="index_object")
   if (is_glmm) {
     res$object_mixeffect <- dplyr::mutate(model_data$mixeffects, tmp="a") %>%
@@ -58,7 +58,7 @@ msglm_dims <- function(model_data)
     res$object_mixcoef <- dplyr::mutate(model_data$mixcoefs, tmp="a") %>%
       dplyr::left_join(dplyr::mutate(objs_df, tmp="a")) %>%
       dplyr::select(-tmp)
-    res$supaction <- dplyr::select(model_data$superactions, glm_supaction_ix,
+    res$supaction <- dplyr::select(model_data$object_mixtures, glm_supaction_ix,
                                    index_object, supaction_id, supcondition_ix, supcondition, is_virtual) %>%
         dplyr::inner_join(objs_df)
   }
@@ -68,8 +68,8 @@ msglm_dims <- function(model_data)
       # check index correctness
       index_col <- paste0('index_', dimname)
       checkmate::assert_set_equal(dim_df[[index_col]], seq_len(nrow(dim_df)), ordered=TRUE)
-      # remove unused dimensions (everything except index_object and index_interaction)
-      dim_df <- dplyr::select(dim_df, -(starts_with("index_") & !any_of(c(index_col, "index_interaction", "index_object", "index_subobject"))))
+      # remove unused dimensions (everything except index_object and index_object_condition)
+      dim_df <- dplyr::select(dim_df, -(starts_with("index_") & !any_of(c(index_col, "index_object_condition", "index_object", "index_quantobject"))))
     }
     return(dim_df)
   })
@@ -316,9 +316,9 @@ vars_opt_convert <- function(vars_category, opt_results, vars_info, dim_info) {
 
 #' @export
 default_contrast_vars <- function(vars_info) {
-  intersect(c('iaction_labu', 'iaction_labu_replCI'),
+  intersect(c('obj_cond_labu', 'obj_cond_labu_replCI'),
             unlist(lapply(vars_info, function(vi) vi$names )))
-  # obs_labu is skipped because it's much more expensive to compute and Rhat statistics doesn't make sense
+  # obj_probe_labu is skipped because it's much more expensive to compute and Rhat statistics doesn't make sense
 }
 
 process.stan_fit.contrasts <- function(vars_results, msglm.stan_draws, msglm.stan_stats, model_data,
@@ -491,23 +491,23 @@ process.stan_fit <- function(msglm.stan_fit, model_data, dims_info = msglm_dims(
   })
   names(res) <- avail_cats
 
-  # add interaction CI with respect to observations variability
-  is_glmm <- "supactions" %in% names(res)
+  # add object-in-condition CI with respect to msprobes variability
+  is_glmm <- "object_mixtures" %in% names(res)
   if (is_glmm) {
-    # FIXME what to do for glmm? there's no interaction observations
-  } else if ('obs_labu' %in% all_vars) {
-    # we combine posteriors from all observations of a given interaction to get yet another
-    # estimate of interaction abundance
+    # FIXME what to do for glmm? there's no object_msprobes
+  } else if ('obj_probe_labu' %in% all_vars) {
+    # we combine posteriors from all object-in-msprobe of a given object-in-condition to get yet another
+    # estimate of object-in-condition abundance
     # we reuse(abuse) the contrast calculation for that -- just to group the appropriate draws
     # and get the summary statistics, but we don't need the contrasts
-    message("  * obs_labu aggregate statistics...")
-    res$interactions_obsCI <- list(stats = vars_identity_contrast_stats(
+    message("  * object_msprobe_labu aggregate statistics...")
+    res$object_condition_mergedCI <- list(stats = vars_identity_contrast_stats(
             msglm.stan_draws, msglm.stan_stats,
-            dplyr::filter(varspecs$spec_info, var == 'obs_labu'),
-            varspecs$cats_info$observations,
-            group_idcol = "index_interaction",
+            dplyr::filter(varspecs$spec_info, var == 'obj_probe_labu'),
+            varspecs$cats_info$object_msprobes,
+            group_idcol = "index_object_condition",
             method=contrast_method,
-            verbose=verbose) %>% dplyr::mutate(var = 'obs_labu'))
+            verbose=verbose) %>% dplyr::mutate(var = 'obj_probe_labu'))
   }
 
   if (rlang::has_name(model_def, "contrasts")) {

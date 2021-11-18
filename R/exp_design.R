@@ -131,45 +131,79 @@ msglm_model <- function(conditionXeffect,
   return(model_def)
 }
 
-#' Set batch effects to the MSGLM model.
+#' Set *batch effects* for the MSGLM model.
 #'
-#' TODO longer description
+#' The batch effects are those that influence the measured data
+#' (so they should be taken into account when fitting the model),
+#' but don't represent the primary interest of the study (so
+#' they should be defined separately from the ones in `conditionXeffect`
+#' matrix). Batch effects are taken into account when fitting the
+#' intensity of *quantobject* to the measurements, but are ignored when
+#' inferring the adundance of *object-in-condition* and calculating
+#' contrasts.
+#'
+#' *MSGLM* discriminates the two types of batch effects:
+#'   * *object-level* batch effects that happen during sample preparation
+#'     and affect the actual content of the MS *probe*. This includes the
+#'     use of different sample preparation protocols, reagent batches etc.
+#'   * *quantobject-level* batch effects that happen when the sample is being
+#'     measured by MS. These effects cannot alter the contents of MS *probe*,
+#'     but rather how it is measured by MS, which MS1 peaks (i.e. *quantobjects*)
+#'     are identified identified and their relative intensities. Any alterations
+#'     to MS protocol can introduce such batch effects: use of different MS
+#'     instrument, LC system, gradient, fractionation, batch of MS-specific
+#'     reagents etc.
+#'
+#' **Note:** While MS data sets with intensities specified at the *object-level*
+#' (LFQ, iBAQ etc) may also contain batch effects related to MS protocol,
+#' for the MSGLM model inference these batch effects are no different than
+#' the ones related to sample preparation. In such cases, these batch effects
+#' have to be specified via *object-level* batch effects matrix.
 #'
 #' @param model_def *msglm_model* object
-#' @param msprobeXbatchEffect
-#' @param batch_effects
-#' @param applies_to
-#' @param verbose
+#' @param batchEffectMatrix experimental design matrix for batch effects:
+#'        the columns are the batch effects, and the rows are either *MS probes*
+#'        (for *object-level* batch effects) or *MS channels* (for
+#'        *quantobject-level* or MS protocol-related batch effects).
+#'        MSGLM will check the row names of the name rows dimension to
+#'        make sure that the matrix is specified correctly
+#' @param batch_effects optional data frame with parameters of individual
+#'        batch effects identified by `batch_effect`/`quant_batch_effect`
+#'        column. Right now it supports specifying whether the batch
+#'        effect is positive with `is_positive` column.
+#' @param applies_to which type of batch effect it is: `object` for *object-level*
+#'        batch effects, `quantobject` for *quantobject-level* ones.
+#' @param verbose provide extended diagnostic output
 #'
 #' @return updated *msglm_model* object
 #' @export
 #'
 #' @examples
 set_batch_effects <- function(model_def,
-                              msprobeXbatchEffect,
+                              batchEffectMatrix,
                               batch_effects = NULL,
-                              applies_to = c('modelobject', 'quantobject'),
+                              applies_to = c('object', 'quantobject'),
                               verbose = model_def$verbose
 ){
   checkmate::assert_class(model_def, "msglm_model")
   applies_to <- match.arg(applies_to)
 
-  id_col <- c(modelobject="batch_effect", quantobject="quant_batch_effect")[applies_to]
+  id_col <- c(object="batch_effect", quantobject="quant_batch_effect")[applies_to]
   df_name <- paste0(id_col, 's')
-  checkmate::assert_matrix(msprobeXbatchEffect, mode="numeric", any.missing=FALSE,
+  checkmate::assert_matrix(batchEffectMatrix, mode="numeric", any.missing=FALSE,
                            min.rows = 1, min.cols = 1, row.names = "unique", col.names = "unique")
-  msprobe_dim <- names(dimnames(msprobeXbatchEffect))[[1]]
+  msprobe_dim <- names(dimnames(batchEffectMatrix))[[1]]
   msprobe_dimnames_allowed <- c("msrun", "mschannel")
-  if (applies_to == "modelobject") msprobe_dimnames_allowed <- append(msprobe_dimnames_allowed, c("msexperiment", "msprobe"))
+  if (applies_to == "object") msprobe_dimnames_allowed <- append(msprobe_dimnames_allowed, c("msexperiment", "msprobe"))
   checkmate::assert_choice(msprobe_dim, msprobe_dimnames_allowed)
-  msprobes <- rownames(msprobeXbatchEffect)
+  msprobes <- rownames(batchEffectMatrix)
   if (is.null(msprobes)) stop("No names for MS probes in the rows of the matrix")
 
-  mtx_name <- c(modelobject="msprobeXbatchEffect",
+  mtx_name <- c(object="msprobeXbatchEffect",
                 quantobject="mschannelXquantBatchEffect")[[applies_to]]
-  mtx_batch_effects <- colnames(msprobeXbatchEffect)
+  mtx_batch_effects <- colnames(batchEffectMatrix)
 
-  if (verbose) message("  * ", ncol(msprobeXbatchEffect), " ", applies_to, "-level batch effect(s) specified")
+  if (verbose) message("  * ", ncol(batchEffectMatrix), " ", applies_to, "-level batch effect(s) specified")
 
   # process batch_effects
   if (!is.null(batch_effects)) {
@@ -189,30 +223,41 @@ set_batch_effects <- function(model_def,
       checkmate::assert_logical(batch_effects$is_positive, any.missing = FALSE)
     }
   } else {
-    if (verbose) message('No batch_effect frame provided, using default batch effects settings')
+    if (verbose) message('No batch_effects frame provided, using default batch effects settings')
     batch_effects <- tibble::tibble(!!sym(paste0("index_", id_col)) := seq_along(mtx_batch_effects),
                                     !!sym(id_col) := mtx_batch_effects,
                                     is_positive = FALSE)
   }
   # update model_def
-  model_def[[mtx_name]] <- msprobeXbatchEffect
+  if (rlang::has_name(model_def, mtx_name)) warning("Redefining ", mtx_name)
+  model_def[[mtx_name]] <- batchEffectMatrix
+  if (rlang::has_name(model_def, df_name)) warning("Redefining ", df_name)
   model_def[[df_name]] <- batch_effects
   return(model_def)
 }
 
-#' Title
+#' Set *contrasts* for the MSGLM model.
 #'
-#' @param model_def
-#' @param metaconditionXcontrast
-#' @param conditionXcontrast
-#' @param verbose
+#' TODO description
 #'
-#' @return updated msglm_model object
+#' @param model_def *msglm_model* object
+#' @param metaconditionXcontrast matrix that defines *contrasts* (matrix columns)
+#'        as linear combinations of *metaconditions* (matrix rows)
+#' @param conditionXmetacondition optional logical matrix defining *metaconditions*
+#'        (matrix columns) as subsets of model's *conditions* (matrix rows). If
+#'        this matrix is not specified, it is assumed that *metaconditions* are
+#'        identical to *conditions*
+#' @param contrasts optional data frame defining the properties of *contrasts*
+#' @param conditionXcontrast optional data frame defining the property of each
+#'        individual *condition* in each individual *contrast*
+#' @param verbose provide extended diagnostic output
+#'
+#' @return updated *msglm_model* object
 #' @export
 #'
 #' @examples
 set_contrasts <- function(model_def,
-                          metaconditionXcontrast = NULL,
+                          metaconditionXcontrast,
                           conditionXmetacondition = NULL,
                           contrasts = NULL,
                           conditionXcontrast = NULL,
@@ -258,6 +303,7 @@ set_contrasts <- function(model_def,
   }
 
   # update model_def
+  if (rlang::has_name(model_def, "conditionXmetacondition")) warning("Redefining conditionXmetacondition")
   model_def$conditionXmetacondition <- conditionXmetacondition
   model_def$metaconditionXcontrast <- metaconditionXcontrast
   model_def$contrasts <- contrasts

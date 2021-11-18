@@ -11,25 +11,32 @@ data {
   int<lower=0> NobjConditions;  // number of object-in-condition pairs
   int<lower=1,upper=Nobjects> obj_cond2obj[NobjConditions];
 
-  int<lower=1> Nprobes;         // number of MS probes (= MS channels)
+  int<lower=1> Nprobes;         // number of MS probes (MS experiment X MS tag)
+  int<lower=0> Nquantobjects;   // number of quantitation objects (subcomponents of object, i.e. peptides of proteins etc), 0 if not supported
+  int<lower=1,upper=Nobjects> quantobj2obj[Nquantobjects];
+
+  int<lower=0> Nmsprotocols;    // number of MS protocols used
   int<lower=Nprobes> Nmschannels; // number of mschannels (MS probe X MS fraction)
-  int<lower=1, upper=Nprobes> mschannel2probe[Nmschannels];
-  vector[Nprobes] mschannel_shift;
+  vector[Nmschannels] mschannel_shift;
+  int<lower=1,upper=Nmsprotocols> mschannel2msproto[Nmsprotocols > 0 ? Nmschannels : 0]; // TODO support by the model
 
   int<lower=0> NobjProbes;      // number of object-in-msprobe pairs with MS data
   int<lower=1,upper=Nprobes> obj_probe2probe[NobjProbes];
   int<lower=1,upper=NobjConditions> obj_probe2obj_cond[NobjProbes];
 
-  // map from quantitations/missings to object-in-msprobe
-  int<lower=0> Nquanted;        // total number of quantified object-in-msprobes
-  int<lower=1,upper=NobjProbes>  quant2obj_probe[Nquanted];
-  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted];
+  int<lower=0> NqobjProbes;     // number of quantobject-in-msprobes (object-in-msprobe X its quantobjects)
+  int<lower=1,upper=NobjProbes> qobj_probe2obj_probe[NqobjProbes];
+  int<lower=1,upper=Nmschannels> qobj_probe2mschannel[NqobjProbes];
+  int<lower=1,upper=Nquantobjects> qobj_probe2quantobj[NqobjProbes];
+
+  // map from quantitations/missings to quantobject-in-msprobe
+  int<lower=0> Nquanted;        // total number of quantified quantobject-in-msprobes
+  int<lower=1,upper=NqobjProbes>  quant2qobj_probe[Nquanted];
   int<lower=0,upper=1> quant_isreliable[Nquanted];
-  int<lower=0> Nmissed;         // total number of missed object-in-msprobes
-  int<lower=1,upper=NobjProbes> miss2obj_probe[Nmissed];
-  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed];
+  int<lower=0> Nmissed;         // total number of missed quantobject-in-msprobes
+  int<lower=1,upper=NqobjProbes> miss2qobj_probe[Nmissed];
   vector<lower=0>[Nquanted] qData; // quanted data
-  vector<lower=0, upper=1>[Nmissed] missing_sigmoid_scale; // sigmoid scales for indiv. object-in-msprobes (<1 for higher uncertainty)
+  vector<lower=0, upper=1>[Nmissed] missing_sigmoid_scale; // sigmoid scales for indiv. quantobject-in-msprobes (<1 for higher uncertainty)
 
   // linear model specification
   int<lower=0> Neffects;        // number of effects (that define conditions)
@@ -42,6 +49,11 @@ data {
   int<lower=0> NobjBatchEffects;
   int<lower=1,upper=NbatchEffects> obj_batch_effect2batch_effect[NobjBatchEffects];
   int<lower=0,upper=1> batch_effect_is_positive[NbatchEffects];
+
+  int<lower=0> NquantBatchEffects; // number of quantification batch effects (that define quantobj-level quantification variation, but not biology)
+  int<lower=0> NqobjBatchEffects;
+  int<lower=1,upper=NquantBatchEffects> qobj_batch_effect2quant_batch_effect[NqobjBatchEffects];
+  int<lower=0,upper=1> quant_batch_effect_is_positive[NquantBatchEffects];
 
   // obj_condXeff (object-in-condition X object-effect) sparse matrix
   int<lower=0> obj_condXeff_Nw;
@@ -61,6 +73,12 @@ data {
   int<lower=1, upper=obj_probeXbatcheff_Nw+1> obj_probeXbatcheff_u[NbatchEffects > 0 ? NobjProbes + 1 : 1];
   int<lower=1, upper=NobjBatchEffects> obj_probeXbatcheff_v[obj_probeXbatcheff_Nw];
 
+  // qobj_probeXqbatcheff (quantobject-in-msprobe X quantobject-quant_batch_effect) sparse matrix
+  int<lower=0> qobj_probeXqbatcheff_Nw;
+  vector[qobj_probeXqbatcheff_Nw] qobj_probeXqbatcheff_w;
+  int<lower=1, upper=qobj_probeXqbatcheff_Nw+1> qobj_probeXqbatcheff_u[NquantBatchEffects > 0 ? NqobjProbes + 1 : 1];
+  int<lower=1, upper=NqobjBatchEffects> qobj_probeXqbatcheff_v[qobj_probeXqbatcheff_Nw];
+
   // global model constants
   real obj_labu_min; // minimal average abundance of an object
   real<lower=0> obj_labu_min_scale; // scale that defines the softness of lower abundance limit
@@ -77,6 +95,13 @@ data {
   real<lower=0> obj_probe_shift_tau; // tau for the object-in-msprobe shift (relative to object-in-condition) prior
   real<lower=0> obj_probe_shift_df;  // degrees of freedom for object-in-msprobe shift
   real<lower=0> batch_effect_sigma;
+
+  real<lower=0> qobj_shift_sigma;    // sigma parameter of qobj_shift distribu
+  real<lower=0> qobj_shift_df;       // df parameter of qobj_shift distribu
+
+  real<lower=0> quant_batch_effect_tau;
+  real<lower=0> quant_batch_effect_df;
+  real<lower=0> quant_batch_effect_c;
 
   // instrument calibrated parameters (FIXME: msproto-dependent)
   real<lower=0> zDetectionFactor;
@@ -102,8 +127,15 @@ transformed data {
   int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
 
+  int<lower=1,upper=Nquantobjects> quant2quantobj[Nquanted] = qobj_probe2quantobj[quant2qobj_probe];
+  int<lower=1,upper=NobjProbes> quant2obj_probe[Nquanted] = qobj_probe2obj_probe[quant2qobj_probe];
   int<lower=1,upper=NobjConditions> quant2obj_cond[Nquanted] = obj_probe2obj_cond[quant2obj_probe];
+  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted] = qobj_probe2mschannel[quant2qobj_probe];
+
+  int<lower=1,upper=Nquantobjects> miss2quantobj[Nmissed] = qobj_probe2quantobj[miss2qobj_probe];
+  int<lower=1,upper=NobjProbes> miss2obj_probe[Nmissed] = qobj_probe2obj_probe[miss2qobj_probe];
   int<lower=1,upper=NobjConditions> miss2obj_cond[Nmissed] = obj_probe2obj_cond[miss2obj_probe];
+  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed] = qobj_probe2mschannel[miss2qobj_probe];
 
   int<lower=0,upper=NobjEffects> NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   int<lower=0,upper=NobjEffects> NobjEffectsOther = NobjEffects - NobjEffectsPos;
@@ -118,6 +150,12 @@ transformed data {
   int<lower=0,upper=NobjBatchEffects> NobjBatchEffectsOther = NobjBatchEffects - NobjBatchEffectsPos;
   int<lower=1,upper=NobjBatchEffects> obj_batch_effect_reshuffle[NobjBatchEffects] =
       nonzeros_first(batch_effect_is_positive[obj_batch_effect2batch_effect]);
+
+  int<lower=0,upper=NqobjBatchEffects> NqobjBatchEffectsPos = sum(quant_batch_effect_is_positive[qobj_batch_effect2quant_batch_effect]);
+  int<lower=0,upper=NqobjBatchEffects> NqobjBatchEffectsOther = NqobjBatchEffects - NqobjBatchEffectsPos;
+  int<lower=1,upper=NqobjBatchEffects> qobj_batch_effect_reshuffle[NqobjBatchEffects] =
+      nonzeros_first(quant_batch_effect_is_positive[qobj_batch_effect2quant_batch_effect]);
+  real<lower=0> qobj_batch_effect_c2 = square(quant_batch_effect_c);
 
   vector[NobjConditions] obj_condXbase_w = rep_vector(1.0, NobjConditions);
   int<lower=0> obj_condXbase_u[NobjConditions + 1] = one_to(NobjConditions + 1);
@@ -135,6 +173,11 @@ transformed data {
   vector[obj_probe_shiftXshift0_Nw] obj_probe_shiftXshift0_w;
   int<lower=1, upper=obj_probe_shiftXshift0_Nw + 1> obj_probe_shiftXshift0_u[NobjProbes0 > 0 ? NobjProbes + 1 : 0];
   int<lower=1, upper=NobjProbes0> obj_probe_shiftXshift0_v[NobjProbes0 > 0 ? obj_probe_shiftXshift0_Nw : 0];
+
+  int<lower=0> qobj_shiftXshift0_Nw = contr_treatment_Nw(Nobjects, quantobj2obj);
+  vector[qobj_shiftXshift0_Nw] qobj_shiftXshift0_w;
+  int<lower=0, upper=qobj_shiftXshift0_Nw + 1> qobj_shiftXshift0_u[Nquantobjects + 1];
+  int<lower=0, upper=Nquantobjects - Nobjects> qobj_shiftXshift0_v[qobj_shiftXshift0_Nw];
 
   matrix[Nobjects + NobjEffects, NobjConditions] obj_baseffXcond; // OLS operator converting obj_cond to obj_effect and obj_base
   //matrix[NobjConditions, Nobjects] obj_condXbase = csr_to_dense_matrix(NobjConditions, Nobjects, obj_condXbase_w, obj_cond2obj, obj_condXbase_u);
@@ -163,11 +206,24 @@ transformed data {
 
   // prepare obj_probe_shiftXshift0
   if (NobjProbes0 > 0) {
-    matrix[NobjProbes, NobjProbes0] obj_probe_shiftXshift0 = block_contr_poly(NobjConditions, obj_probe2obj_cond, positive_infinity());
+    matrix[NobjProbes, NobjProbes0] obj_probe_shiftXshift0 =
+        block_contr_poly(NobjConditions, obj_probe2obj_cond, positive_infinity());
     obj_probe_shiftXshift0_w = csr_extract_w_0(obj_probe_shiftXshift0, positive_infinity());
     obj_probe_shiftXshift0_u = csr_extract_u(obj_probe_shiftXshift0);
     obj_probe_shiftXshift0_v = csr_extract_v(obj_probe_shiftXshift0);
-    //print("obj_probe_shiftXshift0=", obs_shiftXobs_shift0);
+    //print("obj_probe_shiftXshift0=", obj_probe_shiftXshift0);
+  }
+
+  // prepare qobj_shiftXshift0
+  if (Nquantobjects > Nobjects) {
+    matrix[Nquantobjects, Nquantobjects - Nobjects] qobj_shiftXshift0 =
+        block_contr_treatment(Nquantobjects, quantobj2obj);
+    qobj_shiftXshift0_w = csr_extract_w(qobj_shiftXshift0);
+    qobj_shiftXshift0_u = csr_extract_u(qobj_shiftXshift0);
+    qobj_shiftXshift0_v = csr_extract_v(qobj_shiftXshift0);
+    //print("qobj_shiftXshift0=", qobj_shiftXshift0);
+  } else {
+    qobj_shiftXshift0_u = rep_array(0, Nquantobjects+1);
   }
 
   {
@@ -205,6 +261,8 @@ parameters {
 
   vector[Nobjects] obj_base_labu0; // baseline object abundance
 
+  vector[Nquantobjects > 0 ? Nquantobjects-Nobjects : 0] qobj_shift0; // free parameters for quantobject shift within object
+
   //real<lower=0.0> obj_effect_tau;
   real<lower=0.0> effect_slab_c_t;
   vector<lower=0.0>[NobjEffects] obj_effect_lambda_t;
@@ -223,6 +281,11 @@ parameters {
   //real<lower=0> obj_batch_effect_sigma;
   vector<lower=0.0>[NobjBatchEffectsPos] obj_batch_effect_unscaled_pos;
   vector[NobjBatchEffectsOther] obj_batch_effect_unscaled_other;
+
+  vector<lower=0>[NqobjBatchEffects] qobj_batch_effect_lambda_t;
+  vector<lower=0>[NqobjBatchEffects] qobj_batch_effect_lambda_a;
+  vector<lower=0.0>[NqobjBatchEffectsPos] qobj_batch_effect_unscaled_pos;
+  vector[NqobjBatchEffectsOther] qobj_batch_effect_unscaled_other;
 }
 
 transformed parameters {
@@ -232,12 +295,17 @@ transformed parameters {
   vector<lower=0>[NobjEffects] obj_effect_sigma; // AKA lambda_tilde*tau in rstanarm
   vector[NobjBatchEffects] obj_batch_effect;
   //vector<lower=0>[NobjBatchEffects] obj_batch_effect_sigma;
+  vector[NqobjBatchEffects] qobj_batch_effect;
+  vector<lower=0>[NqobjBatchEffects] qobj_batch_effect_sigma;
 
   vector<lower=0>[NobjProbes0 > 0 ? NobjConditions : 0] obj_probe_shift_sigma;
 
   vector[NobjProbes] obj_probe_labu; // obj_cond_labu + obj_probe_shift * obj_probe_shift_sigma
   vector[NobjProbes0 > 0 ? NobjProbes : 0] obj_probe_shift; // replicate shifts for all potential object-in-msprobes (including missing)
   vector[NobjBatchEffects > 0 ? NobjProbes : 0] obj_probe_batch_shift;
+  vector[NqobjBatchEffects > 0 ? NqobjProbes : 0] qobj_probe_batch_shift;
+
+  vector[Nquantobjects] qobj_shift; // quantobject shift within object
 
   // calculate effects lambdas and scale effects
   {
@@ -264,6 +332,24 @@ transformed parameters {
   if (NbatchEffects > 0) {
     obj_batch_effect = append_row(obj_batch_effect_unscaled_pos, obj_batch_effect_unscaled_other)[obj_batch_effect_reshuffle] * batch_effect_sigma;
     obj_probe_batch_shift = csr_matrix_times_vector(NobjProbes, NobjBatchEffects, obj_probeXbatcheff_w, obj_probeXbatcheff_v, obj_probeXbatcheff_u, obj_batch_effect);
+  }
+  // calculate qobj_shift
+  if (Nquantobjects > 1) {
+    qobj_shift = csr_matrix_times_vector(Nquantobjects, Nquantobjects - Nobjects,
+                                         qobj_shiftXshift0_w, qobj_shiftXshift0_v,
+                                         qobj_shiftXshift0_u, qobj_shift0);
+  } else if (Nquantobjects == 1) {
+    qobj_shift = rep_vector(0.0, Nquantobjects);
+  }
+
+  // calculate qobj_probeXqbatch_shift (doesn't make sense to add to obj_probe_labu)
+  if (NqobjBatchEffects > 0) {
+    vector[NqobjBatchEffects] qobj_batch_effect_sigma_pre; // AKA lambda_eta2 in rstanarm
+    qobj_batch_effect_sigma_pre = square(qobj_batch_effect_lambda_a) .* qobj_batch_effect_lambda_t;
+    qobj_batch_effect_sigma = sqrt(qobj_batch_effect_c2 * qobj_batch_effect_sigma_pre ./ (qobj_batch_effect_c2 + square(quant_batch_effect_tau) * qobj_batch_effect_sigma_pre)) * quant_batch_effect_tau;
+    qobj_batch_effect = append_row(qobj_batch_effect_unscaled_pos, qobj_batch_effect_unscaled_other)[qobj_batch_effect_reshuffle] .* qobj_batch_effect_sigma;
+    qobj_probe_batch_shift = csr_matrix_times_vector(NqobjProbes, NqobjBatchEffects, qobj_probeXqbatcheff_w, qobj_probeXqbatcheff_v, qobj_probeXqbatcheff_u,
+                                                     qobj_batch_effect);
   }
 }
 
@@ -306,6 +392,16 @@ model {
       obj_batch_effect_unscaled_pos ~ std_normal();
       obj_batch_effect_unscaled_other ~ std_normal();
     }
+    if (Nquantobjects > 0) {
+      qobj_shift ~ student_t(qobj_shift_df, 0, qobj_shift_sigma);
+      if (NqobjBatchEffects > 0) {
+        qobj_batch_effect_lambda_t - hsprior_lambda_t_offset ~ inv_gamma(0.5 * quant_batch_effect_df, 0.5 * quant_batch_effect_df);
+        qobj_batch_effect_lambda_a - hsprior_lambda_a_offset ~ std_normal();
+        //obj_batch_effect ~ normal(0.0, obj_batch_effect_lambda);
+        qobj_batch_effect_unscaled_pos ~ std_normal();
+        qobj_batch_effect_unscaled_other ~ std_normal();
+      }
+    }
 
     // soft lower limit of protein abundance for each object-in-msprobe
     1 ~ bernoulli_logit((obj_probe_labu - obj_labu_min) * obj_labu_min_scale);
@@ -317,6 +413,16 @@ model {
 
         q_labu = obj_probe_labu[quant2obj_probe] + mschannel_shift[quant2mschannel];
         m_labu = obj_probe_labu[miss2obj_probe] + mschannel_shift[miss2mschannel];
+        if (Nquantobjects > 0) {
+            // adjust by subcomponent shift
+            q_labu += qobj_shift[quant2quantobj];
+            m_labu += qobj_shift[miss2quantobj];
+
+            if (NqobjBatchEffects > 0) {
+                q_labu += qobj_probe_batch_shift[quant2qobj_probe];
+                m_labu += qobj_probe_batch_shift[miss2qobj_probe];
+            }
+        }
         if (NbatchEffects > 0) {
           q_labu += obj_probe_batch_shift[quant2obj_probe];
           m_labu += obj_probe_batch_shift[miss2obj_probe];
@@ -331,7 +437,7 @@ model {
         //}
         // 10% faster version with cauchy_compressv() transform
         cauchy_compressv(exp2(q_labu - qLog2Std) - qDataNorm, compress_a, 4.0) ~ std_normal();
-        // soft-lower-limit for object intensities of reliable quantifications
+        // soft-lower-limit for quantobject intensities of reliable quantifications
         1 ~ bernoulli_logit(q_labu[reliable_quants] * (zScale * zDetectionFactor) + zDetectionIntercept);
         0 ~ bernoulli_logit(missing_sigmoid_scale .* (m_labu * (zScale * zDetectionFactor) + zDetectionIntercept));
     }
@@ -348,6 +454,8 @@ generated quantities {
     vector[NobjConditions] obj_cond_labu_replCI = NobjProbes0 > 0 ? to_vector(normal_rng(obj_cond_labu, obj_probe_shift_sigma)) : obj_cond_labu;
     vector[Nobjects] obj_base_labu_replCI;
     vector[NobjEffects] obj_effect_replCI;
+    vector[Nquantobjects] qobj_llh;
+
     {
       vector[Nobjects + NobjEffects] obj_baseff = obj_baseffXcond * obj_cond_labu_replCI;
       for (i in 1:Nobjects) {
@@ -356,5 +464,37 @@ generated quantities {
       for (i in 1:NobjEffects) {
         obj_effect_replCI[i] = obj_baseff[i+Nobjects];
       }
+    }
+
+    // per-quantobject loglikelihood (the code copied from "model" section)
+    if (Nquantobjects > 0) {
+        vector[Nquanted] q_labu;
+        vector[Nmissed] m_labu;
+
+        // prepare predicted abundances
+        q_labu = obj_probe_labu[quant2obj_probe] + mschannel_shift[quant2mschannel] + qobj_shift[quant2quantobj];
+        m_labu = obj_probe_labu[miss2obj_probe] + mschannel_shift[miss2mschannel] + qobj_shift[miss2quantobj];
+
+        if (NqobjBatchEffects > 0) {
+            q_labu += qobj_probe_batch_shift[quant2qobj_probe];
+            m_labu += qobj_probe_batch_shift[miss2qobj_probe];
+        }
+        if (NbatchEffects > 0) {
+          q_labu += obj_probe_batch_shift[quant2obj_probe];
+          m_labu += obj_probe_batch_shift[miss2obj_probe];
+        }
+
+        // calculate log-likelihood per quantobject
+        qobj_llh = rep_vector(0.0, Nquantobjects);
+        for (i in 1:Nquanted) {
+          real delta = exp2(q_labu[i] - qLog2Std[i]) - qDataNorm[i];
+
+          qobj_llh[quant2quantobj[i]] += log_mix(outlierProb, cauchy_lpdf(delta | 0, 1),
+                                                 std_normal_lpdf(delta)) + qLogShift[i] +
+              bernoulli_logit_lpmf(1 | q_labu[i] * (zScale * zDetectionFactor) + zDetectionIntercept);
+        }
+        for (i in 1:Nmissed) {
+          qobj_llh[miss2quantobj[i]] += bernoulli_logit_lpmf(0 | missing_sigmoid_scale[i] * m_labu[i] * (zScale * zDetectionFactor) + zDetectionIntercept);
+        }
     }
 }

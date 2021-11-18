@@ -529,12 +529,40 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
 
 #' Prepare *MSGLM* model input data for specified objects.
 #'
+#' TODO
+#'
+#' @details
+#' Since some MS quantitations could be false positives resulting from
+#' incorrect MS1 feature matching, co-elution etc, one part of data preparation
+#' carried by `msglm_data()` is the identification of reliable quantitations.
+#' It does that by checking the patterns of how each *quantobject* was quantified.
+#' Non-random patterns provide additional evidence that these quantification
+#' are reliable:
+#'   * it uses `specificity_msexp_group_cols` to define the *specificity groups*
+#'     of MS channels and checks whether the quantifications of any given *quantobject*
+#'     are specific to some of these groups.
+#'   * it uses `cooccurrence_msexp_group_cols` to define the *cooccurrence groups*
+#'     of MS channels. If more *quantobjects* of the same *objet* are simultaneously
+#'     quantified in a given cooccurrence group than expected by chance
+#'     (given `quantobject_fdr` rate of false identifications), such quantifications
+#'     are regarded as reliable.
+#' While both reliable and non-reliable quantifications are used to fit the model,
+#' reliable quantifications give MSGLM an additional hint about the abundance of
+#' MS *object* in corresponding MS *probes*.
+#'
 #' @param model_def *msglm_model* object with MSGLM model definition
 #' @param msdata *msglm_data_collection* object with all MS data
 #' @param object_ids vector of *model objects* IDs to analyze
+#' @param mschannel_shift_col which column of `msdata$mschannel_shifts` data frame
+#'        contains the log2 shifts for intensity normalization, defaults to
+#'        `total_mschannel_shift`
+#' @param specificity_msexp_group_cols the columns of `msdata$mschannels` data
+#'        frame that define the *specificity groups* of MS channels
+#' @param cooccurrence_msexp_group_cols the columns of `msdata$mschannels` data
+#'        frame that define the *cooccurence groups* of MS channels
 #' @param eager_msprotocols if FALSE, missing data entries are created only for
-#'        the probes of MS protocols, where given quantobjects were identified,
-#'        if TRUE, missing data entries are created for all MS probe regardless
+#'        the probes of MS protocols, where given quantobjects were identified.
+#'        If TRUE, missing data entries are created for all MS probes regardless
 #'        of the MS protocol
 #' @param verbose generate verbose diagnostic output
 #'

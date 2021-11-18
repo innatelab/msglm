@@ -290,13 +290,13 @@ test_that(paste0(obj, "/pepmodstate model, msfractions, ",
     expect_list(stan_data1)
     expect_names(names(stan_data1), must.include=c(
         "Nconditions", "Nobjects", "Nquantobjects",
-        "Nprobes", "NobjProbes", "NqobjProbes",
+        "Nprobes", "NobjProbes", "NqobjChannels",
         "Nmschannels", "mschannel_shift",
         "Neffects", "NobjEffects", "NbatchEffects", "NobjBatchEffects",
         "NquantBatchEffects", "NqobjBatchEffects",
         "NobjConditions", "Nquanted", "Nmissed",
-        "quant2qobj_probe", "miss2qobj_probe", "qData",
-        "obj_condXeff_Nw", "obj_probeXbatcheff_Nw", "qobj_probeXqbatcheff_Nw"))
+        "quant2qobj_channel", "miss2qobj_channel", "qData",
+        "obj_condXeff_Nw", "obj_probeXbatcheff_Nw", "qobj_channelXqbatcheff_Nw"))
 })
 
 }}}
@@ -343,7 +343,7 @@ test_that("Technical MS replicates are supported", {
             expect_data_frame(model_data_be$quantobject_batch_effects)
             expect_names(names(model_data_be$quantobject_batch_effects),
                          must.include = c("quantobject_batch_effect", "quant_batch_effect", "index_quantobject"))
-            expect_matrix(model_data_be$quantobject_msprobeXquant_batch_effect, any.missing = FALSE,
+            expect_matrix(model_data_be$quantobject_mschannelXquant_batch_effect, any.missing = FALSE,
                           nrows = nrow(model_data_be$msdata),
                           ncols = nrow(model_data_be$quantobject_batch_effects))
             stan_data_be <- to_standata(model_data_be)

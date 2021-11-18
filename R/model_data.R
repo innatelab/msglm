@@ -171,12 +171,12 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
                                                index_quant_batch_effect = integer(0),
                                                is_positive = logical(0))
     }
-    qobj_probeXbatcheff_df <- dplyr::full_join(matrix2frame(mschannelXquantBatchEffect,
+    qobj_channelXbatcheff_df <- dplyr::full_join(matrix2frame(mschannelXquantBatchEffect,
                                                             row_col="mschannel", col_col="quant_batch_effect"),
                                                dplyr::select(model_data$quantobjects, index_object, index_quantobject, quantobject_id),
                                                by = character()) %>%
       dplyr::inner_join(dplyr::select(quant_batch_effects_df, quant_batch_effect, index_quant_batch_effect), by="quant_batch_effect") %>%
-      dplyr::right_join(dplyr::select(model_data$msdata, mschannel, index_msprobe, index_object, index_quantobject, index_quantobject_msprobe),
+      dplyr::right_join(dplyr::select(model_data$msdata, mschannel, index_msprobe, index_object, index_quantobject, index_quantobject_mschannel),
                         by=c("index_object", "index_quantobject", "mschannel")) %>%
       # index msdata without batch effect as 0 (needed for ref quant object removal later)
       dplyr::mutate(index_quant_batch_effect = replace_na(index_quant_batch_effect, 0L)) %>%
@@ -238,20 +238,20 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
       }) %>% dplyr::ungroup() %>%
       dplyr::filter(index_quant_batch_effect > 0L) %>%
       dplyr::mutate(quantobject_batch_effect = paste0(quant_batch_effect, '@', quantobject_id)) %>%
-      dplyr::arrange(index_quant_batch_effect, index_quantobject_msprobe)
-    model_data$quantobject_batch_effects <- dplyr::select(qobj_probeXbatcheff_df,
+      dplyr::arrange(index_quant_batch_effect, index_quantobject_mschannel)
+    model_data$quantobject_batch_effects <- dplyr::select(qobj_channelXbatcheff_df,
                                                         quantobject_batch_effect,
                                                         index_quant_batch_effect, quant_batch_effect,
                                                         index_quantobject, quantobject_id) %>%
       dplyr::distinct() %>%
       dplyr::arrange(index_quantobject, index_quant_batch_effect) %>%
       dplyr::mutate(index_quantobject_batch_effect = row_number())
-    model_data$quantobject_msprobeXquant_batch_effect <- frame2matrix(
-            qobj_probeXbatcheff_df,
-            row_col="index_quantobject_msprobe",
+    model_data$quantobject_mschannelXquant_batch_effect <- frame2matrix(
+            qobj_channelXbatcheff_df,
+            row_col="index_quantobject_mschannel",
             col_col="quantobject_batch_effect",
-            rows = if (nrow(qobj_probeXbatcheff_df)>0) {
-                    model_data$msdata$index_quantobject_msprobe
+            rows = if (nrow(qobj_channelXbatcheff_df)>0) {
+                    model_data$msdata$index_quantobject_mschannel
                   } else integer(0),
             cols = model_data$quantobject_batch_effects$quantobject_batch_effect)
   } else if (rlang::has_name(model_def, "mschannelXquantBatchEffect")) {
@@ -454,9 +454,9 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
         dplyr::filter(any(!is.na(intensity))) %>%
         dplyr::ungroup()
     }
-    nqobj_probes <- nrow(dplyr::distinct(msdata_df, quantobject_id, mschannel))
-    if (nrow(msdata_df) != nqobj_probes) {
-      if (verbose) warning(nrow(msdata_df) - nqobj_probes, " of ", nrow(msdata_df),
+    nqobj_channels <- nrow(dplyr::distinct(msdata_df, quantobject_id, mschannel))
+    if (nrow(msdata_df) != nqobj_channels) {
+      if (verbose) warning(nrow(msdata_df) - nqobj_channels, " of ", nrow(msdata_df),
                            " ", quantobj, " MS intensities are duplicate, summing duplicate entries")
       msdata_df <- dplyr::group_by(msdata_df, dplyr::across(!any_of(c("intensity", "ident_type")))) %>%
         dplyr::summarise(dplyr::across(intensity, ~sum(.x, na.rm = TRUE)),
@@ -505,7 +505,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                                    dplyr::select(model_data$quantobjects, index_object, index_quantobject, quantobject_id),
                                    by=c("index_object", "quantobject_id")) %>%
       dplyr::arrange(index_object, index_object_msprobe, index_quantobject) %>%
-      dplyr::mutate(index_quantobject_msprobe = row_number())
+      dplyr::mutate(index_quantobject_mschannel = row_number())
   #} else {
   #   stop("Unsupported combination of object=", obj,
   #       " and quantobject=", quantobj)
@@ -515,7 +515,7 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
                               index_qdata = if_else(is_observed, cumsum(is_observed), NA_integer_),
                               index_mdata = if_else(!is_observed, cumsum(!is_observed), NA_integer_))
   message(nrow(model_data$msdata), " ",
-          if (rlang::has_name(model_data$msdata, 'index_quantobject_msprobe'))
+          if (rlang::has_name(model_data$msdata, 'index_quantobject_mschannel'))
             quantobj else obj, '-in-msprobe(s) of ',
           n_distinct(model_data$msdata$index_object), ' ', obj, '(s)',
           if (rlang::has_name(model_data$msdata, 'index_quantobject'))

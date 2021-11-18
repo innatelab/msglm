@@ -24,17 +24,17 @@ data {
   int<lower=1,upper=Nprobes> obj_probe2probe[NobjProbes];
   int<lower=1,upper=NobjConditions> obj_probe2obj_cond[NobjProbes];
 
-  int<lower=0> NqobjProbes;     // number of quantobject-in-msprobes (object-in-msprobe X its quantobjects)
-  int<lower=1,upper=NobjProbes> qobj_probe2obj_probe[NqobjProbes];
-  int<lower=1,upper=Nmschannels> qobj_probe2mschannel[NqobjProbes];
-  int<lower=1,upper=Nquantobjects> qobj_probe2quantobj[NqobjProbes];
+  int<lower=0> NqobjChannels;     // number of quantobject-in-msprobes (object-in-msprobe X its quantobjects)
+  int<lower=1,upper=NobjProbes> qobj_channel2obj_probe[NqobjChannels];
+  int<lower=1,upper=Nmschannels> qobj_channel2mschannel[NqobjChannels];
+  int<lower=1,upper=Nquantobjects> qobj_channel2quantobj[NqobjChannels];
 
   // map from quantitations/missings to quantobject-in-msprobe
   int<lower=0> Nquanted;        // total number of quantified quantobject-in-msprobes
-  int<lower=1,upper=NqobjProbes>  quant2qobj_probe[Nquanted];
+  int<lower=1,upper=NqobjChannels>  quant2qobj_channel[Nquanted];
   int<lower=0,upper=1> quant_isreliable[Nquanted];
   int<lower=0> Nmissed;         // total number of missed quantobject-in-msprobes
-  int<lower=1,upper=NqobjProbes> miss2qobj_probe[Nmissed];
+  int<lower=1,upper=NqobjChannels> miss2qobj_channel[Nmissed];
   vector<lower=0>[Nquanted] qData; // quanted data
   vector<lower=0, upper=1>[Nmissed] missing_sigmoid_scale; // sigmoid scales for indiv. quantobject-in-msprobes (<1 for higher uncertainty)
 
@@ -73,11 +73,11 @@ data {
   int<lower=1, upper=obj_probeXbatcheff_Nw+1> obj_probeXbatcheff_u[NbatchEffects > 0 ? NobjProbes + 1 : 1];
   int<lower=1, upper=NobjBatchEffects> obj_probeXbatcheff_v[obj_probeXbatcheff_Nw];
 
-  // qobj_probeXqbatcheff (quantobject-in-msprobe X quantobject-quant_batch_effect) sparse matrix
-  int<lower=0> qobj_probeXqbatcheff_Nw;
-  vector[qobj_probeXqbatcheff_Nw] qobj_probeXqbatcheff_w;
-  int<lower=1, upper=qobj_probeXqbatcheff_Nw+1> qobj_probeXqbatcheff_u[NquantBatchEffects > 0 ? NqobjProbes + 1 : 1];
-  int<lower=1, upper=NqobjBatchEffects> qobj_probeXqbatcheff_v[qobj_probeXqbatcheff_Nw];
+  // qobj_channelXqbatcheff (quantobject-in-msprobe X quantobject-quant_batch_effect) sparse matrix
+  int<lower=0> qobj_channelXqbatcheff_Nw;
+  vector[qobj_channelXqbatcheff_Nw] qobj_channelXqbatcheff_w;
+  int<lower=1, upper=qobj_channelXqbatcheff_Nw+1> qobj_channelXqbatcheff_u[NquantBatchEffects > 0 ? NqobjChannels + 1 : 1];
+  int<lower=1, upper=NqobjBatchEffects> qobj_channelXqbatcheff_v[qobj_channelXqbatcheff_Nw];
 
   // global model constants
   real obj_labu_min; // minimal average abundance of an object
@@ -127,15 +127,15 @@ transformed data {
   int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
 
-  int<lower=1,upper=Nquantobjects> quant2quantobj[Nquanted] = qobj_probe2quantobj[quant2qobj_probe];
-  int<lower=1,upper=NobjProbes> quant2obj_probe[Nquanted] = qobj_probe2obj_probe[quant2qobj_probe];
+  int<lower=1,upper=Nquantobjects> quant2quantobj[Nquanted] = qobj_channel2quantobj[quant2qobj_channel];
+  int<lower=1,upper=NobjProbes> quant2obj_probe[Nquanted] = qobj_channel2obj_probe[quant2qobj_channel];
   int<lower=1,upper=NobjConditions> quant2obj_cond[Nquanted] = obj_probe2obj_cond[quant2obj_probe];
-  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted] = qobj_probe2mschannel[quant2qobj_probe];
+  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted] = qobj_channel2mschannel[quant2qobj_channel];
 
-  int<lower=1,upper=Nquantobjects> miss2quantobj[Nmissed] = qobj_probe2quantobj[miss2qobj_probe];
-  int<lower=1,upper=NobjProbes> miss2obj_probe[Nmissed] = qobj_probe2obj_probe[miss2qobj_probe];
+  int<lower=1,upper=Nquantobjects> miss2quantobj[Nmissed] = qobj_channel2quantobj[miss2qobj_channel];
+  int<lower=1,upper=NobjProbes> miss2obj_probe[Nmissed] = qobj_channel2obj_probe[miss2qobj_channel];
   int<lower=1,upper=NobjConditions> miss2obj_cond[Nmissed] = obj_probe2obj_cond[miss2obj_probe];
-  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed] = qobj_probe2mschannel[miss2qobj_probe];
+  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed] = qobj_channel2mschannel[miss2qobj_channel];
 
   int<lower=0,upper=NobjEffects> NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   int<lower=0,upper=NobjEffects> NobjEffectsOther = NobjEffects - NobjEffectsPos;
@@ -303,7 +303,7 @@ transformed parameters {
   vector[NobjProbes] obj_probe_labu; // obj_cond_labu + obj_probe_shift * obj_probe_shift_sigma
   vector[NobjProbes0 > 0 ? NobjProbes : 0] obj_probe_shift; // replicate shifts for all potential object-in-msprobes (including missing)
   vector[NobjBatchEffects > 0 ? NobjProbes : 0] obj_probe_batch_shift;
-  vector[NqobjBatchEffects > 0 ? NqobjProbes : 0] qobj_probe_batch_shift;
+  vector[NqobjBatchEffects > 0 ? NqobjChannels : 0] qobj_channel_batch_shift;
 
   vector[Nquantobjects] qobj_shift; // quantobject shift within object
 
@@ -342,13 +342,13 @@ transformed parameters {
     qobj_shift = rep_vector(0.0, Nquantobjects);
   }
 
-  // calculate qobj_probeXqbatch_shift (doesn't make sense to add to obj_probe_labu)
+  // calculate qobj_channelXqbatch_shift (doesn't make sense to add to obj_probe_labu)
   if (NqobjBatchEffects > 0) {
     vector[NqobjBatchEffects] qobj_batch_effect_sigma_pre; // AKA lambda_eta2 in rstanarm
     qobj_batch_effect_sigma_pre = square(qobj_batch_effect_lambda_a) .* qobj_batch_effect_lambda_t;
     qobj_batch_effect_sigma = sqrt(qobj_batch_effect_c2 * qobj_batch_effect_sigma_pre ./ (qobj_batch_effect_c2 + square(quant_batch_effect_tau) * qobj_batch_effect_sigma_pre)) * quant_batch_effect_tau;
     qobj_batch_effect = append_row(qobj_batch_effect_unscaled_pos, qobj_batch_effect_unscaled_other)[qobj_batch_effect_reshuffle] .* qobj_batch_effect_sigma;
-    qobj_probe_batch_shift = csr_matrix_times_vector(NqobjProbes, NqobjBatchEffects, qobj_probeXqbatcheff_w, qobj_probeXqbatcheff_v, qobj_probeXqbatcheff_u,
+    qobj_channel_batch_shift = csr_matrix_times_vector(NqobjChannels, NqobjBatchEffects, qobj_channelXqbatcheff_w, qobj_channelXqbatcheff_v, qobj_channelXqbatcheff_u,
                                                      qobj_batch_effect);
   }
 }
@@ -419,8 +419,8 @@ model {
             m_labu += qobj_shift[miss2quantobj];
 
             if (NqobjBatchEffects > 0) {
-                q_labu += qobj_probe_batch_shift[quant2qobj_probe];
-                m_labu += qobj_probe_batch_shift[miss2qobj_probe];
+                q_labu += qobj_channel_batch_shift[quant2qobj_channel];
+                m_labu += qobj_channel_batch_shift[miss2qobj_channel];
             }
         }
         if (NbatchEffects > 0) {
@@ -476,8 +476,8 @@ generated quantities {
         m_labu = obj_probe_labu[miss2obj_probe] + mschannel_shift[miss2mschannel] + qobj_shift[miss2quantobj];
 
         if (NqobjBatchEffects > 0) {
-            q_labu += qobj_probe_batch_shift[quant2qobj_probe];
-            m_labu += qobj_probe_batch_shift[miss2qobj_probe];
+            q_labu += qobj_channel_batch_shift[quant2qobj_channel];
+            m_labu += qobj_channel_batch_shift[miss2qobj_channel];
         }
         if (NbatchEffects > 0) {
           q_labu += obj_probe_batch_shift[quant2obj_probe];

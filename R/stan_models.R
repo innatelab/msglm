@@ -11,7 +11,7 @@ msglm.vars_info <- list(
   quantobjects = list(names=c('qobj_shift', 'qobj_llh'),
                       dims=c('quantobject')),
   #quantobject_batch_shifts = list(names=c('qobj_batch_shift'),
-  #                                dims=c('quantobject_msprobe')),
+  #                                dims=c('quantobject_mschannel')),
   quantobject_batch_effects = list(names=c('qobj_batch_effect', 'qobj_batch_effect_sigma'),
                                    dims=c('quantobject_batch_effect')),
   objects = list(names=c('obj_base_labu', 'obj_base_labu_replCI'), #"obj_base_repl_shift_sigma"),
@@ -163,12 +163,12 @@ to_standata.msglm_model_data <- function(model_data,
     qobj_data <- list(
       Nquantobjects = nrow(model_data$quantobjects),
       quantobj2obj = as.array(model_data$quantobjects$index_object),
-      NqobjProbes = nrow(model_data$msdata),
-      quant2qobj_probe = as.array(model_data$msdata$index_quantobject_msprobe[!is.na(model_data$msdata$index_qdata)]),
-      miss2qobj_probe = as.array(model_data$msdata$index_quantobject_msprobe[!is.na(model_data$msdata$index_mdata)]),
-      qobj_probe2quantobj = as.array(model_data$msdata$index_quantobject),
-      qobj_probe2mschannel = as.array(model_data$msdata$index_mschannel),
-      qobj_probe2obj_probe = as.array(model_data$msdata$index_object_msprobe),
+      NqobjChannels = nrow(model_data$msdata),
+      quant2qobj_channel = as.array(model_data$msdata$index_quantobject_mschannel[!is.na(model_data$msdata$index_qdata)]),
+      miss2qobj_channel = as.array(model_data$msdata$index_quantobject_mschannel[!is.na(model_data$msdata$index_mdata)]),
+      qobj_channel2quantobj = as.array(model_data$msdata$index_quantobject),
+      qobj_channel2mschannel = as.array(model_data$msdata$index_mschannel),
+      qobj_channel2obj_probe = as.array(model_data$msdata$index_object_msprobe),
       # TODO support different noise models
       Nmsprotocols = 0L,
       mschannel2msproto = integer(0),
@@ -187,7 +187,7 @@ to_standata.msglm_model_data <- function(model_data,
       NqobjBatchEffects = nrow(model_data$quantobject_batch_effects),
       qobj_batch_effect2quant_batch_effect = as.array(model_data$quantobject_batch_effects$index_quant_batch_effect)
     ) %>%
-    modifyList(matrix2stancsr(model_data$quantobject_msprobeXquant_batch_effect, "qobj_probeXqbatcheff"))
+    modifyList(matrix2stancsr(model_data$quantobject_mschannelXquant_batch_effect, "qobj_channelXqbatcheff"))
     res <- modifyList(res, qobj_data)
   } else {
     if (rlang::has_name(model_def, "quant_batch_effects")) {

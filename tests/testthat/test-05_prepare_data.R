@@ -300,3 +300,78 @@ test_that(paste0(obj, "/pepmodstate model, msfractions, ",
 })
 
 }}}
+
+test_that("Technical MS replicates are supported", {
+    msprobes_df <- tidyr::expand_grid(condition = conditions_df$condition,
+                                      replicate = 1:4) %>%
+               dplyr::mutate(msprobe = paste0(condition, "_", replicate))
+    mschannels_df <- tidyr::expand_grid(msprobe = msprobes_df$msprobe,
+                                        tech_replicate = 1:2) %>%
+               dplyr::left_join(dplyr::select(msprobes_df, msprobe, condition), by="msprobe") %>%
+               dplyr::mutate(mschannel = paste0(msprobe, "_", tech_replicate))
+    mschannel_shifts_df <- tibble(mschannel = mschannels_df$mschannel,
+                                  total_mschannel_shift = rnorm(nrow(mschannels_df), 0.0, 0.1))
+
+    test_that("Technical MS replicates are supported on pepmodstate level", {
+        orig_msdata <- gen_msdata(model_def, mschannels_df, msprobe = "msprobe", mschannel = "mschannel",
+                                  object = "protgroup", quantobject = "pepmodstate", nobjects=3)
+        msdata <- import_msglm_data(orig_msdata, model_def,
+                                    object="protgroup", quantobject="pepmodstate",
+                                    mscalib=mscalib)
+        msdata$mschannel_shifts <- mschannel_shifts_df
+        model_data <- msglm_data(model_def, msdata, 1L)
+        expect_s3_class(model_data, "msglm_model_data")
+        expect_equal(nrow(model_data$msprobes), nrow(msprobes_df))
+        expect_equal(nrow(model_data$mschannels), nrow(mschannels_df))
+        stan_data <- to_standata(model_data)
+        expect_list(stan_data)
+
+        test_that("Technical MS replicates + quant batch effects work", {
+            mschannels_be_df <- dplyr::mutate(dplyr::left_join(mschannels_df, dplyr::select(msprobes_df, msprobe, replicate),
+                                                               by="msprobe"),
+                                              batch = LETTERS[pmin(3L, 1L + (replicate + tech_replicate) %% 4)])
+            batch_effect_mtx <- model.matrix(~ 1 + batch, data = mschannels_be_df)
+            batch_effect_mtx <- batch_effect_mtx[, -1, drop=FALSE]
+            dimnames(batch_effect_mtx) <- list(mschannel = mschannels_be_df$mschannel,
+                                               quant_batch_effect = colnames(batch_effect_mtx))
+
+            model_def_be <- set_batch_effects(model_def, batch_effect_mtx, applies_to = "quantobject")
+            expect_matrix(model_def_be$mschannelXquantBatchEffect, any.missing = FALSE,
+                          nrows=nrow(mschannels_be_df), ncols=n_distinct(mschannels_be_df$batch) - 1L)
+            expect_data_frame(model_def_be$quant_batch_effects, nrows=n_distinct(mschannels_be_df$batch) - 1L)
+            model_data_be <- msglm_data(model_def_be, msdata, 1L)
+            expect_data_frame(model_data_be$quantobject_batch_effects)
+            expect_names(names(model_data_be$quantobject_batch_effects),
+                         must.include = c("quantobject_batch_effect", "quant_batch_effect", "index_quantobject"))
+            expect_matrix(model_data_be$quantobject_msprobeXquant_batch_effect, any.missing = FALSE,
+                          nrows = nrow(model_data_be$msdata),
+                          ncols = nrow(model_data_be$quantobject_batch_effects))
+            stan_data_be <- to_standata(model_data_be)
+            expect_equal(stan_data_be$NquantBatchEffects, n_distinct(mschannels_be_df$batch) - 1L)
+            expect_equal(stan_data_be$NqobjBatchEffects, nrow(model_data_be$quantobject_batch_effects))
+        })
+    })
+
+    test_that("Technical MS replicates are supported on protgroup level", {
+        orig_msdata <- gen_msdata(model_def, mschannels_df, msprobe = "msprobe", mschannel = "mschannel",
+                                  object = "protgroup", quantobject = NA_character_, nobjects=3)
+        msdata <- import_msglm_data(orig_msdata, model_def,
+                                    object="protgroup", quantobject="protgroup",
+                                    mscalib=mscalib, verbose=TRUE)
+        msdata$mschannel_shifts <- mschannel_shifts_df
+        model_data <- msglm_data(model_def, msdata, 1L)
+        expect_s3_class(model_data, "msglm_model_data")
+        expect_data_frame(model_data$msprobes, nrows=nrow(msprobes_df))
+        expect_data_frame(model_data$mschannels, nrows=nrow(mschannels_df))
+        stan_data <- to_standata(model_data)
+        expect_list(stan_data)
+        expect_equal(stan_data$Nprobes, nrow(msprobes_df))
+        expect_equal(stan_data$Nmschannels, nrow(mschannels_df))
+        expect_integer(stan_data$quant2mschannel,
+                       lower=1, upper=stan_data$Nmschannels,
+                       len=sum(model_data$msdata$is_observed))
+        expect_integer(stan_data$miss2mschannel,
+                       lower=1, upper=stan_data$Nmschannels,
+                       len=sum(!model_data$msdata$is_observed))
+    })
+})

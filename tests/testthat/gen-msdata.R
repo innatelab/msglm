@@ -65,10 +65,16 @@ gen_obj_conditions <- function(model_def, objXeffects_df) {
     }) %>% dplyr::ungroup()
 }
 
-gen_obj_intensities <- function(objconds_df, msprobes_df, labu_base_shift = 0.0, replicate_sigma = 0.1) {
-    dplyr::inner_join(objconds_df, dplyr::select(msprobes_df, msprobe, condition), by="condition") %>%
+gen_obj_intensities <- function(objconds_df, mschannels_df, labu_base_shift = 0.0,
+                                replicate_sigma = 0.1, tech_replicate_sigma = 0.1) {
+    dplyr::inner_join(objconds_df, dplyr::select(mschannels_df, msprobe, condition) %>% dplyr::distinct(), by="condition") %>%
     dplyr::mutate(replicate_shift = rnorm(n(), 0, replicate_sigma),
-                  intensity = 2^(value + replicate_shift + labu_base_shift))
+                  intensity = 2^(value + replicate_shift + labu_base_shift)) %>%
+    dplyr::inner_join(dplyr::select(mschannels_df, mschannel, msprobe), by="msprobe") %>%
+    dplyr::group_by(!!!syms(names(objconds_df)), msprobe) %>%
+    dplyr::mutate(tech_replicate_shift = if(n() > 1) rnorm(n(), 0, tech_replicate_sigma) else 0) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(intensity = intensity * 2^tech_replicate_shift)
 }
 
 gen_quantobj_intensities <- function(objconds_df, quantobjs_df, mschannels_df,
@@ -91,6 +97,7 @@ gen_msdata <- function(model_def, mschannels_df,
     res$object_effects <- gen_obj_effects(objects$objects, model_def$effects)
     res$object_conditions <- gen_obj_conditions(model_def, res$object_effects)
     intensities_cols <- c("intensity")
+    intensities_cols[[mschannel]] <- "mschannel"
     #if (rlang::has_name(mschannels_df, "msfraction")) {
     #    intensities_cols[[msfraction]] <- "msfraction"
     #}
@@ -109,7 +116,6 @@ gen_msdata <- function(model_def, mschannels_df,
                                                              !!sym(msfraction) := msfraction)
         }
         intensities_cols[[paste0(quantobject, "_id")]] <- "quantobj_id"
-        intensities_cols[[mschannel]] <- "mschannel"
         res[[paste0(quantobject, "_intensities")]] <- gen_quantobj_intensities(res$object_conditions, objects$quantobjects, mschannels_df) %>%
             dplyr::select_at(intensities_cols)
         res[[paste0(object, "2pepmod")]] <- dplyr::select_at(objects$pepmods, paste0(c(object, "pepmod"), "_id")) %>%
@@ -118,12 +124,11 @@ gen_msdata <- function(model_def, mschannels_df,
             dplyr::mutate(is_specific = TRUE)
     } else {
         intensities_cols[[paste0(object, "_id")]] <- "obj_id"
-        intensities_cols[[msprobe]] <- "msprobe"
         res[[paste0(object, "_intensities")]] <- gen_obj_intensities(res$object_conditions, mschannels_df) %>%
             dplyr::select_at(intensities_cols)
     }
     mschan_cols <- character()
-    for (col in c('condition', 'replicate', 'raw_file', 'rawfile')) {
+    for (col in c('condition', 'replicate', 'tech_replicate', 'raw_file', 'rawfile')) {
         if (rlang::has_name(mschannels_df, col)) {
             mschan_cols <- append(mschan_cols, col)
         }

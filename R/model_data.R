@@ -254,6 +254,8 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
                     model_data$msdata$index_quantobject_msprobe
                   } else integer(0),
             cols = model_data$quantobject_batch_effects$quantobject_batch_effect)
+  } else if (rlang::has_name(model_def, "mschannelXquantBatchEffect")) {
+      warning("Object-level model data specifies quant_batch_effects matrix. The inference would ignore it, please specify batch effects at the object-level")
   }
 
   return(model_data)
@@ -409,12 +411,15 @@ prepare_msdata <- function(model_data, msdata, verbose = model_data$model_def$ve
   if (obj == quantobj) {
     # obj is quanted directly
     intensities_df <- dplyr::select(msdata[[intensities_dfname]],
-                                    object_id=!!sym(obj_idcol), msprobe=!!sym(msprb_idcol),
+                                    object_id=!!sym(obj_idcol), mschannel=!!sym(mschan_idcol),
                                     intensity, any_of("ident_type"))
     msdata_df <- dplyr::left_join(model_data$object_msprobes,
-                                  intensities_df, by = c("object_id", "msprobe")) %>%
+                                  dplyr::select(model_data$mschannels, index_mschannel, mschannel, index_msprobe,
+                                                index_msprotocol, any_of(c("msfraction", "msprotocol"))),
+                                  by = "index_msprobe") %>%
+                 dplyr::left_join(intensities_df, by = c("object_id", "mschannel")) %>%
         annotate_msdata(model_def) %>%
-        dplyr::arrange(index_object_msprobe)
+        dplyr::arrange(index_object, index_mschannel)
   } else {
     # quant specific quantobjects of object
     obj2quantobj_df <- msdata[[paste0(obj, "2", quantobj)]]

@@ -12,6 +12,8 @@ data {
   int<lower=1,upper=Nobjects> obj_cond2obj[NobjConditions];
 
   int<lower=1> Nprobes;         // number of MS probes (= MS channels)
+  int<lower=Nprobes> Nmschannels; // number of mschannels (MS probe X MS fraction)
+  int<lower=1, upper=Nprobes> mschannel2probe[Nmschannels];
   vector[Nprobes] mschannel_shift;
 
   int<lower=0> NobjProbes;      // number of object-in-msprobe pairs with MS data
@@ -21,9 +23,11 @@ data {
   // map from quantitations/missings to object-in-msprobe
   int<lower=0> Nquanted;        // total number of quantified object-in-msprobes
   int<lower=1,upper=NobjProbes>  quant2obj_probe[Nquanted];
+  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted];
   int<lower=0,upper=1> quant_isreliable[Nquanted];
   int<lower=0> Nmissed;         // total number of missed object-in-msprobes
   int<lower=1,upper=NobjProbes> miss2obj_probe[Nmissed];
+  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed];
   vector<lower=0>[Nquanted] qData; // quanted data
   vector<lower=0, upper=1>[Nmissed] missing_sigmoid_scale; // sigmoid scales for indiv. object-in-msprobes (<1 for higher uncertainty)
 
@@ -98,11 +102,8 @@ transformed data {
   int<lower=0,upper=Nquanted> NreliableQuants = sum(quant_isreliable);
   int<lower=1,upper=Nquanted> reliable_quants[NreliableQuants];
 
-  int<lower=1> Nmschannels = Nprobes;
   int<lower=1,upper=NobjConditions> quant2obj_cond[Nquanted] = obj_probe2obj_cond[quant2obj_probe];
-  int<lower=1,upper=Nmschannels> quant2mschannel[Nquanted] = obj_probe2probe[quant2obj_probe];
   int<lower=1,upper=NobjConditions> miss2obj_cond[Nmissed] = obj_probe2obj_cond[miss2obj_probe];
-  int<lower=1,upper=Nmschannels> miss2mschannel[Nmissed] = obj_probe2probe[miss2obj_probe];
 
   int<lower=0,upper=NobjEffects> NobjEffectsPos = sum(effect_is_positive[obj_effect2effect]);
   int<lower=0,upper=NobjEffects> NobjEffectsOther = NobjEffects - NobjEffectsPos;

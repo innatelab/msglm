@@ -190,8 +190,13 @@ to_standata.msglm_model_data <- function(model_data,
     modifyList(matrix2stancsr(model_data$quantobject_msprobeXquant_batch_effect, "qobj_probeXqbatcheff"))
     res <- modifyList(res, qobj_data)
   } else {
+    if (rlang::has_name(model_def, "quant_batch_effects")) {
+      stop("Object-level model data provides quant_batch_effects, please rerun msglm_data().")
+    }
     res$quant2obj_probe <- as.array(model_data$msdata$index_object_msprobe[!is.na(model_data$msdata$index_qdata)])
+    res$quant2mschannel <- as.array(model_data$msdata$index_mschannel[!is.na(model_data$msdata$index_qdata)])
     res$miss2obj_probe <- as.array(model_data$msdata$index_object_msprobe[!is.na(model_data$msdata$index_mdata)])
+    res$miss2mschannel <- as.array(model_data$msdata$index_mschannel[!is.na(model_data$msdata$index_mdata)])
   }
   if (rlang::has_name(model_data, 'index_msprotocol')) {
     res$Nmsprotocols <- n_distinct(model_data$mschannels$index_msprotocol)

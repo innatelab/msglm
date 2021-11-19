@@ -50,9 +50,9 @@ test_that(paste0(obj, "/", obj, " model, no msfractions, ",
                               object = obj, nobjects = 3)
     msprobes_dfname <- paste0(msprobe, "s")
     if (!(msprobe %in% c("msrun", "mschannel"))) {
-        # add raw_file column to facilitate autodetection
+        # add rawfile column to facilitate autodetection
         orig_msdata[[msprobes_dfname]] <- dplyr::mutate(orig_msdata[[msprobes_dfname]],
-                                                        raw_file = paste0(!!sym(msprobe), ".raw"))
+                                                        rawfile = paste0(!!sym(msprobe), ".raw"))
     }
 
     test_that(paste0("import fails if no ", msprobe, " data provided"), {
@@ -63,7 +63,7 @@ test_that(paste0(obj, "/", obj, " model, no msfractions, ",
         bad_msdata <- orig_msdata
         if (!(msprobe %in% c("msrun", "mschannel"))) {
             bad_msdata[[msprobes_dfname]] <- dplyr::mutate(orig_msdata[[msprobes_dfname]],
-                                                           raw_file = NULL)
+                                                           rawfile = NULL)
             expect_error(import_msglm_data(bad_msdata, model_def, mscalib, object=obj),
                          "Cannot autodetect MS channels")
         }
@@ -140,7 +140,7 @@ test_that(paste0(obj, "/pepmodstate model, no msfractions, ",
                               object = obj, quantobject = "pepmodstate", nobjects=3)
     msprobes_dfname <- paste0(msprobe, "s")
     orig_msdata[[msprobes_dfname]] <- dplyr::rename(msprobes_df, !!sym(msprobe) := msprobe) %>%
-        dplyr::mutate(raw_file = paste0(!!sym(msprobe), ".raw"))
+        dplyr::mutate(rawfile = paste0(!!sym(msprobe), ".raw"))
     if (msprobe != "msprobe") {
         orig_msdata[[msprobes_dfname]]$msprobe <- NULL
     }
@@ -181,8 +181,8 @@ test_that(paste0(obj, "/pepmodstate model, msfractions, ",
                                        mschannel = paste0(mschannel, "_", mstag))
     }
     mschannels_df <- dplyr::mutate(mschannels_df,
-                                   raw_file = paste0(condition, '_', replicate,
-                                                     '_F', msfraction, ".raw"))
+                                   rawfile = paste0(condition, '_', replicate,
+                                                    '_F', msfraction, ".raw"))
     orig_msdata <- gen_msdata(model_def, mschannels_df, msprobe = msprobe, mschannel = mschannel,
                               object = obj, quantobject = "pepmodstate", nobjects=3)
     msprobes_dfname <- paste0(msprobe, "s")

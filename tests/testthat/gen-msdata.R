@@ -128,7 +128,7 @@ gen_msdata <- function(model_def, mschannels_df,
             dplyr::select_at(intensities_cols)
     }
     mschan_cols <- character()
-    for (col in c('condition', 'replicate', 'tech_replicate', 'raw_file', 'rawfile')) {
+    for (col in c('condition', 'replicate', 'tech_replicate', 'rawfile')) {
         if (rlang::has_name(mschannels_df, col)) {
             mschan_cols <- append(mschan_cols, col)
         }

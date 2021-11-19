@@ -304,7 +304,7 @@ import_msglm_data <- function(msdata, model_def = NULL,
   } else if (!is.na(msfraction)) {
     stop("MS entities declared to contain fractions (", msfraction,
           " column), but no MS channels/MS runs frame found")
-  } else if (is.na(mschannel) && is.na(msfraction) && rlang::has_name(msprbs_df, "raw_file")) {
+  } else if (is.na(mschannel) && is.na(msfraction) && rlang::has_name(msprbs_df, "rawfile")) {
     mschan <- msprb
     mschans_dfname <- msprbs_dfname
     mschans_df <- msprbs_df

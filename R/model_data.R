@@ -108,6 +108,9 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
     if (msprb_dim != msprb_idcol) {
       stop("Name of model_def$", msprobeXeffect_name, " rows dimension (", msprb_dim, ") inconsistent with ", msprb_idcol)
     }
+    checkmate::assert_set_equal(rownames(model_def[[msprobeXeffect_name]]),
+                                model_data$msprobes$msprobe)
+
     obj_probeXeff_df <- dplyr::full_join(matrix2frame(model_def[[msprobeXeffect_name]], row_col="condition", col_col = msprb_idcol),
                                          dplyr::select(model_data$objects, index_object, object_id),
                                          by = character()) %>%
@@ -128,6 +131,8 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
     batch_effects_df <- model_def$batch_effects
     if (verbose) message(nrow(batch_effects_df), " batch effects on ",
                          msprb, " level defined")
+    checkmate::assert_set_equal(rownames(msprobeXbatchEffect),
+                                model_data$msprobes$msprobe)
   } else {
     if (verbose) message("No batch effects defined")
     msprobeXbatchEffect <- constant_matrix(0, list(msprobe = character(0),
@@ -140,8 +145,8 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
                                             dplyr::select(model_data$objects, index_object, object_id, object_label),
                                             by = character()) %>%
     dplyr::inner_join(dplyr::select(batch_effects_df, batch_effect, index_batch_effect), by="batch_effect") %>%
-    dplyr::left_join(dplyr::select(model_data$object_msprobes, msprobe, index_object, index_object_msprobe),
-                     by=c("index_object", "msprobe")) %>%
+    dplyr::inner_join(dplyr::select(model_data$object_msprobes, msprobe, index_object, index_object_msprobe),
+                      by=c("index_object", "msprobe")) %>%
     dplyr::mutate(object_batch_effect = paste0(batch_effect, '@', object_id))
   model_data$object_batch_effects <- dplyr::select(obj_probeXbatcheff_df,
                                                    object_batch_effect,

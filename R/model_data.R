@@ -103,19 +103,22 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
   msprb <- model_data$msentities[['msprobe']]
   msprb_idcol <- msprb
   if (rlang::has_name(model_def, "msprobeXeffect")) {
-    if (verbose) message("Using model_def$", msprobeXeffect_name, " for per-", msprobe, " design matrix")
-    msprb_dim <- names(dimnames(model_def[[msprobeXeffect_name]]))[[1]]
+    if (verbose) message("Using model_def$", msprobeXeffect_name, " for per-", msprb, " design matrix")
+    msprbXeff_mtx <- model_def[[msprobeXeffect_name]]
+    msprb_dim <- names(dimnames(msprbXeff_mtx))[[1]]
     if (msprb_dim != msprb_idcol) {
       stop("Name of model_def$", msprobeXeffect_name, " rows dimension (", msprb_dim, ") inconsistent with ", msprb_idcol)
     }
-    checkmate::assert_set_equal(rownames(model_def[[msprobeXeffect_name]]),
-                                model_data$msprobes$msprobe)
+    checkmate::assert_set_equal(rownames(msprbXeff_mtx), model_data$msprobes$msprobe,
+                                .var.name = paste0("rownames(model_def$", msprobeXeffect_name, ")"))
+    checkmate::assert_set_equal(colnames(msprbXeff_mtx), model_def$effects$effect,
+                                .var.name = paste0("colnames(model_def$", msprobeXeffect_name, ")"))
 
-    obj_probeXeff_df <- dplyr::full_join(matrix2frame(model_def[[msprobeXeffect_name]], row_col="condition", col_col = msprb_idcol),
+    obj_probeXeff_df <- dplyr::full_join(matrix2frame(msprbXeff_mtx, row_col="msprobe", col_col = "effect"),
                                          dplyr::select(model_data$objects, index_object, object_id),
                                          by = character()) %>%
-      dplyr::inner_join(dplyr::select(model_data$object_msprobes, index_object_msprobe, index_object, index_mschannel, !!sym(msprb_idcol)),
-                        by=c("index_object", msprb_idcol)) %>%
+      dplyr::inner_join(dplyr::select(model_data$object_msprobes, index_object_msprobe, index_object, msprobe),
+                        by=c("index_object", "msprobe")) %>%
       dplyr::mutate(object_effect = paste0(effect, '@', object_id))
   } else {
     obj_probeXeff_df <- dplyr::inner_join(obj_condXeff_df,
@@ -722,10 +725,10 @@ msglm_data <- function(model_def, msdata, object_ids,
     dplyr::arrange(dplyr::across(c(index_condition, any_of(c("mstag", "msexperiment")), msprobe)))
   if (rlang::has_name(model_def, "msprobeXeffect")) {
     msprb_dim <- names(dimnames(model_def$msprobeXeffect))
-    if (msprb_dim != msprb_idcol) {
+    if (msprb_dim[[1]] != msprb_idcol) {
       stop("MS experiments object (", msprb_idcol, ") does not match",
            " the name of model_def$msprobeXeffect rows dimension (",
-           msprb_dim, ")")
+           msprb_dim[[1]], ")")
     }
     msprobes_order <- rownames(model_def$msprobeXeffect)
   } else {

@@ -131,6 +131,18 @@ test_that(paste0(obj, "/", obj, " model, no msfractions, ",
     expect_equal(unique(model_data2$objects$object_id), 2L)
 
     expect_error(msglm_data(model_def, msdata, 5L), "Objects not found")
+
+    test_that(paste0(msprobe, "Xeffect matrix could be used for the model"), {
+        msprobeXeffect <- model.matrix(~ 1 + infection * treatment,
+                                       data = dplyr::inner_join(msprobes_df, conditions_df, by="condition"))
+        msprobeXeffect <- msprobeXeffect[, -1, drop=FALSE]
+        rownames(msprobeXeffect) <- msprobes_df$msprobe
+        names(dimnames(msprobeXeffect)) <- c(msprobe, "effect")
+        msprobe_model_def <- msglm_model(conditionXeffect, conditions_df, effects_df, msprobeXeffect = msprobeXeffect)
+
+        model_data3 <- msglm_data(msprobe_model_def, msdata, 2L)
+        expect_s3_class(model_data3, "msglm_model_data")
+    })
 })
 
 test_that(paste0(obj, "/pepmodstate model, no msfractions, ",

@@ -102,7 +102,7 @@ prepare_expanded_effects <- function(model_data, verbose=model_data$model_def$ve
   msprobeXeffect_name <- "msprobeXeffect"
   msprb <- model_data$msentities[['msprobe']]
   msprb_idcol <- msprb
-  if (rlang::has_name(model_def, "msprobeXeffect")) {
+  if (rlang::has_name(model_def, msprobeXeffect_name)) {
     if (verbose) message("Using model_def$", msprobeXeffect_name, " for per-", msprb, " design matrix")
     msprbXeff_mtx <- model_def[[msprobeXeffect_name]]
     msprb_dim <- names(dimnames(msprbXeff_mtx))[[1]]

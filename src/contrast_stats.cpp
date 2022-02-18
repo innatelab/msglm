@@ -34,7 +34,7 @@ name_index_map_t nameToIndexMap( const strings& strs )
 }
 
 #if 0 // unsupported default params
-writable::data_frame ContrastStatistics(
+cpp11::writable::data_frame ContrastStatistics(
         doubles   X,
         integers  col2group_col,
         integers  col2group_group,
@@ -42,7 +42,7 @@ writable::data_frame ContrastStatistics(
         doubles  contrast_offsets,
         int   nsteps = 100,
         double maxBandwidth = na<double>(),
-        doubles  quant_probs = writable::doubles{0.025, 0.25, 0.50, 0.75, 0.975},
+        doubles  quant_probs = cpp11::writable::doubles{0.025, 0.25, 0.50, 0.75, 0.975},
         double mlog10pvalue_threshold = 10.0,
         double mlog10pvalue_hard_threshold_factor = 3.0
 #endif
@@ -123,12 +123,12 @@ data_frame ContrastStatistics(
     }
   }
 
-  writable::integers index_contrast;
-  writable::doubles probs_nonpos;
-  writable::doubles probs_nonneg;
-  writable::doubles nperms;
+  cpp11::writable::integers index_contrast;
+  cpp11::writable::doubles probs_nonpos;
+  cpp11::writable::doubles probs_nonneg;
+  cpp11::writable::doubles nperms;
 
-  writable::list extra_dfs{};
+  cpp11::writable::list extra_dfs{};
 
   // generate contrast samples for all relevant columns combinations
   LOG_DEBUG1("Calculating the probabilities that contrast is non-positive and non-negative");
@@ -230,7 +230,7 @@ data_frame ContrastStatistics(
   LOG_DEBUG2("composing resulting data.frame");
   static auto bindcols = package("dplyr")["bind_cols"];
   static auto bindrows = package("dplyr")["bind_rows"];
-  data_frame res_df = writable::data_frame{
+  data_frame res_df = cpp11::writable::data_frame{
       "__contrast_ix__"_nm = index_contrast,
       "prob_nonneg"_nm = probs_nonneg,
       "prob_nonpos"_nm = probs_nonpos,
@@ -264,8 +264,8 @@ private:
   size_t nperms_;
 
   size_t perm_i_;
-  writable::doubles contrast_draws_;
-  writable::integers contrast_draws_dims_;
+  cpp11::writable::doubles contrast_draws_;
+  cpp11::writable::integers contrast_draws_dims_;
 
 public:
   DrawsContrastCalculator(doubles draws, sexp summaryfun,
@@ -292,7 +292,7 @@ public:
     nchains_ = draw_dims[1];
     nvars_ = draw_dims[2];
     LOG_DEBUG1("nmcmc_iters=%ld nchains=%ld nvars=%ld", niters_, nchains_, nvars_);
-    contrast_draws_.attr("class") = writable::strings{"array"};
+    contrast_draws_.attr("class") = cpp11::writable::strings{"array"};
     contrast_draws_dims_[1] = nchains_;
   }
 
@@ -361,7 +361,7 @@ public:
 
     static auto bindcols = package("dplyr")["bind_cols"];
 
-    const data_frame bw_df = writable::data_frame{
+    const data_frame bw_df = cpp11::writable::data_frame{
                                 "bandwidth"_nm = cur_bw,
                                 "bin_width"_nm = contrast_bins.step};
     const data_frame summary_df = !Rf_isNull(summaryfun_) ?

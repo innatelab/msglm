@@ -17,17 +17,17 @@ using boost::math::normal; // typedef provides default type is double.
 using namespace cpp11;
 
 #if 0 // unsupported default params
-writable::data_frame CloudsOverlap(
+cpp11::writable::data_frame CloudsOverlap(
         doubles_matrix<by_column>  X,
         doubles_matrix<by_column>  Y,
         double maxBandwidth = na<double>(),
         int   nsteps = 100,
-        doubles quant_probs = writable::doubles{0.025, 0.25, 0.50, 0.75, 0.975}
+        doubles quant_probs = cpp11::writable::doubles{0.025, 0.25, 0.50, 0.75, 0.975}
 )
 #endif
 
 [[cpp11::register]]
-writable::data_frame CloudsOverlap(
+cpp11::writable::data_frame CloudsOverlap(
     doubles_matrix<by_column>  X,
     doubles_matrix<by_column>  Y,
     double maxBandwidth,
@@ -108,8 +108,8 @@ writable::data_frame CloudsOverlap(
     //LOG_DEBUG0("prob_avg=%g", prob_sum/nsamples);
     //LOG_DEBUG0("offset_avg=%g", offset_sum/nsamples);
     //LOG_DEBUG0("scale_avg=%g", scale_sum/nsamples);
-    return ( writable::data_frame{
-              "offset"_nm = writable::doubles{offset_sum/nsamples},
-              "scale"_nm = writable::doubles{scale_sum/nsamples},
-              "prob_further"_nm = writable::doubles{prob_sum/nsamples} } );
+    return ( cpp11::writable::data_frame{
+              "offset"_nm = cpp11::writable::doubles{offset_sum/nsamples},
+              "scale"_nm = cpp11::writable::doubles{scale_sum/nsamples},
+              "prob_further"_nm = cpp11::writable::doubles{prob_sum/nsamples} } );
 }

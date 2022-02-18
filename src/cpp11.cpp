@@ -6,7 +6,7 @@
 #include <R_ext/Visibility.h>
 
 // cloud_stats.cpp
-writable::data_frame CloudsOverlap(doubles_matrix<by_column>  X, doubles_matrix<by_column>  Y, double maxBandwidth, int   nsteps, doubles quant_probs);
+cpp11::writable::data_frame CloudsOverlap(doubles_matrix<by_column>  X, doubles_matrix<by_column>  Y, double maxBandwidth, int   nsteps, doubles quant_probs);
 extern "C" SEXP _msglm_CloudsOverlap(SEXP X, SEXP Y, SEXP maxBandwidth, SEXP nsteps, SEXP quant_probs) {
   BEGIN_CPP11
     return cpp11::as_sexp(CloudsOverlap(cpp11::as_cpp<cpp11::decay_t<doubles_matrix<by_column> >>(X), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<by_column> >>(Y), cpp11::as_cpp<cpp11::decay_t<double>>(maxBandwidth), cpp11::as_cpp<cpp11::decay_t<int  >>(nsteps), cpp11::as_cpp<cpp11::decay_t<doubles>>(quant_probs)));

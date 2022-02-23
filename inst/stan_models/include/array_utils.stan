@@ -11,7 +11,7 @@
     // distinct elements of ixs
     int[] distinct(int[] ixs, int maxix) {
       int ixs_pos[maxix] = rep_array(0, maxix);
-      int ixs_distinct[ndistinct(ixs, maxix)] = rep_array(0, maxix);
+      int ixs_distinct[ndistinct(ixs, maxix)] = rep_array(0, ndistinct(ixs, maxix));
       int offset = 0;
       for (ix in ixs) {
         if (ixs_pos[ix] == 0) {

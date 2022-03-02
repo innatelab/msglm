@@ -249,11 +249,11 @@ msglm_model_names <- function() {
   list.files(pattern="\\.stan$") %>% sapply(basename) %>% str_remove("\\.stan$")
 }
 
-msglm_stan_model <- function(model_name) {
+msglm_stan_model <- function(model_name, ...) {
   stan_models_path <- system.file('stan_models', package="msglm", mustWork=FALSE)
   message("Loading ", model_name, " Stan model")
   return (cmdstanr::cmdstan_model(file.path(stan_models_path, paste0(model_name, ".stan")),
-                                  include_paths = stan_models_path))
+                                  include_paths = stan_models_path, ...))
 }
 
 stan_model_name <- function(standata) {
